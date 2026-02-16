@@ -111,6 +111,10 @@ Supported annotation types:
 - `single_choice` - Radio button selection
 - `multi_choice` - Checkbox selection (multiple allowed)
 - `span_annotation` - Text highlighting with entity type labeling
+  - Copy/paste or type text from the document
+  - Select entity type
+  - Click "Add Annotation" to highlight the text
+  - Click × to remove annotations
 - `free_text` - Open text field
 
 ## Output

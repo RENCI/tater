@@ -33,7 +33,9 @@ def create_document_viewer() -> dbc.Card:
                             "overflowY": "auto",
                             "backgroundColor": "#f8f9fa",
                             "border": "1px solid #dee2e6",
-                            "borderRadius": "4px"
+                            "borderRadius": "4px",
+                            "userSelect": "text",
+                            "cursor": "text"
                         }
                     )
                 ]
@@ -63,6 +65,7 @@ def format_document_text(
     if not span_annotations:
         return html.Pre(
             text,
+            id="document-text",
             style={
                 "whiteSpace": "pre-wrap",
                 "fontFamily": "monospace",
@@ -73,7 +76,9 @@ def format_document_text(
                 "overflowY": "auto",
                 "backgroundColor": "#f8f9fa",
                 "border": "1px solid #dee2e6",
-                "borderRadius": "4px"
+                "borderRadius": "4px",
+                "userSelect": "text",
+                "cursor": "text"
             }
         )
     
@@ -119,6 +124,7 @@ def format_document_text(
     
     return html.Pre(
         children,
+        id="document-text",
         style={
             "whiteSpace": "pre-wrap",
             "fontFamily": "monospace",
@@ -129,7 +135,9 @@ def format_document_text(
             "overflowY": "auto",
             "backgroundColor": "#f8f9fa",
             "border": "1px solid #dee2e6",
-            "borderRadius": "4px"
+            "borderRadius": "4px",
+            "userSelect": "text",
+            "cursor": "text"
         }
     )
 

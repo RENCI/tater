@@ -112,6 +112,7 @@ app.layout = html.Div([
     dcc.Store(id="dirty-state-store", data=False),
     dcc.Store(id="documents-file-content", data=None),
     dcc.Store(id="schema-file-content", data=None),
+    dcc.Store(id="selected-text-store", data=None),
     dcc.Interval(id="auto-save-interval", interval=AUTO_SAVE_INTERVAL, n_intervals=0),
     html.Div(id="main-content", children=create_startup_screen())
 ])
@@ -290,7 +291,7 @@ def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
 
 
 @app.callback(
-    [Output("document-text", "children"),
+    [Output("document-text-container", "children"),
      Output("document-metadata", "children"),
      Output("annotation-controls-container", "children"),
      Output("flag-for-review", "value"),
@@ -404,6 +405,188 @@ def update_document_display(current_index, documents, schema_data, annotations_d
 def mark_dirty(annotation_values, flagged):
     """Mark annotations as having unsaved changes."""
     return True
+
+
+@app.callback(
+    [Output({"type": "annotation-input", "id": ALL}, "data"),
+     Output({"type": "span-status", "id": ALL}, "children"),
+     Output({"type": "span-text-input", "id": ALL}, "value"),
+     Output({"type": "entity-type-selector", "id": ALL}, "value"),
+     Output("document-text-container", "children", allow_duplicate=True),
+     Output("span-annotations-list", "children", allow_duplicate=True)],
+    Input({"type": "add-span", "id": ALL}, "n_clicks"),
+    [State({"type": "span-text-input", "id": ALL}, "value"),
+     State({"type": "entity-type-selector", "id": ALL}, "value"),
+     State({"type": "annotation-input", "id": ALL}, "data"),
+     State("current-index-store", "data"),
+     State("documents-store", "data"),
+     State("schema-store", "data"),
+     State("annotations-store", "data")],
+    prevent_initial_call=True
+)
+def add_span_annotation(n_clicks_list, text_inputs, entity_types, span_data_list, 
+                       current_index, documents, schema_data, annotations_data):
+    """Add a span annotation when button is clicked."""
+    if not ctx.triggered_id or not any(n_clicks_list):
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    
+    # The triggered_id contains the annotation type ID
+    annotation_type_id = ctx.triggered_id["id"]
+    
+    # Find the index in the schema for this annotation type
+    from data.validator import AnnotationSchema
+    schema = AnnotationSchema(**schema_data)
+    
+    schema_index = None
+    span_control_index = None
+    span_count = 0
+    
+    for i, ann_type in enumerate(schema.annotation_types):
+        if ann_type.type == "span_annotation":
+            if ann_type.id == annotation_type_id:
+                schema_index = i
+                span_control_index = span_count
+            span_count += 1
+    
+    if schema_index is None or span_control_index is None:
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    
+    # Get input values for this specific span annotation type
+    text_input = text_inputs[span_control_index] if span_control_index < len(text_inputs) else None
+    entity_type = entity_types[span_control_index] if span_control_index < len(entity_types) else None
+    current_spans = span_data_list[schema_index] if schema_index < len(span_data_list) else []
+    
+    # Validate inputs
+    status_messages = ["" for _ in range(span_count)]
+    clear_text_inputs = [text_inputs[i] if i < len(text_inputs) else "" for i in range(span_count)]
+    clear_entity_selectors = [entity_types[i] if i < len(entity_types) else None for i in range(span_count)]
+    
+    if not text_input or not text_input.strip():
+        status_messages[span_control_index] = html.Small("⚠ Please enter text to annotate", className="text-warning")
+        # Get current document text for display
+        doc_data = documents[current_index]
+        file_path = doc_data['file_path']
+        full_text, _ = load_document_text(file_path)
+        formatted_text = format_document_text(full_text, current_spans)
+        span_list = create_span_annotations_display(current_spans)
+        return span_data_list, status_messages, clear_text_inputs, clear_entity_selectors, formatted_text, span_list
+    
+    if not entity_type:
+        status_messages[span_control_index] = html.Small("⚠ Please select an entity type", className="text-warning")
+        # Get current document text for display
+        doc_data = documents[current_index]
+        file_path = doc_data['file_path']
+        full_text, _ = load_document_text(file_path)
+        formatted_text = format_document_text(full_text, current_spans)
+        span_list = create_span_annotations_display(current_spans)
+        return span_data_list, status_messages, clear_text_inputs, clear_entity_selectors, formatted_text, span_list
+    
+    # Get current document text to find the span
+    doc_data = documents[current_index]
+    file_path = doc_data['file_path']
+    full_text, success = load_document_text(file_path)
+    
+    if not success:
+        status_messages[span_control_index] = html.Small("⚠ Error loading document", className="text-danger")
+        formatted_text = format_document_text(full_text, current_spans)
+        span_list = create_span_annotations_display(current_spans)
+        return span_data_list, status_messages, clear_text_inputs, clear_entity_selectors, formatted_text, span_list
+    
+    # Find the text in the document
+    text_to_find = text_input.strip()
+    start_pos = full_text.find(text_to_find)
+    
+    if start_pos == -1:
+        status_messages[span_control_index] = html.Small("⚠ Text not found in document", className="text-warning")
+        formatted_text = format_document_text(full_text, current_spans)
+        span_list = create_span_annotations_display(current_spans)
+        return span_data_list, status_messages, clear_text_inputs, clear_entity_selectors, formatted_text, span_list
+    
+    # Create new span annotation
+    new_span = {
+        "text": text_to_find,
+        "start": start_pos,
+        "end": start_pos + len(text_to_find),
+        "entity_type": entity_type
+    }
+    
+    # Add to current spans
+    if current_spans is None:
+        current_spans = []
+    updated_spans = current_spans + [new_span]
+    
+    # Update span data list (for ALL annotation types)
+    new_span_data_list = [span_data_list[i] if i != schema_index else updated_spans 
+                          for i in range(len(span_data_list))]
+    
+    # Update status and clear inputs
+    status_messages[span_control_index] = html.Small(f"✓ Added: {entity_type}", className="text-success")
+    clear_text_inputs[span_control_index] = ""  # Clear the text input
+    clear_entity_selectors[span_control_index] = None  # Clear the entity selector
+    
+    # Re-render document with highlights
+    formatted_text = format_document_text(full_text, updated_spans)
+    span_list = create_span_annotations_display(updated_spans)
+    
+    return new_span_data_list, status_messages, clear_text_inputs, clear_entity_selectors, formatted_text, span_list
+
+
+@app.callback(
+    [Output({"type": "annotation-input", "id": ALL}, "data", allow_duplicate=True),
+     Output("document-text-container", "children", allow_duplicate=True),
+     Output("span-annotations-list", "children", allow_duplicate=True)],
+    Input({"type": "delete-span", "index": ALL}, "n_clicks"),
+    [State({"type": "annotation-input", "id": ALL}, "data"),
+     State("current-index-store", "data"),
+     State("documents-store", "data"),
+     State("schema-store", "data")],
+    prevent_initial_call=True
+)
+def delete_span_annotation(delete_clicks, span_data_list, current_index, documents, schema_data):
+    """Delete a span annotation."""
+    if not ctx.triggered_id or not any(delete_clicks):
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    
+    # Find which delete button was clicked
+    delete_index = ctx.triggered_id["index"]
+    
+    # Find the span annotation storage (should be only one for span_annotation type)
+    from data.validator import AnnotationSchema
+    schema = AnnotationSchema(**schema_data)
+    
+    span_field_index = None
+    for i, ann_type in enumerate(schema.annotation_types):
+        if ann_type.type == "span_annotation":
+            span_field_index = i
+            break
+    
+    if span_field_index is None or span_field_index >= len(span_data_list):
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    
+    # Get current spans and remove the one at delete_index
+    current_spans = span_data_list[span_field_index] or []
+    if delete_index < len(current_spans):
+        updated_spans = [span for i, span in enumerate(current_spans) if i != delete_index]
+    else:
+        updated_spans = current_spans
+    
+    # Update span data list
+    new_span_data_list = [span_data_list[i] if i != span_field_index else updated_spans 
+                          for i in range(len(span_data_list))]
+    
+    # Re-render document with updated highlights
+    doc_data = documents[current_index]
+    file_path = doc_data['file_path']
+    full_text, success = load_document_text(file_path)
+    
+    formatted_text = format_document_text(full_text, updated_spans)
+    span_list = create_span_annotations_display(updated_spans)
+    
+    return new_span_data_list, formatted_text, span_list
 
 
 @app.callback(

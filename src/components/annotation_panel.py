@@ -177,7 +177,12 @@ def create_span_annotation_control(
     label = "Required *" if required else ""
     
     return html.Div([
-        html.P("Select text in the document, then choose entity type:", className="small text-muted mb-2"),
+        html.P("Enter the text to annotate:", className="small text-muted mb-2"),
+        dbc.Input(
+            id={"type": "span-text-input", "id": control_id},
+            placeholder="Type or paste text from document...",
+            className="mb-2"
+        ),
         dbc.Select(
             id={"type": "entity-type-selector", "id": control_id},
             options=[{"label": et, "value": et} for et in entity_types],
@@ -185,11 +190,15 @@ def create_span_annotation_control(
             className="mb-2"
         ),
         dbc.Button(
-            "Add Selected Text",
+            "Add Annotation",
             id={"type": "add-span", "id": control_id},
             color="success",
             size="sm",
-            className="w-100"
+            className="w-100 mb-2"
+        ),
+        html.Div(
+            id={"type": "span-status", "id": control_id},
+            className="small mb-2"
         ),
         html.Small(label, className="text-danger") if required else html.Div(),
         # Hidden store for span annotations
