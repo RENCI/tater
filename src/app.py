@@ -41,6 +41,9 @@ def create_startup_screen() -> html.Div:
             dmc.Title("Clinical Note Annotation Tool", order=2, ta="center", mt="xl", mb="lg"),
             # Load Previous section
             html.Div(id="load-previous-section"),
+            # Hidden placeholders to satisfy callback outputs before annotation screen loads
+            html.Div(id="document-text-container", style={"display": "none"}),
+            html.Div(id="span-annotations-list", style={"display": "none"}),
             dmc.Paper([
                 dmc.Stack([
                     dmc.Title("Load New Documents and Schema", order=5, mb="md"),
