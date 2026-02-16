@@ -1,0 +1,53 @@
+PATIENT: Jane Smith
+DATE: 2024-01-16
+MRN: 67890
+
+CHIEF COMPLAINT:
+Shortness of breath and wheezing.
+
+HISTORY OF PRESENT ILLNESS:
+45-year-old female with history of asthma presents with acute exacerbation. Patient reports 
+increased wheezing and shortness of breath for the past 3 days. Triggers include recent upper 
+respiratory infection. Patient has been using albuterol inhaler every 4 hours with minimal 
+relief. Denies fever, chest pain, or hemoptysis. Some productive cough with clear sputum.
+
+PAST MEDICAL HISTORY:
+- Asthma (childhood onset)
+- Seasonal allergies
+- GERD
+
+CURRENT MEDICATIONS:
+- Albuterol HFA inhaler PRN
+- Fluticasone/Salmeterol 250/50 BID
+- Omeprazole 20mg daily
+
+ALLERGIES:
+Penicillin (rash)
+
+PHYSICAL EXAMINATION:
+Vitals: BP 118/76, HR 88, RR 22, Temp 98.2F, O2 Sat 94% on room air
+General: Mild respiratory distress, able to speak in full sentences
+HEENT: Normal
+Cardiovascular: Tachycardic, regular rhythm
+Respiratory: Bilateral expiratory wheezing, decreased air movement in lower lobes
+Abdomen: Soft, non-tender
+
+ASSESSMENT AND PLAN:
+1. Asthma exacerbation - moderate severity
+   - Start prednisone 40mg daily x 5 days
+   - Continue fluticasone/salmeterol
+   - Increase albuterol to Q4H scheduled
+   - Patient education on proper inhaler technique
+   - Peak flow meter provided
+
+2. Upper respiratory infection - likely viral
+   - Supportive care
+   - Increase fluid intake
+   - Rest
+
+3. GERD - stable
+   - Continue omeprazole
+
+Patient instructed to return immediately if worsening symptoms, chest pain, or difficulty breathing.
+
+FOLLOW-UP: 1 week or sooner PRN.

@@ -1,0 +1,48 @@
+PATIENT: John Doe
+DATE: 2024-01-15
+MRN: 12345
+
+CHIEF COMPLAINT:
+Patient presents with elevated blood sugar levels and fatigue.
+
+HISTORY OF PRESENT ILLNESS:
+62-year-old male with a history of type 2 diabetes mellitus presents for routine follow-up. 
+Patient reports good compliance with metformin 1000mg twice daily. Recent home glucose 
+monitoring shows fasting levels between 110-130 mg/dL. Patient denies polyuria, polydipsia, 
+or polyphagia. Reports mild fatigue in afternoons.
+
+PAST MEDICAL HISTORY:
+- Type 2 Diabetes Mellitus (diagnosed 2018)
+- Hypertension (controlled)
+- Hyperlipidemia
+
+CURRENT MEDICATIONS:
+- Metformin 1000mg PO BID
+- Lisinopril 10mg PO daily
+- Atorvastatin 20mg PO QPM
+
+PHYSICAL EXAMINATION:
+Vitals: BP 128/82, HR 76, Temp 98.6F
+General: Alert and oriented, no acute distress
+HEENT: Normal
+Cardiovascular: Regular rate and rhythm, no murmurs
+Respiratory: Clear to auscultation bilaterally
+Abdomen: Soft, non-tender
+
+ASSESSMENT AND PLAN:
+1. Type 2 Diabetes Mellitus - well controlled on current regimen
+   - Continue metformin 1000mg BID
+   - HbA1c ordered
+   - Follow up in 3 months
+
+2. Hypertension - well controlled
+   - Continue lisinopril
+   - Monitor BP at home
+
+3. Hyperlipidemia
+   - Continue atorvastatin
+   - Lipid panel ordered
+
+Patient counseled on diet and exercise. Encouraged to continue home glucose monitoring.
+
+FOLLOW-UP: 3 months or sooner if symptoms worsen.

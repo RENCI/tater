@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "annotation_types": [
+    {
+      "id": "document_sentiment",
+      "label": "Overall Sentiment",
+      "type": "single_choice",
+      "options": ["Positive", "Negative", "Neutral"],
+      "required": true,
+      "description": "The overall tone of the clinical note"
+    },
+    {
+      "id": "conditions_mentioned",
+      "label": "Conditions Mentioned",
+      "type": "multi_choice",
+      "options": ["Diabetes", "Hypertension", "Asthma", "COPD", "Heart Disease", "Other"],
+      "required": false,
+      "description": "Medical conditions referenced in the note"
+    },
+    {
+      "id": "text_entities",
+      "label": "Named Entities",
+      "type": "span_annotation",
+      "entity_types": ["Medication", "Symptom", "Diagnosis"],
+      "required": false,
+      "description": "Highlight and label specific text spans"
+    },
+    {
+      "id": "notes",
+      "label": "Annotator Notes",
+      "type": "free_text",
+      "required": false,
+      "description": "Any additional observations"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "documents": [
+    {
+      "file_path": "data/note_001.txt",
+      "metadata": {
+        "date": "2024-01-15",
+        "patient_id": "12345"
+      }
+    },
+    {
+      "file_path": "data/note_002.txt",
+      "metadata": {
+        "date": "2024-01-16",
+        "patient_id": "67890"
+      }
+    },
+    {
+      "file_path": "data/note_003.txt",
+      "metadata": {
+        "date": "2024-01-17",
+        "patient_id": "11223"
+      }
+    }
+  ]
+}
