@@ -6,7 +6,8 @@ from typing import List, Dict, Any, Optional
 from data.validator import AnnotationType
 from utils.constants import (
     TYPE_SINGLE_CHOICE, TYPE_MULTI_CHOICE,
-    TYPE_SPAN_ANNOTATION, TYPE_FREE_TEXT
+    TYPE_SPAN_ANNOTATION, TYPE_FREE_TEXT,
+    ENTITY_COLORS
 )
 
 
@@ -176,6 +177,35 @@ def create_span_annotation_control(
     """Create a span annotation control."""
     label = "Required *" if required else ""
     
+    # Create individual buttons for each entity type with color indicators
+    entity_buttons = []
+    for et in entity_types:
+        color = ENTITY_COLORS.get(et, "#E0E0E0")
+        entity_buttons.append(
+            dbc.Button(
+                [
+                    html.Span(
+                        "",
+                        style={
+                            "display": "inline-block",
+                            "width": "12px",
+                            "height": "12px",
+                            "backgroundColor": color,
+                            "borderRadius": "2px",
+                            "marginRight": "6px",
+                            "border": "1px solid rgba(0,0,0,0.2)"
+                        }
+                    ),
+                    et
+                ],
+                id={"type": "add-span", "id": control_id, "entity": et},
+                color="light",
+                size="sm",
+                className="w-100 mb-1 text-start",
+                style={"border": f"2px solid {color}"}
+            )
+        )
+    
     return html.Div([
         html.P("Enter the text to annotate:", className="small text-muted mb-2"),
         dbc.Input(
@@ -183,19 +213,8 @@ def create_span_annotation_control(
             placeholder="Type or paste text from document...",
             className="mb-2"
         ),
-        dbc.Select(
-            id={"type": "entity-type-selector", "id": control_id},
-            options=[{"label": et, "value": et} for et in entity_types],
-            placeholder="Select entity type...",
-            className="mb-2"
-        ),
-        dbc.Button(
-            "Add Annotation",
-            id={"type": "add-span", "id": control_id},
-            color="success",
-            size="sm",
-            className="w-100 mb-2"
-        ),
+        html.P("Select entity type:", className="small text-muted mb-1 mt-2"),
+        html.Div(entity_buttons, className="mb-2"),
         html.Div(
             id={"type": "span-status", "id": control_id},
             className="small mb-2"
