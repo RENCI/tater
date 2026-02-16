@@ -388,11 +388,35 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename, schema_fil
 
 
 @app.callback(
+    Output("document-selector", "value"),
+    [Input("prev-button", "n_clicks"),
+     Input("next-button", "n_clicks")],
+    [State("document-selector", "value"),
+     State("documents-store", "data")],
+    prevent_initial_call=True
+)
+def navigate_buttons(prev_clicks, next_clicks, selector_value, documents):
+    """Update the document selector when navigation buttons are clicked."""
+    if not documents:
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+
+    current_index = int(selector_value) if selector_value is not None else 0
+    triggered_id = ctx.triggered_id
+
+    new_index = current_index
+    if triggered_id == "prev-button" and current_index > 0:
+        new_index = current_index - 1
+    elif triggered_id == "next-button" and current_index < len(documents) - 1:
+        new_index = current_index + 1
+
+    return str(new_index)
+
+
+@app.callback(
     [Output("current-index-store", "data"),
      Output("dirty-state-store", "data", allow_duplicate=True)],
-    [Input("prev-button", "n_clicks"),
-     Input("next-button", "n_clicks"),
-     Input("document-selector", "value")],
+    Input("document-selector", "value"),
     [State("current-index-store", "data"),
      State("documents-store", "data"),
      State("annotations-store", "data"),
@@ -401,30 +425,22 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename, schema_fil
      State("flag-for-review", "checked")],
     prevent_initial_call=True
 )
-def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
-                       documents, annotations_data, schema_data, annotation_values, flagged):
-    """Handle document navigation."""
-    if not documents:
+def sync_current_index(selector_value, current_index,
+                       documents, annotations_data, schema_data,
+                       annotation_values, flagged):
+    """Sync current index to selector changes and save before switching."""
+    if not documents or selector_value is None:
         return current_index, False
-    
-    # Determine new index based on trigger
-    triggered_id = ctx.triggered_id
-    
-    new_index = current_index
-    if triggered_id == "prev-button" and current_index > 0:
-        new_index = current_index - 1
-    elif triggered_id == "next-button" and current_index < len(documents) - 1:
-        new_index = current_index + 1
-    elif triggered_id == "document-selector" and selector_value is not None:
-        new_index = int(selector_value)
-    
+
+    new_index = int(selector_value)
+
     # Save current document's annotations before navigating
     if new_index != current_index and annotations_data and schema_data:
         save_current_annotations(
             current_index, documents, annotations_data,
             schema_data, annotation_values, flagged
         )
-    
+
     return new_index, False
 
 
@@ -437,7 +453,6 @@ def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
      Output("prev-button", "disabled"),
      Output("next-button", "disabled"),
      Output("document-selector", "data"),
-     Output("document-selector", "value"),
      Output("progress-display", "children")],
     Input("current-index-store", "data"),
     [State("documents-store", "data"),
@@ -529,7 +544,6 @@ def update_document_display(current_index, documents, schema_data, annotations_d
         prev_disabled,
         next_disabled,
         dropdown_options,
-        str(current_index),
         progress
     )
 
