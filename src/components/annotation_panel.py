@@ -1,6 +1,6 @@
 """Annotation panel component for entering annotations."""
 from dash import html, dcc
-import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from typing import List, Dict, Any, Optional
 
 from data.validator import AnnotationType
@@ -11,35 +11,31 @@ from utils.constants import (
 )
 
 
-def create_annotation_panel() -> dbc.Card:
+def create_annotation_panel() -> dmc.Paper:
     """
     Create the right panel annotation component.
     
     Returns:
-        A Dash Bootstrap Card containing annotation controls
+        A Dash Mantine Paper containing annotation controls
     """
-    return dbc.Card([
-        dbc.CardHeader([
-            html.H5("Annotations", className="mb-0")
-        ]),
-        dbc.CardBody([
+    return dmc.Paper([
+        dmc.Stack([
+            dmc.Title("Annotations", order=5),
             html.Div(id="annotation-controls-container"),
-            html.Hr(),
-            dbc.Checkbox(
+            dmc.Divider(),
+            dmc.Checkbox(
                 id="flag-for-review",
                 label="Flag for Review",
-                value=False,
-                className="mb-3"
+                checked=False
             ),
-            html.Div(id="save-status", className="mb-3 text-muted small"),
-            dbc.Button(
+            html.Div(id="save-status", style={"color": "#868e96", "fontSize": "0.875rem"}),
+            dmc.Button(
                 "Save Annotations",
                 id="manual-save-button",
-                color="primary",
-                className="w-100"
+                fullWidth=True
             )
-        ], style={"padding": "15px"})
-    ], className="h-100")
+        ], gap="md")
+    ], p="md", shadow="sm", radius="md", style={"height": "100%"})
 
 
 def create_annotation_controls(
@@ -62,16 +58,17 @@ def create_annotation_controls(
     controls = []
     
     for ann_type in schema:
-        controls.append(html.Hr())
-        controls.append(html.H6(
+        controls.append(dmc.Divider())
+        controls.append(dmc.Title(
             ann_type.label,
-            className="mb-2"
+            order=6
         ))
         
         if ann_type.description:
-            controls.append(html.Small(
+            controls.append(dmc.Text(
                 ann_type.description,
-                className="text-muted d-block mb-2"
+                size="sm",
+                c="dimmed"
             ))
         
         # Get current value
@@ -129,21 +126,19 @@ def create_single_choice_control(
     label = "Required *" if required else ""
     
     return html.Div([
-        dbc.RadioItems(
+        dmc.RadioGroup(
             id={"type": "annotation-input", "id": control_id},
-            options=[{"label": opt, "value": opt} for opt in options],
-            value=current_value,
-            className="mb-2"
+            children=dmc.Stack([dmc.Radio(opt, value=opt) for opt in options], gap="xs"),
+            value=current_value
         ),
-        dbc.Button(
+        dmc.Button(
             "Clear",
             id={"type": "clear-single", "id": control_id},
-            color="secondary",
-            size="sm",
-            outline=True
+            variant="subtle",
+            size="xs"
         ) if not required else html.Div(),
-        html.Small(label, className="text-danger") if required else html.Div()
-    ], className="mb-3")
+        dmc.Text(label, size="sm", c="red") if required else html.Div()
+    ], style={"marginBottom": "1rem"})
 
 
 def create_multi_choice_control(
@@ -159,14 +154,13 @@ def create_multi_choice_control(
     label = "Required *" if required else ""
     
     return html.Div([
-        dbc.Checklist(
+        dmc.CheckboxGroup(
             id={"type": "annotation-input", "id": control_id},
-            options=[{"label": opt, "value": opt} for opt in options],
-            value=current_value,
-            className="mb-2"
+            children=dmc.Stack([dmc.Checkbox(opt, value=opt) for opt in options], gap="xs"),
+            value=current_value
         ),
-        html.Small(label, className="text-danger") if required else html.Div()
-    ], className="mb-3")
+        dmc.Text(label, size="sm", c="red") if required else html.Div()
+    ], style={"marginBottom": "1rem"})
 
 
 def create_span_annotation_control(
@@ -182,7 +176,7 @@ def create_span_annotation_control(
     for et in entity_types:
         color = ENTITY_COLORS.get(et, "#E0E0E0")
         entity_buttons.append(
-            dbc.Button(
+            dmc.Button(
                 [
                     html.Span(
                         "",
@@ -199,33 +193,32 @@ def create_span_annotation_control(
                     et
                 ],
                 id={"type": "add-span", "id": control_id, "entity": et},
-                color="light",
-                size="sm",
-                className="w-100 mb-1 text-start",
-                style={"border": f"2px solid {color}"}
+                variant="light",
+                size="xs",
+                fullWidth=True,
+                style={"border": f"2px solid {color}", "justifyContent": "flex-start", "marginBottom": "4px"}
             )
         )
     
     return html.Div([
-        html.P("Enter the text to annotate:", className="small text-muted mb-2"),
-        dbc.Input(
+        dmc.Text("Enter the text to annotate:", size="sm", c="dimmed"),
+        dmc.TextInput(
             id={"type": "span-text-input", "id": control_id},
-            placeholder="Type or paste text from document...",
-            className="mb-2"
+            placeholder="Type or paste text from document..."
         ),
-        html.P("Select entity type:", className="small text-muted mb-1 mt-2"),
-        html.Div(entity_buttons, className="mb-2"),
+        dmc.Text("Select entity type:", size="sm", c="dimmed", mt="sm"),
+        dmc.Stack(entity_buttons, gap="xs"),
         html.Div(
             id={"type": "span-status", "id": control_id},
-            className="small mb-2"
+            style={"fontSize": "0.875rem"}
         ),
-        html.Small(label, className="text-danger") if required else html.Div(),
+        dmc.Text(label, size="sm", c="red") if required else html.Div(),
         # Hidden store for span annotations
         dcc.Store(
             id={"type": "annotation-input", "id": control_id},
             data=[]
         )
-    ], className="mb-3")
+    ], style={"marginBottom": "1rem"})
 
 
 def create_free_text_control(
@@ -237,12 +230,11 @@ def create_free_text_control(
     label = "Required *" if required else ""
     
     return html.Div([
-        dbc.Textarea(
+        dmc.Textarea(
             id={"type": "annotation-input", "id": control_id},
             value=current_value or "",
             placeholder="Enter notes here...",
-            rows=4,
-            className="mb-2"
+            minRows=4
         ),
-        html.Small(label, className="text-danger") if required else html.Div()
-    ], className="mb-3")
+        dmc.Text(label, size="sm", c="red") if required else html.Div()
+    ], style={"marginBottom": "1rem"})

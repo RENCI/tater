@@ -6,7 +6,7 @@ import json
 import csv
 from pathlib import Path
 from dash import Dash, html, dcc, Input, Output, State, ALL, ctx, callback
-import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from datetime import datetime
 import pandas as pd
 
@@ -28,7 +28,6 @@ from utils.constants import (
 # Initialize the Dash app
 app = Dash(
     __name__,
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
     suppress_callback_exceptions=True
 )
 
@@ -37,73 +36,62 @@ app.title = "Clinical Note Annotation Tool"
 
 def create_startup_screen() -> html.Div:
     """Create the initial startup screen for loading files."""
-    return dbc.Container([
-        dbc.Row([
-            dbc.Col([
-                html.H2("Clinical Note Annotation Tool", className="text-center mt-5 mb-4"),
-                dbc.Card([
-                    dbc.CardBody([
-                        html.H5("Load Documents and Schema", className="mb-4"),
-                        dbc.Label("Document List File (CSV or JSON):"),
-                        dcc.Upload(
-                            id="documents-file-upload",
-                            children=dbc.Button(
-                                "Choose Document List File",
-                                color="secondary",
-                                outline=True,
-                                className="w-100"
-                            ),
-                            className="mb-2"
+    return dmc.Container([
+        dmc.Stack([
+            dmc.Title("Clinical Note Annotation Tool", order=2, ta="center", mt="xl", mb="lg"),
+            dmc.Paper([
+                dmc.Stack([
+                    dmc.Title("Load Documents and Schema", order=5, mb="md"),
+                    dmc.Text("Document List File (CSV or JSON):", size="sm", fw=500),
+                    dcc.Upload(
+                        id="documents-file-upload",
+                        children=dmc.Button(
+                            "Choose Document List File",
+                            variant="default",
+                            fullWidth=True
                         ),
-                        html.Div(id="documents-file-name", className="text-muted small mb-3"),
-                        dbc.Label("Annotation Schema File (JSON):"),
-                        dcc.Upload(
-                            id="schema-file-upload",
-                            children=dbc.Button(
-                                "Choose Schema File",
-                                color="secondary",
-                                outline=True,
-                                className="w-100"
-                            ),
-                            className="mb-2"
+                        className="mb-2"
+                    ),
+                    html.Div(id="documents-file-name", style={"color": "#666", "fontSize": "0.875rem", "marginBottom": "1rem"}),
+                    dmc.Text("Annotation Schema File (JSON):", size="sm", fw=500),
+                    dcc.Upload(
+                        id="schema-file-upload",
+                        children=dmc.Button(
+                            "Choose Schema File",
+                            variant="default",
+                            fullWidth=True
                         ),
-                        html.Div(id="schema-file-name", className="text-muted small mb-3"),
-                        html.Div(id="load-error", className="text-danger mb-3"),
-                        dbc.Button(
-                            "Load and Start Annotating",
-                            id="load-button",
-                            color="primary",
-                            className="w-100",
-                            disabled=True
-                        )
-                    ])
-                ], className="shadow")
-            ], width=6)
-        ], justify="center")
+                        className="mb-2"
+                    ),
+                    html.Div(id="schema-file-name", style={"color": "#666", "fontSize": "0.875rem", "marginBottom": "1rem"}),
+                    html.Div(id="load-error", style={"color": "#fa5252", "marginBottom": "1rem"}),
+                    dmc.Button(
+                        "Load and Start Annotating",
+                        id="load-button",
+                        fullWidth=True,
+                        disabled=True
+                    )
+                ], gap="sm")
+            ], shadow="sm", p="lg", radius="md", style={"maxWidth": "500px", "margin": "0 auto"})
+        ], align="center", justify="center", style={"minHeight": "100vh"})
     ], fluid=True)
 
 
 def create_annotation_screen() -> html.Div:
     """Create the main annotation interface."""
-    return dbc.Container([
-        dbc.Row([
-            dbc.Col([
-                create_navigation_bar()
-            ], width=12, className="mb-3")
-        ]),
-        dbc.Row([
-            dbc.Col([
-                create_document_viewer()
-            ], width=7),
-            dbc.Col([
-                create_annotation_panel()
-            ], width=5)
-        ])
-    ], fluid=True, className="p-3")
+    return dmc.Container([
+        dmc.Stack([
+            create_navigation_bar(),
+            dmc.Grid([
+                dmc.GridCol(create_document_viewer(), span=7),
+                dmc.GridCol(create_annotation_panel(), span=5)
+            ], gutter="md")
+        ], gap="md")
+    ], fluid=True, p="md")
 
 
 # Main app layout
-app.layout = html.Div([
+app.layout = dmc.MantineProvider([
     dcc.Store(id="app-state", data={"loaded": False}),
     dcc.Store(id="documents-store", data=[]),
     dcc.Store(id="schema-store", data=None),
@@ -260,7 +248,7 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename):
      State("annotations-store", "data"),
      State("schema-store", "data"),
      State({"type": "annotation-input", "id": ALL}, "value"),
-     State("flag-for-review", "value")],
+     State("flag-for-review", "checked")],
     prevent_initial_call=True
 )
 def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
@@ -278,7 +266,7 @@ def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
     elif triggered_id == "next-button" and current_index < len(documents) - 1:
         new_index = current_index + 1
     elif triggered_id == "document-selector" and selector_value is not None:
-        new_index = selector_value
+        new_index = int(selector_value)
     
     # Save current document's annotations before navigating
     if new_index != current_index and annotations_data and schema_data:
@@ -294,11 +282,11 @@ def navigate_documents(prev_clicks, next_clicks, selector_value, current_index,
     [Output("document-text-container", "children"),
      Output("document-metadata", "children"),
      Output("annotation-controls-container", "children"),
-     Output("flag-for-review", "value"),
+     Output("flag-for-review", "checked"),
      Output("span-annotations-list", "children"),
      Output("prev-button", "disabled"),
      Output("next-button", "disabled"),
-     Output("document-selector", "options"),
+     Output("document-selector", "data"),
      Output("document-selector", "value"),
      Output("progress-display", "children")],
     Input("current-index-store", "data"),
@@ -369,7 +357,7 @@ def update_document_display(current_index, documents, schema_data, annotations_d
         filename = Path(doc['file_path']).name
         dropdown_options.append({
             "label": f"{i + 1}. {filename}",
-            "value": i
+            "value": str(i)
         })
     
     # Calculate statistics
@@ -391,7 +379,7 @@ def update_document_display(current_index, documents, schema_data, annotations_d
         prev_disabled,
         next_disabled,
         dropdown_options,
-        current_index,
+        str(current_index),
         progress
     )
 
@@ -399,10 +387,11 @@ def update_document_display(current_index, documents, schema_data, annotations_d
 @app.callback(
     Output("dirty-state-store", "data"),
     [Input({"type": "annotation-input", "id": ALL}, "value"),
-     Input("flag-for-review", "value")],
+     Input({"type": "annotation-input", "id": ALL}, "data"),
+     Input("flag-for-review", "checked")],
     prevent_initial_call=True
 )
-def mark_dirty(annotation_values, flagged):
+def mark_dirty(annotation_values, annotation_data, flagged):
     """Mark annotations as having unsaved changes."""
     return True
 
@@ -585,7 +574,7 @@ def delete_span_annotation(delete_clicks, span_data_list, current_index, documen
      State("annotations-store", "data"),
      State("schema-store", "data"),
      State({"type": "annotation-input", "id": ALL}, "value"),
-     State("flag-for-review", "value"),
+     State("flag-for-review", "checked"),
      State("dirty-state-store", "data")],
     prevent_initial_call=True
 )

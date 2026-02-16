@@ -1,6 +1,6 @@
 """Navigation component for document navigation."""
 from dash import html, dcc
-import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from typing import List, Optional
 from pathlib import Path
 
@@ -9,7 +9,7 @@ def create_navigation_bar(
     total_docs: int = 0,
     current_index: int = 0,
     documents: Optional[List] = None
-) -> dbc.Card:
+) -> dmc.Paper:
     """
     Create navigation controls.
     
@@ -19,7 +19,7 @@ def create_navigation_bar(
         documents: List of Document objects
     
     Returns:
-        A Dash Bootstrap Card with navigation controls
+        A Dash Mantine Paper with navigation controls
     """
     if documents is None:
         documents = []
@@ -30,46 +30,44 @@ def create_navigation_bar(
         filename = Path(doc.file_path).name
         dropdown_options.append({
             "label": f"{i + 1}. {filename}",
-            "value": i
+            "value": str(i)
         })
     
-    return dbc.Card([
-        dbc.CardBody([
-            dbc.Row([
-                dbc.Col([
-                    html.H6("Navigation", className="mb-3"),
-                    dbc.ButtonGroup([
-                        dbc.Button(
-                            "← Previous",
-                            id="prev-button",
-                            color="secondary",
-                            disabled=current_index <= 0
-                        ),
-                        dbc.Button(
-                            "Next →",
-                            id="next-button",
-                            color="secondary",
-                            disabled=current_index >= total_docs - 1
-                        )
-                    ], className="w-100 mb-3"),
-                    dbc.Select(
-                        id="document-selector",
-                        options=dropdown_options,
-                        value=current_index,
-                        className="mb-3"
-                    ),
-                    html.Div(
-                        id="progress-display",
-                        children=create_progress_display(
-                            total_docs,
-                            current_index,
-                            0, 0, 0, 0
-                        )
-                    )
-                ])
-            ])
-        ], style={"padding": "15px"})
-    ])
+    return dmc.Paper([
+        dmc.Stack([
+            dmc.Title("Navigation", order=6),
+            dmc.Group([
+                dmc.Button(
+                    "← Previous",
+                    id="prev-button",
+                    variant="default",
+                    disabled=current_index <= 0,
+                    style={"flex": 1}
+                ),
+                dmc.Button(
+                    "Next →",
+                    id="next-button",
+                    variant="default",
+                    disabled=current_index >= total_docs - 1,
+                    style={"flex": 1}
+                )
+            ], grow=True),
+            dmc.Select(
+                id="document-selector",
+                data=dropdown_options,
+                value=str(current_index) if dropdown_options else None,
+                placeholder="Select document"
+            ),
+            html.Div(
+                id="progress-display",
+                children=create_progress_display(
+                    total_docs,
+                    current_index,
+                    0, 0, 0, 0
+                )
+            )
+        ], gap="md")
+    ], p="md", shadow="sm", radius="md")
 
 
 def create_progress_display(
@@ -100,33 +98,34 @@ def create_progress_display(
         progress_pct = (completed / total_docs) * 100
     
     return html.Div([
-        html.P(
+        dmc.Text(
             f"Document {current_index + 1} of {total_docs}",
-            className="mb-2 fw-bold"
+            fw=700,
+            mb="sm"
         ),
-        dbc.Progress(
+        dmc.Progress(
             value=progress_pct,
-            className="mb-3",
-            style={"height": "20px"}
+            size="lg",
+            mb="md"
         ),
-        html.Div([
-            html.Small([
-                html.Span("✓ Completed: ", className="text-success"),
-                html.Span(str(completed), className="fw-bold")
-            ], className="d-block"),
-            html.Small([
-                html.Span("⋯ In Progress: ", className="text-warning"),
-                html.Span(str(in_progress), className="fw-bold")
-            ], className="d-block"),
-            html.Small([
-                html.Span("○ Not Started: ", className="text-muted"),
-                html.Span(str(not_started), className="fw-bold")
-            ], className="d-block"),
-            html.Small([
-                html.Span("⚑ Flagged: ", className="text-danger"),
-                html.Span(str(flagged), className="fw-bold")
-            ], className="d-block")
-        ], className="small")
+        dmc.Stack([
+            dmc.Text([
+                dmc.Text("✓ Completed: ", c="green", span=True),
+                dmc.Text(str(completed), fw=700, span=True)
+            ], size="sm"),
+            dmc.Text([
+                dmc.Text("⋯ In Progress: ", c="yellow", span=True),
+                dmc.Text(str(in_progress), fw=700, span=True)
+            ], size="sm"),
+            dmc.Text([
+                dmc.Text("○ Not Started: ", c="gray", span=True),
+                dmc.Text(str(not_started), fw=700, span=True)
+            ], size="sm"),
+            dmc.Text([
+                dmc.Text("⚑ Flagged: ", c="red", span=True),
+                dmc.Text(str(flagged), fw=700, span=True)
+            ], size="sm")
+        ], gap="xs")
     ])
 
 

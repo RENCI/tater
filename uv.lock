@@ -169,15 +169,15 @@ wheels = [
 ]
 
 [[package]]
-name = "dash-bootstrap-components"
-version = "2.0.4"
+name = "dash-mantine-components"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dash" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cc/d4/5b7da808ff5acb3a6ca702f504d8ef05bc7d4c475b18dadefd783b1120c3/dash_bootstrap_components-2.0.4.tar.gz", hash = "sha256:c3206c0923774bbc6a6ddaa7822b8d9aa5326b0d3c1e7cd795cc975025fe2484", size = 115599, upload-time = "2025-08-20T19:42:09.449Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/1c/922819c3a1fc096d11221a2f788aa5df61a4c6575582f29417e69944d38f/dash_mantine_components-2.6.0.tar.gz", hash = "sha256:46dadc90cf261b951f087eb96fb64b4b2d9616f854354e1f382c66209dce82c4", size = 930821, upload-time = "2026-02-14T21:47:48.58Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/38/1efeec8b4d741c09ccd169baf8a00c07a0176b58e418d4cd0c30dffedd22/dash_bootstrap_components-2.0.4-py3-none-any.whl", hash = "sha256:767cf0084586c1b2b614ccf50f79fe4525fdbbf8e3a161ed60016e584a14f5d1", size = 204044, upload-time = "2025-08-20T19:42:07.928Z" },
+    { url = "https://files.pythonhosted.org/packages/78/10/416c602674d67082c41851cacaf521e27989aaf45f93d479b59ab48849c1/dash_mantine_components-2.6.0-py3-none-any.whl", hash = "sha256:55db031186b83febc9d320fe00337f60f33d6d47cdb4160434e9cfb8f29fd105", size = 1377793, upload-time = "2026-02-14T21:47:47.052Z" },
 ]
 
 [[package]]
@@ -850,7 +850,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dash" },
-    { name = "dash-bootstrap-components" },
+    { name = "dash-mantine-components" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pydantic" },
@@ -859,7 +859,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "dash", specifier = ">=2.14.0" },
-    { name = "dash-bootstrap-components", specifier = ">=1.5.0" },
+    { name = "dash-mantine-components", specifier = ">=0.12.0" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
 ]

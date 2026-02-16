@@ -1,22 +1,22 @@
 """Document viewer component for displaying clinical notes."""
 from dash import html, dcc
-import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 from typing import Optional, List, Dict, Any
 
 
-def create_document_viewer() -> dbc.Card:
+def create_document_viewer() -> dmc.Paper:
     """
     Create the left panel document viewer component.
     
     Returns:
-        A Dash Bootstrap Card containing the document viewer
+        A Dash Mantine Paper containing the document viewer
     """
-    return dbc.Card([
-        dbc.CardHeader([
-            html.H5("Document", className="mb-0"),
-            html.Small(id="document-metadata", className="text-muted")
-        ]),
-        dbc.CardBody([
+    return dmc.Paper([
+        dmc.Stack([
+            dmc.Group([
+                dmc.Title("Document", order=5),
+                html.Div(id="document-metadata", style={"color": "#868e96", "fontSize": "0.875rem"})
+            ], justify="space-between"),
             html.Div(
                 id="document-text-container",
                 children=[
@@ -41,11 +41,10 @@ def create_document_viewer() -> dbc.Card:
                 ]
             ),
             html.Div(
-                id="span-annotations-list",
-                className="mt-3"
+                id="span-annotations-list"
             )
-        ], style={"padding": "15px"})
-    ], className="h-100")
+        ], gap="md")
+    ], p="md", shadow="sm", radius="md", style={"height": "100%"})
 
 
 def format_document_text(
@@ -166,28 +165,28 @@ def create_span_annotations_display(
         color = ENTITY_COLORS.get(entity_type, "#E0E0E0")
         
         items.append(
-            dbc.ListGroupItem([
-                html.Span(
-                    entity_type,
-                    className="badge me-2",
-                    style={
-                        "backgroundColor": color,
-                        "color": "#000"
-                    }
-                ),
-                html.Span(f'"{text}"', className="font-monospace"),
-                dbc.Button(
-                    "×",
-                    color="link",
-                    size="sm",
-                    className="float-end text-danger",
-                    id={"type": "delete-span", "index": i},
-                    style={"textDecoration": "none", "fontSize": "20px"}
-                )
-            ])
+            dmc.Paper([
+                dmc.Group([
+                    dmc.Badge(
+                        entity_type,
+                        color="gray",
+                        variant="filled",
+                        style={"backgroundColor": color, "color": "#000"}
+                    ),
+                    dmc.Text(f'"{text}"', style={"fontFamily": "monospace", "flex": 1}),
+                    dmc.ActionIcon(
+                        "×",
+                        color="red",
+                        variant="subtle",
+                        size="sm",
+                        id={"type": "delete-span", "index": i},
+                        style={"fontSize": "20px"}
+                    )
+                ], justify="space-between", align="center")
+            ], p="xs", withBorder=True, radius="sm", mb="xs")
         )
     
     return html.Div([
-        html.H6("Text Annotations:", className="mt-3 mb-2"),
-        dbc.ListGroup(items, className="small")
+        dmc.Title("Text Annotations:", order=6, mt="md", mb="sm"),
+        dmc.Stack(items, gap="xs")
     ])
