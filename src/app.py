@@ -111,6 +111,7 @@ app.layout = dmc.MantineProvider([
     dcc.Store(id="documents-file-content", data=None),
     dcc.Store(id="schema-file-content", data=None),
     dcc.Store(id="selected-text-store", data=None),
+    dcc.Store(id="span-trigger-store", data=None),
     # Local storage for previous files
     dcc.Store(id="local-documents-file", storage_type="local", data=None),
     dcc.Store(id="local-schema-file", storage_type="local", data=None),
@@ -545,7 +546,7 @@ app.clientside_callback(
             console.log('Initializing text selection capture...');
             
             // Capture selection on mouseup anywhere in document
-            document.addEventListener('mouseup', function(e) {
+            document.addEventListener('mouseup', function() {
                 setTimeout(function() {
                     const selection = window.getSelection();
                     const selectedText = selection ? selection.toString().trim() : '';
@@ -557,7 +558,7 @@ app.clientside_callback(
             });
             
             // Also listen for button mousedown to capture selection before it's cleared
-            document.addEventListener('mousedown', function(e) {
+            document.addEventListener('mousedown', function() {
                 const selection = window.getSelection();
                 const selectedText = selection ? selection.toString().trim() : '';
                 if (selectedText) {
@@ -567,17 +568,19 @@ app.clientside_callback(
             });
         }
         
-        // When button is clicked, return the stored selection
+        // Only emit values when an add-span button was clicked
         if (n_clicks_list && n_clicks_list.some(n => n)) {
             const result = window.dash_selection_store || '';
+            const triggeredId = dash_clientside.callback_context.triggered_id;
             console.log('Returning to callback:', result);
-            return result;
+            return [result, triggeredId || null];
         }
         
-        return window.dash_clientside.no_update;
+        return [window.dash_clientside.no_update, window.dash_clientside.no_update];
     }
     """,
-    Output("selected-text-store", "data"),
+    [Output("selected-text-store", "data"),
+     Output("span-trigger-store", "data")],
     [Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
      Input("app-state", "data")],
     prevent_initial_call=False
@@ -602,35 +605,33 @@ def mark_dirty(annotation_values, annotation_data, flagged):
      Output("document-text-container", "children", allow_duplicate=True),
      Output("span-annotations-list", "children", allow_duplicate=True),
      Output("selected-text-store", "data", allow_duplicate=True)],
-    [Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
-     Input("selected-text-store", "data")],
-    [State({"type": "annotation-input", "id": ALL}, "data"),
+    Input("span-trigger-store", "data"),
+    [State("selected-text-store", "data"),
+     State({"type": "annotation-input", "id": ALL}, "data"),
+     State("app-state", "data"),
      State("current-index-store", "data"),
      State("documents-store", "data"),
      State("schema-store", "data"),
      State("annotations-store", "data")],
     prevent_initial_call=True
 )
-def add_span_annotation(n_clicks_list, selected_text, span_data_list, 
+def add_span_annotation(span_trigger, selected_text, span_data_list, app_state,
                        current_index, documents, schema_data, annotations_data):
     """Add a span annotation when button is clicked."""
-    triggered_id = ctx.triggered_id
-    if (
-        not triggered_id
-        or not any(n_clicks_list)
-        or not isinstance(triggered_id, dict)
-        or triggered_id.get("type") != "add-span"
-    ):
+    if not app_state or not app_state.get("loaded"):
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    if not span_trigger or not isinstance(span_trigger, dict) or span_trigger.get("type") != "add-span":
         from dash.exceptions import PreventUpdate
         raise PreventUpdate
     
     # Debug logging
-    print(f"DEBUG: Button clicked - entity type: {triggered_id.get('entity')}")
+    print(f"DEBUG: Button clicked - entity type: {span_trigger.get('entity')}")
     print(f"DEBUG: Selected text from store: '{selected_text}'")
     
     # The triggered_id contains the annotation type ID and entity type
-    annotation_type_id = triggered_id["id"]
-    entity_type = triggered_id["entity"]  # Entity type from button ID
+    annotation_type_id = span_trigger["id"]
+    entity_type = span_trigger["entity"]  # Entity type from button ID
     
     # Find the index in the schema for this annotation type
     from data.validator import AnnotationSchema
@@ -658,6 +659,8 @@ def add_span_annotation(n_clicks_list, selected_text, span_data_list,
     status_messages = ["" for _ in range(span_count)]
     
     # Use selected text (from highlighting)
+    if selected_text == "None":
+        selected_text = ""
     text_to_annotate = selected_text or ""
     
     if not text_to_annotate or not text_to_annotate.strip():

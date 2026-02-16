@@ -36,6 +36,20 @@ def create_navigation_bar(
     return dmc.Paper([
         dmc.Stack([
             dmc.Title("Navigation", order=6),
+            html.Div(
+                id="progress-display",
+                children=create_progress_display(
+                    total_docs,
+                    current_index,
+                    0, 0, 0, 0
+                )
+            ),
+            dmc.Select(
+                id="document-selector",
+                data=dropdown_options,
+                value=str(current_index) if dropdown_options else None,
+                placeholder="Select document"
+            ),
             dmc.Group([
                 dmc.Button(
                     "← Previous",
@@ -51,21 +65,7 @@ def create_navigation_bar(
                     disabled=current_index >= total_docs - 1,
                     style={"flex": 1}
                 )
-            ], grow=True),
-            dmc.Select(
-                id="document-selector",
-                data=dropdown_options,
-                value=str(current_index) if dropdown_options else None,
-                placeholder="Select document"
-            ),
-            html.Div(
-                id="progress-display",
-                children=create_progress_display(
-                    total_docs,
-                    current_index,
-                    0, 0, 0, 0
-                )
-            )
+            ], grow=True)
         ], gap="md")
     ], p="md", shadow="sm", radius="md")
 
@@ -98,34 +98,30 @@ def create_progress_display(
         progress_pct = (completed / total_docs) * 100
     
     return html.Div([
-        dmc.Text(
-            f"Document {current_index + 1} of {total_docs}",
-            fw=700,
-            mb="sm"
-        ),
+        dmc.Group([
+            dmc.Text(
+                f"Document {current_index + 1} of {total_docs}",
+                fw=700
+            ),
+            dmc.Text([
+                dmc.Text("✓ ", c="green", span=True),
+                dmc.Text(str(completed), fw=700, span=True),
+                dmc.Text(" | ", c="dimmed", span=True),
+                dmc.Text("⋯ ", c="yellow", span=True),
+                dmc.Text(str(in_progress), fw=700, span=True),
+                dmc.Text(" | ", c="dimmed", span=True),
+                dmc.Text("○ ", c="gray", span=True),
+                dmc.Text(str(not_started), fw=700, span=True),
+                dmc.Text(" | ", c="dimmed", span=True),
+                dmc.Text("⚑ ", c="red", span=True),
+                dmc.Text(str(flagged), fw=700, span=True)
+            ], size="sm")
+        ], justify="space-between", align="center", wrap="nowrap", mb="sm"),
         dmc.Progress(
             value=progress_pct,
             size="lg",
-            mb="md"
-        ),
-        dmc.Stack([
-            dmc.Text([
-                dmc.Text("✓ Completed: ", c="green", span=True),
-                dmc.Text(str(completed), fw=700, span=True)
-            ], size="sm"),
-            dmc.Text([
-                dmc.Text("⋯ In Progress: ", c="yellow", span=True),
-                dmc.Text(str(in_progress), fw=700, span=True)
-            ], size="sm"),
-            dmc.Text([
-                dmc.Text("○ Not Started: ", c="gray", span=True),
-                dmc.Text(str(not_started), fw=700, span=True)
-            ], size="sm"),
-            dmc.Text([
-                dmc.Text("⚑ Flagged: ", c="red", span=True),
-                dmc.Text(str(flagged), fw=700, span=True)
-            ], size="sm")
-        ], gap="xs")
+            mb="sm"
+        )
     ])
 
 
