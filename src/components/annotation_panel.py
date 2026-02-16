@@ -201,10 +201,10 @@ def create_span_annotation_control(
         )
     
     return html.Div([
-        dmc.Text("Enter the text to annotate:", size="sm", c="dimmed"),
-        dmc.TextInput(
-            id={"type": "span-text-input", "id": control_id},
-            placeholder="Type or paste text from document..."
+        dmc.Text(
+            "Highlight text in the document, then select entity type:",
+            size="sm",
+            c="dimmed"
         ),
         dmc.Text("Select entity type:", size="sm", c="dimmed", mt="sm"),
         dmc.Stack(entity_buttons, gap="xs"),

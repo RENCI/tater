@@ -533,6 +533,57 @@ def update_document_display(current_index, documents, schema_data, annotations_d
     )
 
 
+# Clientside callback to capture selected text when button is clicked
+app.clientside_callback(
+    """
+    function(n_clicks_list, app_state) {
+        // Set up event listeners on first run
+        if (!window.dash_selection_initialized) {
+            window.dash_selection_initialized = true;
+            window.dash_selection_store = '';
+            
+            console.log('Initializing text selection capture...');
+            
+            // Capture selection on mouseup anywhere in document
+            document.addEventListener('mouseup', function(e) {
+                setTimeout(function() {
+                    const selection = window.getSelection();
+                    const selectedText = selection ? selection.toString().trim() : '';
+                    if (selectedText) {
+                        window.dash_selection_store = selectedText;
+                        console.log('Stored selection:', selectedText);
+                    }
+                }, 10);
+            });
+            
+            // Also listen for button mousedown to capture selection before it's cleared
+            document.addEventListener('mousedown', function(e) {
+                const selection = window.getSelection();
+                const selectedText = selection ? selection.toString().trim() : '';
+                if (selectedText) {
+                    window.dash_selection_store = selectedText;
+                    console.log('Captured on mousedown:', selectedText);
+                }
+            });
+        }
+        
+        // When button is clicked, return the stored selection
+        if (n_clicks_list && n_clicks_list.some(n => n)) {
+            const result = window.dash_selection_store || '';
+            console.log('Returning to callback:', result);
+            return result;
+        }
+        
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("selected-text-store", "data"),
+    [Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
+     Input("app-state", "data")],
+    prevent_initial_call=False
+)
+
+
 @app.callback(
     Output("dirty-state-store", "data"),
     [Input({"type": "annotation-input", "id": ALL}, "value"),
@@ -548,28 +599,38 @@ def mark_dirty(annotation_values, annotation_data, flagged):
 @app.callback(
     [Output({"type": "annotation-input", "id": ALL}, "data"),
      Output({"type": "span-status", "id": ALL}, "children"),
-     Output({"type": "span-text-input", "id": ALL}, "value"),
      Output("document-text-container", "children", allow_duplicate=True),
-     Output("span-annotations-list", "children", allow_duplicate=True)],
-    Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
-    [State({"type": "span-text-input", "id": ALL}, "value"),
-     State({"type": "annotation-input", "id": ALL}, "data"),
+     Output("span-annotations-list", "children", allow_duplicate=True),
+     Output("selected-text-store", "data", allow_duplicate=True)],
+    [Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
+     Input("selected-text-store", "data")],
+    [State({"type": "annotation-input", "id": ALL}, "data"),
      State("current-index-store", "data"),
      State("documents-store", "data"),
      State("schema-store", "data"),
      State("annotations-store", "data")],
     prevent_initial_call=True
 )
-def add_span_annotation(n_clicks_list, text_inputs, span_data_list, 
+def add_span_annotation(n_clicks_list, selected_text, span_data_list, 
                        current_index, documents, schema_data, annotations_data):
     """Add a span annotation when button is clicked."""
-    if not ctx.triggered_id or not any(n_clicks_list):
+    triggered_id = ctx.triggered_id
+    if (
+        not triggered_id
+        or not any(n_clicks_list)
+        or not isinstance(triggered_id, dict)
+        or triggered_id.get("type") != "add-span"
+    ):
         from dash.exceptions import PreventUpdate
         raise PreventUpdate
     
+    # Debug logging
+    print(f"DEBUG: Button clicked - entity type: {triggered_id.get('entity')}")
+    print(f"DEBUG: Selected text from store: '{selected_text}'")
+    
     # The triggered_id contains the annotation type ID and entity type
-    annotation_type_id = ctx.triggered_id["id"]
-    entity_type = ctx.triggered_id["entity"]  # Entity type from button ID
+    annotation_type_id = triggered_id["id"]
+    entity_type = triggered_id["entity"]  # Entity type from button ID
     
     # Find the index in the schema for this annotation type
     from data.validator import AnnotationSchema
@@ -590,23 +651,24 @@ def add_span_annotation(n_clicks_list, text_inputs, span_data_list,
         from dash.exceptions import PreventUpdate
         raise PreventUpdate
     
-    # Get input values for this specific span annotation type
-    text_input = text_inputs[span_control_index] if span_control_index < len(text_inputs) else None
+    # Get current spans
     current_spans = span_data_list[schema_index] if schema_index < len(span_data_list) else []
     
     # Validate inputs
     status_messages = ["" for _ in range(span_count)]
-    clear_text_inputs = [text_inputs[i] if i < len(text_inputs) else "" for i in range(span_count)]
     
-    if not text_input or not text_input.strip():
-        status_messages[span_control_index] = html.Small("⚠ Please enter text to annotate", className="text-warning")
+    # Use selected text (from highlighting)
+    text_to_annotate = selected_text or ""
+    
+    if not text_to_annotate or not text_to_annotate.strip():
+        status_messages[span_control_index] = html.Small("⚠ Please highlight text in the document", className="text-warning")
         # Get current document text for display
         doc_data = documents[current_index]
         file_path = doc_data['file_path']
         full_text, _ = load_document_text(file_path)
         formatted_text = format_document_text(full_text, current_spans)
         span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, clear_text_inputs, formatted_text, span_list
+        return span_data_list, status_messages, formatted_text, span_list, ""
     
     # Get current document text to find the span
     doc_data = documents[current_index]
@@ -617,17 +679,17 @@ def add_span_annotation(n_clicks_list, text_inputs, span_data_list,
         status_messages[span_control_index] = html.Small("⚠ Error loading document", className="text-danger")
         formatted_text = format_document_text(full_text, current_spans)
         span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, clear_text_inputs, formatted_text, span_list
+        return span_data_list, status_messages, formatted_text, span_list, ""
     
     # Find the text in the document
-    text_to_find = text_input.strip()
+    text_to_find = text_to_annotate.strip()
     start_pos = full_text.find(text_to_find)
     
     if start_pos == -1:
         status_messages[span_control_index] = html.Small("⚠ Text not found in document", className="text-warning")
         formatted_text = format_document_text(full_text, current_spans)
         span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, clear_text_inputs, formatted_text, span_list
+        return span_data_list, status_messages, formatted_text, span_list, ""
     
     # Create new span annotation
     new_span = {
@@ -648,13 +710,12 @@ def add_span_annotation(n_clicks_list, text_inputs, span_data_list,
     
     # Update status and clear inputs
     status_messages[span_control_index] = html.Small(f"✓ Added: {entity_type}", className="text-success")
-    clear_text_inputs[span_control_index] = ""  # Clear the text input
-    
     # Re-render document with highlights
     formatted_text = format_document_text(full_text, updated_spans)
     span_list = create_span_annotations_display(updated_spans)
     
-    return new_span_data_list, status_messages, clear_text_inputs, formatted_text, span_list
+    # Clear the selected text store
+    return new_span_data_list, status_messages, formatted_text, span_list, ""
 
 
 @app.callback(
