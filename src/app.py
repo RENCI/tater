@@ -39,10 +39,16 @@ def create_startup_screen() -> html.Div:
     return dmc.Container([
         dmc.Stack([
             dmc.Title("Clinical Note Annotation Tool", order=2, ta="center", mt="xl", mb="lg"),
+            # Load Previous section
+            html.Div(id="load-previous-section"),
             dmc.Paper([
                 dmc.Stack([
-                    dmc.Title("Load Documents and Schema", order=5, mb="md"),
-                    dmc.Text("Document List File (CSV or JSON):", size="sm", fw=500),
+                    dmc.Title("Load New Documents and Schema", order=5, mb="md"),
+                    dmc.Text(
+                        "Document list file (CSV or JSON):",
+                        size="sm",
+                        fw=500
+                    ),
                     dcc.Upload(
                         id="documents-file-upload",
                         children=dmc.Button(
@@ -53,7 +59,11 @@ def create_startup_screen() -> html.Div:
                         className="mb-2"
                     ),
                     html.Div(id="documents-file-name", style={"color": "#666", "fontSize": "0.875rem", "marginBottom": "1rem"}),
-                    dmc.Text("Annotation Schema File (JSON):", size="sm", fw=500),
+                    dmc.Text(
+                        "Annotation schema file (JSON):",
+                        size="sm",
+                        fw=500
+                    ),
                     dcc.Upload(
                         id="schema-file-upload",
                         children=dmc.Button(
@@ -101,6 +111,9 @@ app.layout = dmc.MantineProvider([
     dcc.Store(id="documents-file-content", data=None),
     dcc.Store(id="schema-file-content", data=None),
     dcc.Store(id="selected-text-store", data=None),
+    # Local storage for previous files
+    dcc.Store(id="local-documents-file", storage_type="local", data=None),
+    dcc.Store(id="local-schema-file", storage_type="local", data=None),
     dcc.Interval(id="auto-save-interval", interval=AUTO_SAVE_INTERVAL, n_intervals=0),
     html.Div(id="main-content", children=create_startup_screen())
 ])
@@ -145,20 +158,150 @@ def enable_load_button(docs_content, schema_content):
 
 
 @app.callback(
+    Output("load-previous-section", "children"),
+    [Input("local-documents-file", "data"),
+     Input("local-schema-file", "data")],
+    prevent_initial_call=False
+)
+def show_load_previous(local_docs, local_schema):
+    """Show continue annotating button if files exist in local storage."""
+    if local_docs and local_schema:
+        docs_filename = local_docs.get("filename", "cached files")
+        schema_filename = local_schema.get("filename", "cached schema")
+        return dmc.Paper([
+            dmc.Stack([
+                dmc.Title("Continue Previous Session", order=5, mb="md"),
+                dmc.Text(
+                    "Document list file:",
+                    size="sm",
+                    fw=500
+                ),
+                dmc.Text(
+                    docs_filename,
+                    size="sm",
+                    c="dimmed",
+                    mb="xs"
+                ),
+                dmc.Text(
+                    "Annotation schema file:",
+                    size="sm",
+                    fw=500
+                ),
+                dmc.Text(
+                    schema_filename,
+                    size="sm",
+                    c="dimmed",
+                    mb="sm"
+                ),
+                dmc.Button(
+                    "Continue annotating",
+                    id="load-previous-button",
+                    fullWidth=True,
+                    n_clicks=0
+                )
+            ], gap="sm")
+        ], shadow="sm", p="lg", radius="md", mb="md", style={"maxWidth": "500px", "margin": "0 auto"})
+    return html.Div()
+
+
+@app.callback(
+    [Output("main-content", "children", allow_duplicate=True),
+     Output("app-state", "data", allow_duplicate=True),
+     Output("documents-store", "data", allow_duplicate=True),
+     Output("schema-store", "data", allow_duplicate=True),
+     Output("annotations-store", "data", allow_duplicate=True)],
+    Input("load-previous-button", "n_clicks"),
+    [State("local-documents-file", "data"),
+     State("local-schema-file", "data")],
+    prevent_initial_call=True
+)
+def load_previous_files(n_clicks, local_docs, local_schema):
+    """Load previously uploaded files from local storage."""
+    if not n_clicks or not local_docs or not local_schema:
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+    
+    try:
+        docs_content = local_docs.get("contents")
+        schema_content = local_schema.get("contents")
+        docs_filename = local_docs.get("filename", "documents")
+        
+        # Decode documents file
+        content_type, content_string = docs_content.split(',')
+        decoded_docs = base64.b64decode(content_string)
+        
+        # Parse documents based on file extension
+        documents = []
+        if docs_filename.endswith('.json'):
+            docs_data = json.loads(decoded_docs.decode('utf-8'))
+            doc_list = DocumentList(**docs_data)
+            documents = doc_list.documents
+        elif docs_filename.endswith('.csv'):
+            df = pd.read_csv(io.StringIO(decoded_docs.decode('utf-8')))
+            if 'file_path' not in df.columns:
+                raise ValueError("CSV must contain 'file_path' column")
+            
+            for _, row in df.iterrows():
+                metadata = None
+                if 'metadata' in df.columns and pd.notna(row['metadata']):
+                    try:
+                        metadata = json.loads(row['metadata'])
+                    except json.JSONDecodeError:
+                        metadata = None
+                
+                doc = Document(
+                    file_path=row['file_path'],
+                    metadata=metadata
+                )
+                documents.append(doc)
+        else:
+            raise ValueError("Document list must be .json or .csv file")
+        
+        # Decode and parse schema file
+        content_type, content_string = schema_content.split(',')
+        decoded_schema = base64.b64decode(content_string)
+        schema_data = json.loads(decoded_schema.decode('utf-8'))
+        schema = AnnotationSchema(**schema_data)
+        
+        # Load existing annotations
+        annotations = load_annotations()
+        
+        # Update schema version if needed
+        if annotations.schema_version != schema.schema_version:
+            annotations.schema_version = schema.schema_version
+        
+        return (
+            create_annotation_screen(),
+            {"loaded": True},
+            [doc.model_dump() for doc in documents],
+            schema.model_dump(),
+            annotations.model_dump()
+        )
+    
+    except Exception as e:
+        print(f"Error loading cached files: {e}")
+        from dash.exceptions import PreventUpdate
+        raise PreventUpdate
+
+
+@app.callback(
     [Output("main-content", "children"),
      Output("app-state", "data"),
      Output("documents-store", "data"),
      Output("schema-store", "data"),
      Output("annotations-store", "data"),
-     Output("load-error", "children")],
+     Output("load-error", "children"),
+     Output("local-documents-file", "data"),
+     Output("local-schema-file", "data")],
     Input("load-button", "n_clicks"),
     [State("documents-file-content", "data"),
      State("schema-file-content", "data"),
-     State("documents-file-upload", "filename")],
+     State("documents-file-upload", "filename"),
+     State("schema-file-upload", "filename")],
     prevent_initial_call=True
 )
-def load_files(n_clicks, docs_content, schema_content, docs_filename):
-    """Load documents and schema files from uploaded content."""
+def load_files(n_clicks, docs_content, schema_content, docs_filename, schema_filename):
+    """Load documents and schema files from uploaded content and save to local storage."""
     if not docs_content or not schema_content:
         return (
             create_startup_screen(),
@@ -166,7 +309,9 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename):
             [],
             None,
             None,
-            "Please upload both files."
+            "Please upload both files.",
+            None,
+            None
         )
     
     try:
@@ -223,7 +368,9 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename):
             [doc.model_dump() for doc in documents],
             schema.model_dump(),
             annotations.model_dump(),
-            ""
+            "",
+            {"contents": docs_content, "filename": docs_filename},
+            {"contents": schema_content, "filename": schema_filename}
         )
     
     except Exception as e:
@@ -233,7 +380,9 @@ def load_files(n_clicks, docs_content, schema_content, docs_filename):
             [],
             None,
             None,
-            f"Error loading files: {str(e)}"
+            f"Error loading files: {str(e)}",
+            None,
+            None
         )
 
 
