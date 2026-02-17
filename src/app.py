@@ -558,8 +558,6 @@ app.clientside_callback(
             window.dash_selection_initialized = true;
             window.dash_selection_store = '';
             
-            console.log('Initializing text selection capture...');
-            
             // Capture selection on mouseup anywhere in document
             document.addEventListener('mouseup', function() {
                 setTimeout(function() {
@@ -567,7 +565,6 @@ app.clientside_callback(
                     const selectedText = selection ? selection.toString().trim() : '';
                     if (selectedText) {
                         window.dash_selection_store = selectedText;
-                        console.log('Stored selection:', selectedText);
                     }
                 }, 10);
             });
@@ -578,7 +575,6 @@ app.clientside_callback(
                 const selectedText = selection ? selection.toString().trim() : '';
                 if (selectedText) {
                     window.dash_selection_store = selectedText;
-                    console.log('Captured on mousedown:', selectedText);
                 }
             });
         }
@@ -660,7 +656,6 @@ app.clientside_callback(
             const result = window.dash_selection_store || '';
             const triggeredId = dash_clientside.callback_context.triggered_id;
             const range = getSelectionRange();
-            console.log('Returning to callback:', result, range);
             return [result, triggeredId || null, range];
         }
         
@@ -717,10 +712,6 @@ def add_span_annotation(span_trigger, selected_text, selection_range, span_data_
     if not span_trigger or not isinstance(span_trigger, dict) or span_trigger.get("type") != "add-span":
         from dash.exceptions import PreventUpdate
         raise PreventUpdate
-    
-    # Debug logging
-    print(f"DEBUG: Button clicked - entity type: {span_trigger.get('entity')}")
-    print(f"DEBUG: Selected text from store: '{selected_text}'")
     
     # The triggered_id contains the annotation type ID and entity type
     annotation_type_id = span_trigger["id"]

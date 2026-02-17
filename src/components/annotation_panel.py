@@ -203,12 +203,7 @@ def create_span_annotation_control(
         )
     
     return html.Div([
-        dmc.Text(
-            "Highlight text in the document, then select entity type:",
-            size="sm",
-            c="dimmed"
-        ),
-        dmc.Text("Select entity type:", size="sm", c="dimmed", mt="sm"),
+        dmc.Text("Highlight text in the document, then select entity type:", size="sm", c="dimmed", mt="sm"),
         dmc.Stack(entity_buttons, gap="xs"),
         html.Div(
             id={"type": "span-status", "id": control_id},
