@@ -418,33 +418,35 @@ def navigate_buttons(prev_clicks, next_clicks, selector_value, documents):
 
 @app.callback(
     [Output("current-index-store", "data"),
-     Output("dirty-state-store", "data", allow_duplicate=True)],
+     Output("dirty-state-store", "data", allow_duplicate=True),
+     Output("annotations-store", "data", allow_duplicate=True)],
     Input("document-selector", "value"),
     [State("current-index-store", "data"),
      State("documents-store", "data"),
      State("annotations-store", "data"),
      State("schema-store", "data"),
      State({"type": "annotation-input", "id": ALL}, "value"),
+     State({"type": "annotation-input", "id": ALL}, "data"),
      State("flag-for-review", "checked")],
     prevent_initial_call=True
 )
 def sync_current_index(selector_value, current_index,
                        documents, annotations_data, schema_data,
-                       annotation_values, flagged):
+                       annotation_values, annotation_data_values, flagged):
     """Sync current index to selector changes and save before switching."""
     if not documents or selector_value is None:
-        return current_index, False
+        return current_index, False, annotations_data
 
     new_index = int(selector_value)
 
     # Save current document's annotations before navigating
     if new_index != current_index and annotations_data and schema_data:
-        save_current_annotations(
+        annotations_data = save_current_annotations(
             current_index, documents, annotations_data,
-            schema_data, annotation_values, flagged
+            schema_data, annotation_values, annotation_data_values, flagged
         )
 
-    return new_index, False
+    return new_index, False, annotations_data
 
 
 @app.callback(
@@ -804,13 +806,14 @@ def delete_span_annotation(delete_clicks, span_data_list, current_index, documen
      State("annotations-store", "data"),
      State("schema-store", "data"),
      State({"type": "annotation-input", "id": ALL}, "value"),
+     State({"type": "annotation-input", "id": ALL}, "data"),
      State("flag-for-review", "checked"),
      State("dirty-state-store", "data")],
     prevent_initial_call=True
 )
 def save_annotations_callback(manual_click, auto_interval, current_index, documents,
                                annotations_data, schema_data, annotation_values,
-                               flagged, is_dirty):
+                               annotation_data_values, flagged, is_dirty):
     """Save annotations (manual or auto-save)."""
     # Only auto-save if dirty
     if ctx.triggered_id == "auto-save-interval" and not is_dirty:
@@ -834,8 +837,10 @@ def save_annotations_callback(manual_click, auto_interval, current_index, docume
         # Update annotations from inputs
         ann_dict = {}
         for i, ann_type in enumerate(schema.annotation_types):
-            if i < len(annotation_values):
-                ann_dict[ann_type.id] = annotation_values[i]
+            value = annotation_values[i] if i < len(annotation_values) else None
+            if value is None and i < len(annotation_data_values):
+                value = annotation_data_values[i]
+            ann_dict[ann_type.id] = value
         
         doc_ann.annotations = ann_dict
         doc_ann.flagged_for_review = flagged
@@ -869,7 +874,7 @@ def save_annotations_callback(manual_click, auto_interval, current_index, docume
 
 
 def save_current_annotations(current_index, documents, annotations_data,
-                             schema_data, annotation_values, flagged):
+                             schema_data, annotation_values, annotation_data_values, flagged):
     """Helper to save current document's annotations."""
     try:
         from data.validator import AnnotationCollection, AnnotationSchema
@@ -883,8 +888,10 @@ def save_current_annotations(current_index, documents, annotations_data,
         
         ann_dict = {}
         for i, ann_type in enumerate(schema.annotation_types):
-            if i < len(annotation_values):
-                ann_dict[ann_type.id] = annotation_values[i]
+            value = annotation_values[i] if i < len(annotation_values) else None
+            if value is None and i < len(annotation_data_values):
+                value = annotation_data_values[i]
+            ann_dict[ann_type.id] = value
         
         doc_ann.annotations = ann_dict
         doc_ann.flagged_for_review = flagged
@@ -901,9 +908,10 @@ def save_current_annotations(current_index, documents, annotations_data,
         
         annotations.update_annotation(doc_ann)
         save_annotations(annotations)
-    
+        return annotations.model_dump()
     except Exception as e:
         print(f"Error saving annotations: {e}")
+        return annotations_data
 
 
 if __name__ == "__main__":

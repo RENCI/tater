@@ -100,6 +100,7 @@ def create_annotation_controls(
                 create_span_annotation_control(
                     ann_type.id,
                     ann_type.entity_types,
+                    current_value,
                     ann_type.required
                 )
             )
@@ -166,6 +167,7 @@ def create_multi_choice_control(
 def create_span_annotation_control(
     control_id: str,
     entity_types: List[str],
+    current_value: Optional[List[Dict[str, Any]]] = None,
     required: bool = False
 ) -> html.Div:
     """Create a span annotation control."""
@@ -216,7 +218,7 @@ def create_span_annotation_control(
         # Hidden store for span annotations
         dcc.Store(
             id={"type": "annotation-input", "id": control_id},
-            data=[]
+            data=current_value or []
         )
     ], style={"marginBottom": "1rem"})
 
