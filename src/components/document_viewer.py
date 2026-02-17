@@ -19,6 +19,13 @@ def create_document_viewer() -> dmc.Paper:
             ], justify="space-between"),
             html.Div(
                 id="document-text-container",
+                style={
+                    "maxHeight": "70vh",
+                    "overflowY": "auto",
+                    "backgroundColor": "#f8f9fa",
+                    "border": "1px solid #dee2e6",
+                    "borderRadius": "4px"
+                },
                 children=[
                     html.Pre(
                         id="document-text",
@@ -29,19 +36,11 @@ def create_document_viewer() -> dmc.Paper:
                             "fontSize": "14px",
                             "lineHeight": "1.6",
                             "padding": "10px",
-                            "maxHeight": "70vh",
-                            "overflowY": "auto",
-                            "backgroundColor": "#f8f9fa",
-                            "border": "1px solid #dee2e6",
-                            "borderRadius": "4px",
                             "userSelect": "text",
                             "cursor": "text"
                         }
                     )
                 ]
-            ),
-            html.Div(
-                id="span-annotations-list"
             )
         ], gap="md")
     ], p="md", shadow="sm", radius="md", style={"height": "100%"})
@@ -71,11 +70,6 @@ def format_document_text(
                 "fontSize": "14px",
                 "lineHeight": "1.6",
                 "padding": "10px",
-                "maxHeight": "70vh",
-                "overflowY": "auto",
-                "backgroundColor": "#f8f9fa",
-                "border": "1px solid #dee2e6",
-                "borderRadius": "4px",
                 "userSelect": "text",
                 "cursor": "text"
             }
@@ -102,16 +96,43 @@ def format_document_text(
         # Add highlighted span
         color = ENTITY_COLORS.get(entity_type, "#E0E0E0")
         children.append(
-            html.Mark(
-                text[start:end],
-                style={
-                    "backgroundColor": color,
-                    "padding": "2px 4px",
-                    "borderRadius": "3px",
-                    "cursor": "pointer"
-                },
-                id={"type": "span-highlight", "index": i},
-                title=f"{entity_type}: {text[start:end]}"
+            html.Span(
+                [
+                    html.Mark(
+                        text[start:end],
+                        style={
+                            "backgroundColor": color,
+                            "padding": "2px 4px",
+                            "borderRadius": "3px",
+                            "cursor": "pointer"
+                        },
+                        id={"type": "span-highlight", "index": i}
+                    ),
+                    html.Span(
+                        [
+                            html.Span(
+                                entity_type,
+                                className="span-annotation-label",
+                                style={"backgroundColor": color}
+                            ),
+                            html.Button(
+                                "x",
+                                id={
+                                    "type": "delete-span",
+                                    "start": start,
+                                    "end": end,
+                                    "entity": entity_type
+                                },
+                                className="span-annotation-delete",
+                                title="Remove span"
+                            )
+                        ],
+                        className="span-annotation-pop"
+                    )
+                ],
+                className="span-annotation",
+                tabIndex=0,
+                **{"data-span-annotation": "true"}
             )
         )
         
@@ -130,11 +151,6 @@ def format_document_text(
             "fontSize": "14px",
             "lineHeight": "1.6",
             "padding": "10px",
-            "maxHeight": "70vh",
-            "overflowY": "auto",
-            "backgroundColor": "#f8f9fa",
-            "border": "1px solid #dee2e6",
-            "borderRadius": "4px",
             "userSelect": "text",
             "cursor": "text"
         }

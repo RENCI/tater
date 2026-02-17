@@ -14,7 +14,7 @@ from data.loader import load_documents, load_schema, load_document_text
 from data.storage import load_annotations, save_annotations, get_or_create_annotation
 from data.validator import AnnotationSchema, Document, DocumentAnnotation, DocumentList
 from components.document_viewer import (
-    create_document_viewer, format_document_text, create_span_annotations_display
+    create_document_viewer, format_document_text
 )
 from components.annotation_panel import create_annotation_panel, create_annotation_controls
 from components.navigation import create_navigation_bar, create_progress_display
@@ -43,7 +43,6 @@ def create_startup_screen() -> html.Div:
             html.Div(id="load-previous-section"),
             # Hidden placeholders to satisfy callback outputs before annotation screen loads
             html.Div(id="document-text-container", style={"display": "none"}),
-            html.Div(id="span-annotations-list", style={"display": "none"}),
             dmc.Paper([
                 dmc.Stack([
                     dmc.Title("Load New Documents and Schema", order=5, mb="md"),
@@ -115,6 +114,7 @@ app.layout = dmc.MantineProvider([
     dcc.Store(id="schema-file-content", data=None),
     dcc.Store(id="selected-text-store", data=None),
     dcc.Store(id="span-trigger-store", data=None),
+    dcc.Store(id="selection-range-store", data=None),
     # Local storage for previous files
     dcc.Store(id="local-documents-file", storage_type="local", data=None),
     dcc.Store(id="local-schema-file", storage_type="local", data=None),
@@ -454,7 +454,6 @@ def sync_current_index(selector_value, current_index,
      Output("document-metadata", "children"),
      Output("annotation-controls-container", "children"),
      Output("flag-for-review", "checked"),
-     Output("span-annotations-list", "children"),
      Output("prev-button", "disabled"),
      Output("next-button", "disabled"),
      Output("document-selector", "data"),
@@ -515,8 +514,6 @@ def update_document_display(current_index, documents, schema_data, annotations_d
     formatted_text = format_document_text(text, span_anns)
     
     # Create span annotations display
-    span_display = create_span_annotations_display(span_anns)
-    
     # Navigation state
     prev_disabled = current_index <= 0
     next_disabled = current_index >= len(documents) - 1
@@ -545,7 +542,6 @@ def update_document_display(current_index, documents, schema_data, annotations_d
         metadata_str,
         controls,
         flagged,
-        span_display,
         prev_disabled,
         next_disabled,
         dropdown_options,
@@ -586,20 +582,98 @@ app.clientside_callback(
                 }
             });
         }
+
+        function getSelectionRange() {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) {
+                return null;
+            }
+            const range = selection.getRangeAt(0);
+            const docText = document.getElementById('document-text');
+            if (!docText) {
+                return null;
+            }
+
+            function normalizeContainer(container, offset) {
+                if (container.nodeType === Node.TEXT_NODE) {
+                    return {node: container, offset: offset};
+                }
+                if (container.childNodes && container.childNodes.length > 0) {
+                    var idx = Math.min(offset, container.childNodes.length - 1);
+                    var node = container.childNodes[idx];
+                    while (node && node.nodeType !== Node.TEXT_NODE) {
+                        node = node.firstChild;
+                    }
+                    if (node) {
+                        return {node: node, offset: 0};
+                    }
+                }
+                return {node: container, offset: 0};
+            }
+
+            function isIgnored(node) {
+                if (!node || !node.parentElement) {
+                    return false;
+                }
+                return !!node.parentElement.closest('.span-annotation-pop');
+            }
+
+            function getTextOffset(root, container, offset) {
+                var normalized = normalizeContainer(container, offset);
+                var targetNode = normalized.node;
+                var targetOffset = normalized.offset;
+
+                var walker = document.createTreeWalker(
+                    root,
+                    NodeFilter.SHOW_TEXT,
+                    {
+                        acceptNode: function(node) {
+                            if (isIgnored(node)) {
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                            return NodeFilter.FILTER_ACCEPT;
+                        }
+                    }
+                );
+                var count = 0;
+                var current = walker.nextNode();
+                while (current) {
+                    if (current === targetNode) {
+                        return count + targetOffset;
+                    }
+                    count += current.nodeValue.length;
+                    current = walker.nextNode();
+                }
+                return null;
+            }
+
+            const start = getTextOffset(docText, range.startContainer, range.startOffset);
+            const end = getTextOffset(docText, range.endContainer, range.endOffset);
+            if (start === null || end === null || end <= start) {
+                return null;
+            }
+            return {start: start, end: end};
+        }
         
         // Only emit values when an add-span button was clicked
         if (n_clicks_list && n_clicks_list.some(n => n)) {
             const result = window.dash_selection_store || '';
             const triggeredId = dash_clientside.callback_context.triggered_id;
-            console.log('Returning to callback:', result);
-            return [result, triggeredId || null];
+            const range = getSelectionRange();
+            console.log('Returning to callback:', result, range);
+            return [result, triggeredId || null, range];
         }
         
-        return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+        return [
+            window.dash_clientside.no_update,
+            window.dash_clientside.no_update,
+            window.dash_clientside.no_update
+        ];
     }
     """,
     [Output("selected-text-store", "data"),
-     Output("span-trigger-store", "data")],
+     Output("span-trigger-store", "data"),
+     Output("selection-range-store", "data")],
     [Input({"type": "add-span", "id": ALL, "entity": ALL}, "n_clicks"),
      Input("app-state", "data")],
     prevent_initial_call=False
@@ -622,10 +696,10 @@ def mark_dirty(annotation_values, annotation_data, flagged):
     [Output({"type": "annotation-input", "id": ALL}, "data"),
      Output({"type": "span-status", "id": ALL}, "children"),
      Output("document-text-container", "children", allow_duplicate=True),
-     Output("span-annotations-list", "children", allow_duplicate=True),
      Output("selected-text-store", "data", allow_duplicate=True)],
     Input("span-trigger-store", "data"),
     [State("selected-text-store", "data"),
+     State("selection-range-store", "data"),
      State({"type": "annotation-input", "id": ALL}, "data"),
      State("app-state", "data"),
      State("current-index-store", "data"),
@@ -634,7 +708,7 @@ def mark_dirty(annotation_values, annotation_data, flagged):
      State("annotations-store", "data")],
     prevent_initial_call=True
 )
-def add_span_annotation(span_trigger, selected_text, span_data_list, app_state,
+def add_span_annotation(span_trigger, selected_text, selection_range, span_data_list, app_state,
                        current_index, documents, schema_data, annotations_data):
     """Add a span annotation when button is clicked."""
     if not app_state or not app_state.get("loaded"):
@@ -689,8 +763,7 @@ def add_span_annotation(span_trigger, selected_text, span_data_list, app_state,
         file_path = doc_data['file_path']
         full_text, _ = load_document_text(file_path)
         formatted_text = format_document_text(full_text, current_spans)
-        span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, formatted_text, span_list, ""
+        return span_data_list, status_messages, formatted_text, ""
     
     # Get current document text to find the span
     doc_data = documents[current_index]
@@ -700,24 +773,35 @@ def add_span_annotation(span_trigger, selected_text, span_data_list, app_state,
     if not success:
         status_messages[span_control_index] = html.Small("⚠ Error loading document", className="text-danger")
         formatted_text = format_document_text(full_text, current_spans)
-        span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, formatted_text, span_list, ""
+        return span_data_list, status_messages, formatted_text, ""
     
-    # Find the text in the document
-    text_to_find = text_to_annotate.strip()
-    start_pos = full_text.find(text_to_find)
+    # Prefer exact selection range to avoid wrong occurrences
+    start_pos = None
+    end_pos = None
+    if selection_range and isinstance(selection_range, dict):
+        start_candidate = selection_range.get("start")
+        end_candidate = selection_range.get("end")
+        if isinstance(start_candidate, int) and isinstance(end_candidate, int):
+            if 0 <= start_candidate < end_candidate <= len(full_text):
+                start_pos = start_candidate
+                end_pos = end_candidate
+
+    if start_pos is None:
+        # Fall back to first occurrence if no range was captured
+        text_to_find = text_to_annotate.strip()
+        start_pos = full_text.find(text_to_find)
+        end_pos = start_pos + len(text_to_find) if start_pos != -1 else None
     
-    if start_pos == -1:
+    if start_pos == -1 or end_pos is None:
         status_messages[span_control_index] = html.Small("⚠ Text not found in document", className="text-warning")
         formatted_text = format_document_text(full_text, current_spans)
-        span_list = create_span_annotations_display(current_spans)
-        return span_data_list, status_messages, formatted_text, span_list, ""
+        return span_data_list, status_messages, formatted_text, ""
     
     # Create new span annotation
     new_span = {
-        "text": text_to_find,
+        "text": full_text[start_pos:end_pos],
         "start": start_pos,
-        "end": start_pos + len(text_to_find),
+        "end": end_pos,
         "entity_type": entity_type
     }
     
@@ -734,17 +818,14 @@ def add_span_annotation(span_trigger, selected_text, span_data_list, app_state,
     status_messages[span_control_index] = html.Small(f"✓ Added: {entity_type}", className="text-success")
     # Re-render document with highlights
     formatted_text = format_document_text(full_text, updated_spans)
-    span_list = create_span_annotations_display(updated_spans)
-    
     # Clear the selected text store
-    return new_span_data_list, status_messages, formatted_text, span_list, ""
+    return new_span_data_list, status_messages, formatted_text, ""
 
 
 @app.callback(
     [Output({"type": "annotation-input", "id": ALL}, "data", allow_duplicate=True),
-     Output("document-text-container", "children", allow_duplicate=True),
-     Output("span-annotations-list", "children", allow_duplicate=True)],
-    Input({"type": "delete-span", "index": ALL}, "n_clicks"),
+     Output("document-text-container", "children", allow_duplicate=True)],
+    Input({"type": "delete-span", "start": ALL, "end": ALL, "entity": ALL}, "n_clicks"),
     [State({"type": "annotation-input", "id": ALL}, "data"),
      State("current-index-store", "data"),
      State("documents-store", "data"),
@@ -758,7 +839,10 @@ def delete_span_annotation(delete_clicks, span_data_list, current_index, documen
         raise PreventUpdate
     
     # Find which delete button was clicked
-    delete_index = ctx.triggered_id["index"]
+    delete_id = ctx.triggered_id
+    delete_start = delete_id.get("start") if isinstance(delete_id, dict) else None
+    delete_end = delete_id.get("end") if isinstance(delete_id, dict) else None
+    delete_entity = delete_id.get("entity") if isinstance(delete_id, dict) else None
     
     # Find the span annotation storage (should be only one for span_annotation type)
     from data.validator import AnnotationSchema
@@ -774,12 +858,16 @@ def delete_span_annotation(delete_clicks, span_data_list, current_index, documen
         from dash.exceptions import PreventUpdate
         raise PreventUpdate
     
-    # Get current spans and remove the one at delete_index
+    # Get current spans and remove the matching span
     current_spans = span_data_list[span_field_index] or []
-    if delete_index < len(current_spans):
-        updated_spans = [span for i, span in enumerate(current_spans) if i != delete_index]
-    else:
-        updated_spans = current_spans
+    updated_spans = [
+        span for span in current_spans
+        if not (
+            span.get("start") == delete_start
+            and span.get("end") == delete_end
+            and span.get("entity_type") == delete_entity
+        )
+    ]
     
     # Update span data list
     new_span_data_list = [span_data_list[i] if i != span_field_index else updated_spans 
@@ -791,9 +879,7 @@ def delete_span_annotation(delete_clicks, span_data_list, current_index, documen
     full_text, success = load_document_text(file_path)
     
     formatted_text = format_document_text(full_text, updated_spans)
-    span_list = create_span_annotations_display(updated_spans)
-    
-    return new_span_data_list, formatted_text, span_list
+    return new_span_data_list, formatted_text
 
 
 @app.callback(
