@@ -173,32 +173,62 @@ def create_span_annotation_control(
     """Create a span annotation control."""
     label = "Required *" if required else ""
     
+    # Count spans by entity type
+    entity_counts = {et: 0 for et in entity_types}
+    if current_value:
+        for span in current_value:
+            if isinstance(span, dict) and "entity_type" in span:
+                entity_type = span["entity_type"]
+                if entity_type in entity_counts:
+                    entity_counts[entity_type] += 1
+    
     # Create individual buttons for each entity type with color indicators
     entity_buttons = []
     for et in entity_types:
         color = ENTITY_COLORS.get(et, "#E0E0E0")
-        entity_buttons.append(
-            dmc.Button(
-                [
-                    html.Span(
-                        "",
-                        style={
-                            "display": "inline-block",
-                            "width": "12px",
-                            "height": "12px",
-                            "backgroundColor": color,
-                            "borderRadius": "2px",
-                            "marginRight": "6px",
-                            "border": "1px solid rgba(0,0,0,0.2)"
-                        }
-                    ),
-                    et
-                ],
-                id={"type": "add-span", "id": control_id, "entity": et},
+        count = entity_counts[et]
+        
+        # Create button content with entity name only
+        button_content = [
+            html.Span(
+                "",
+                style={
+                    "display": "inline-block",
+                    "width": "12px",
+                    "height": "12px",
+                    "backgroundColor": color,
+                    "borderRadius": "2px",
+                    "marginRight": "6px",
+                    "border": "1px solid rgba(0,0,0,0.2)"
+                }
+            ),
+            html.Span(et),
+        ]
+        
+        button = dmc.Button(
+            button_content,
+            id={"type": "add-span", "id": control_id, "entity": et},
+            variant="light",
+            size="xs",
+            style={"border": f"2px solid {color}", "justifyContent": "flex-start", "display": "flex", "alignItems": "center", "flex": 1, "marginBottom": "4px"}
+        )
+        
+        # Create row with button and count badge - always show badge
+        row_content = [
+            button,
+            dmc.Badge(
+                str(count),
+                id={"type": "entity-count-badge", "id": control_id, "entity": et},
+                size="sm",
                 variant="light",
-                size="xs",
-                fullWidth=True,
-                style={"border": f"2px solid {color}", "justifyContent": "flex-start", "marginBottom": "4px"}
+                style={"width": "32px", "textAlign": "center", "marginBottom": "4px"}
+            )
+        ]
+        
+        entity_buttons.append(
+            html.Div(
+                row_content,
+                style={"display": "flex", "gap": "8px", "alignItems": "center"}
             )
         )
     

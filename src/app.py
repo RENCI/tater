@@ -5,7 +5,7 @@ import io
 import json
 import csv
 from pathlib import Path
-from dash import Dash, html, dcc, Input, Output, State, ALL, ctx, callback
+from dash import Dash, html, dcc, Input, Output, State, ALL, MATCH, ctx, callback
 import dash_mantine_components as dmc
 from datetime import datetime
 import pandas as pd
@@ -994,6 +994,38 @@ def save_current_annotations(current_index, documents, annotations_data,
     except Exception as e:
         print(f"Error saving annotations: {e}")
         return annotations_data
+
+
+# Update entity count badges when span data changes
+@app.callback(
+    Output({"type": "entity-count-badge", "id": MATCH, "entity": ALL}, "children"),
+    Input({"type": "annotation-input", "id": MATCH}, "data"),
+    prevent_initial_call=True
+)
+def update_entity_count_badges(span_data):
+    """Update entity count badges based on span store data."""
+    if not span_data:
+        return []
+    
+    # Count spans by entity type
+    entity_counts = {}
+    if isinstance(span_data, list):
+        for span in span_data:
+            if isinstance(span, dict) and "entity_type" in span:
+                entity_type = span["entity_type"]
+                entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
+    
+    # Extract entity types from the output specs
+    # ctx.outputs_list contains the matched output specs in order
+    matched_entities = []
+    if ctx.outputs_list:
+        for spec in ctx.outputs_list:
+            # Each spec has 'id' (a dict) and 'property'
+            entity = spec.get('id', {}).get('entity', '')
+            matched_entities.append(entity)
+    
+    # Return counts for each matched entity in order
+    return [str(entity_counts.get(entity, 0)) for entity in matched_entities]
 
 
 if __name__ == "__main__":
