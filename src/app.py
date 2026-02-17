@@ -783,8 +783,13 @@ def add_span_annotation(span_trigger, selected_text, selection_range, span_data_
         end_candidate = selection_range.get("end")
         if isinstance(start_candidate, int) and isinstance(end_candidate, int):
             if 0 <= start_candidate < end_candidate <= len(full_text):
-                start_pos = start_candidate
-                end_pos = end_candidate
+                raw_text = full_text[start_candidate:end_candidate]
+                trimmed_text = raw_text.strip()
+                if trimmed_text:
+                    trim_start = raw_text.find(trimmed_text)
+                    start_pos = start_candidate + (trim_start if trim_start != -1 else 0)
+                    end_pos = start_pos + len(trimmed_text)
+                    text_to_annotate = trimmed_text
 
     if start_pos is None:
         # Fall back to first occurrence if no range was captured

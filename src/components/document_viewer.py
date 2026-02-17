@@ -102,8 +102,9 @@ def format_document_text(
                         text[start:end],
                         style={
                             "backgroundColor": color,
-                            "padding": "2px 4px",
+                            "padding": "0",
                             "borderRadius": "3px",
+                            "boxShadow": "inset 0 0 0 1px rgba(0,0,0,0.12)",
                             "cursor": "pointer"
                         },
                         id={"type": "span-highlight", "index": i}
