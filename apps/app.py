@@ -2,11 +2,13 @@
 
 This is a minimal example showing how to create and run a Tater app.
 """
-from tater import TaterApp
+from tater import TaterApp, parse_args
 
 
 def main():
     """Run the basic annotation app."""
+    args = parse_args()
+    
     # Create the app
     app = TaterApp(
         title="Basic Annotation App",
@@ -15,8 +17,9 @@ def main():
     
     # Run the server
     app.run(
-        debug=True,
-        port=8050
+        debug=args.debug,
+        port=args.port,
+        host=args.host
     )
 
 
