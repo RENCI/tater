@@ -4,6 +4,58 @@ import dash_mantine_components as dmc
 
 from ...models.schema import DataField
 from ...models.ui_config import WidgetConfig
+from .base import TaterWidget
+
+
+class SegmentedControlWidget(TaterWidget):
+    """Segmented control widget implementation."""
+
+    def __init__(
+        self,
+        schema_id: str,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        options: Optional[list[str]] = None,
+        default: Optional[str] = None
+    ) -> None:
+        label = label or schema_id.replace("_", " ").title()
+        super().__init__(schema_id=schema_id, label=label, description=description)
+        self.options = options or []
+        self.default = default
+
+    @classmethod
+    def from_field(
+        cls,
+        field: DataField,
+        widget_config: Optional[WidgetConfig] = None,
+        value: Optional[str] = None
+    ) -> "SegmentedControlWidget":
+        label = widget_config.label if widget_config and widget_config.label else field.id.replace("_", " ").title()
+        description = widget_config.description if widget_config and widget_config.description else field.description
+        options = field.options or []
+        default = value if value is not None else field.default
+
+        return cls(
+            schema_id=field.id,
+            label=label,
+            description=description,
+            options=options,
+            default=default
+        )
+
+    def component(self) -> dmc.Stack:
+        data = [{"label": opt, "value": opt} for opt in self.options]
+
+        return dmc.Stack([
+            dmc.Title(self.label, order=6),
+            dmc.SegmentedControl(
+                id=self.component_id,
+                data=data,
+                value=self.default,
+                fullWidth=True
+            ),
+            dmc.Text(self.description, size="sm", c="dimmed") if self.description else None
+        ], gap="xs")
 
 
 def create_segmented_control(
@@ -11,32 +63,5 @@ def create_segmented_control(
     widget_config: Optional[WidgetConfig] = None,
     value: Optional[str] = None
 ) -> dmc.Stack:
-    """Create a segmented control widget for single-choice selection.
-    
-    Args:
-        field: DataField definition from schema
-        widget_config: Optional UI configuration
-        value: Current selected value
-        
-    Returns:
-        Dash component containing the segmented control
-    """
-    label = widget_config.label if widget_config and widget_config.label else field.id.replace("_", " ").title()
-    description = widget_config.description if widget_config and widget_config.description else field.description
-    
-    # Set default value if not provided
-    if value is None and field.default is not None:
-        value = field.default
-    
-    data = [{"label": opt, "value": opt} for opt in (field.options or [])]
-    
-    return dmc.Stack([
-        dmc.Title(label, order=6),
-        dmc.SegmentedControl(
-            id=f"annotation-{field.id}",
-            data=data,
-            value=value,
-            fullWidth=True
-        ),
-        dmc.Text(description, size="sm", c="dimmed") if description else None
-    ], gap="xs")
+    """Create a segmented control widget for single-choice selection."""
+    return SegmentedControlWidget.from_field(field, widget_config, value).component()

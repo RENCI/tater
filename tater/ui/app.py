@@ -12,7 +12,7 @@ from .components import (
     create_document_navigation,
     create_document_info
 )
-from .widgets import create_radio_group, create_segmented_control
+from .widgets import RadioGroupWidget, SegmentedControlWidget, TaterWidget
 
 
 class TaterApp:
@@ -45,6 +45,8 @@ class TaterApp:
         self.theme = theme
         self.documents: Optional[DocumentList] = None
         self.spec: Optional[AnnotationSpec] = None
+        self.annotation_widgets: Optional[list[TaterWidget]] = None
+        self.annotation_panel_title = "Annotations"
         self.annotations: dict[int, dict] = {}  # doc_index -> {field_id: value}
         self.current_index = 0
         
@@ -106,6 +108,16 @@ class TaterApp:
         except Exception as e:
             print(f"✗ Error loading schema: {e}")
             return False
+
+    def set_annotation_widgets(self, widgets: list[TaterWidget], title: str = "Annotations") -> None:
+        """Set custom annotation widgets for the right panel.
+
+        Args:
+            widgets: List of TaterWidget instances to render
+            title: Panel title shown above widgets
+        """
+        self.annotation_widgets = widgets
+        self.annotation_panel_title = title
         
     def _setup_layout(self):
         """Set up the basic application layout."""
@@ -139,26 +151,29 @@ class TaterApp:
     
     def _create_annotation_panel(self):
         """Create the annotation panel with widgets based on schema."""
-        if not self.spec:
+        if not self.spec and not self.annotation_widgets:
             return None
-        
-        widgets = []
-        
-        for field in self.spec.data_schema:
-            widget_config = self.spec.get_widget_config(field.id)
-            
-            # Currently only supporting single_choice widgets
-            if field.type == "single_choice":
-                widget_type = widget_config.widget if widget_config else "segmented_control"
-                if widget_type == "radio_group":
-                    widget = create_radio_group(field, widget_config)
-                else:
-                    widget = create_segmented_control(field, widget_config)
-                widgets.append(widget)
+
+        if self.annotation_widgets is not None:
+            widgets = [widget.component() for widget in self.annotation_widgets]
+        else:
+            widgets = []
+
+            for field in self.spec.data_schema:
+                widget_config = self.spec.get_widget_config(field.id)
+
+                # Currently only supporting single_choice widgets
+                if field.type == "single_choice":
+                    widget_type = widget_config.widget if widget_config else "segmented_control"
+                    if widget_type == "radio_group":
+                        widget = RadioGroupWidget.from_field(field, widget_config).component()
+                    else:
+                        widget = SegmentedControlWidget.from_field(field, widget_config).component()
+                    widgets.append(widget)
         
         return dmc.Paper([
             dmc.Stack([
-                dmc.Title("Annotations", order=3, mb="md"),
+                dmc.Title(self.annotation_panel_title, order=3, mb="md"),
                 *widgets
             ], gap="md")
         ], p="md", withBorder=True, shadow="sm")
