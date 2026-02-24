@@ -161,18 +161,21 @@ class TaterApp:
     
     def _create_main_content(self):
         """Create main content layout (document viewer + optional annotation panel)."""
-        document_panel = dmc.Stack([
-            create_document_info(),
-            html.Div(id="document-viewer"),
-            create_document_navigation(),
-        ], gap="lg")
+        # Document viewer only (without info and navigation)
+        document_viewer_only = html.Div(id="document-viewer")
         
-        # Always use two-column layout with placeholder for annotations
-        # The annotation panel will be populated via callback if schema is loaded
-        return dmc.Grid([
-            dmc.GridCol([document_panel], span={"base": 12, "md": 7}),
+        # Two-column layout with document viewer and annotation panel
+        content_grid = dmc.Grid([
+            dmc.GridCol([document_viewer_only], span={"base": 12, "md": 7}),
             dmc.GridCol([html.Div(id="annotation-panel")], span={"base": 12, "md": 5}),
         ], gutter="xl")
+        
+        # Stack everything with full-width info and navigation
+        return dmc.Stack([
+            create_document_info(),
+            content_grid,
+            create_document_navigation(),
+        ], gap="lg")
 
     
     def _setup_callbacks(self):

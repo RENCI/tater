@@ -1,0 +1,22 @@
+{
+  "spec_version": "1.0",
+  "schema": [
+    {
+      "id": "pet_type",
+      "type": "single_choice",
+      "options": ["cat", "dog", "fish"],
+      "required": false,
+      "default": null,
+      "description": "Select the type of pet mentioned in the document"
+    }
+  ],
+  "ui": [
+    {
+      "field": "pet_type",
+      "widget": "radio_group",
+      "label": "Pet Type",
+      "description": "What type of pet is mentioned?",
+      "orientation": "vertical"
+    }
+  ]
+}
