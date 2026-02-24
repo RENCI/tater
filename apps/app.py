@@ -15,6 +15,15 @@ def main():
         theme="light"
     )
     
+    # Load documents from the provided file
+    if not app.load_documents(args.documents):
+        return
+    
+    # Load schema if provided
+    if args.schema:
+        if not app.load_schema(args.schema):
+            return
+    
     # Run the server
     app.run(
         debug=args.debug,

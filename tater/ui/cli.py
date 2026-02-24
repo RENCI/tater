@@ -14,6 +14,16 @@ def parse_args() -> Namespace:
         description="Tater - Text Annotation Tool for Easy Research"
     )
     parser.add_argument(
+        "--documents",
+        required=True,
+        help="Path to documents file (JSON or CSV)"
+    )
+    parser.add_argument(
+        "--schema",
+        required=False,
+        help="Path to annotation schema file (JSON)"
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=os.getenv("TATER_DEBUG", "").lower() in ("true", "1", "yes"),
