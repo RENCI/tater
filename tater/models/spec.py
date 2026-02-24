@@ -50,7 +50,7 @@ class AnnotationSpec(BaseModel):
         """Get widget configuration for a field, or generate default."""
         # First check if explicit UI config exists
         for widget in self.ui:
-            if widget.field == field_id:
+            if widget.schema_id == field_id:
                 return widget
         
         # Generate default widget config based on field type
@@ -71,7 +71,7 @@ class AnnotationSpec(BaseModel):
         }
         
         return WidgetConfig(
-            field=field.id,
+            schema_id=field.id,
             widget=widget_type_map.get(field.type, "textarea"),
             label=field.id.replace("_", " ").title(),
             description=field.description,

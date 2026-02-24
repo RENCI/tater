@@ -12,7 +12,7 @@
   ],
   "ui": [
     {
-      "field": "pet_type",
+      "schema_id": "pet_type",
       "widget": "radio_group",
       "label": "Pet Type",
       "description": "What type of pet is mentioned?",

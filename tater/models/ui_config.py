@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class WidgetConfig(BaseModel):
     """Configuration for a single UI widget."""
     
-    field: str = Field(..., description="ID of the schema field this widget represents")
+    schema_id: str = Field(..., description="ID of the schema field this widget represents")
     widget: Literal["radio_group", "checkbox_group", "select", "textarea", "checkbox"] = Field(
         ..., description="Type of widget to render"
     )
@@ -25,6 +25,6 @@ class UIConfig(BaseModel):
     def get_widget_config(self, field_id: str) -> Optional[WidgetConfig]:
         """Get widget configuration for a specific field."""
         for widget in self.ui:
-            if widget.field == field_id:
+            if widget.schema_id == field_id:
                 return widget
         return None
