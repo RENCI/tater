@@ -12,7 +12,7 @@ class AnnotationSpec(BaseModel):
     """Complete annotation specification combining schema and UI configuration."""
     
     spec_version: str = Field(default="1.0", description="Specification version")
-    schema: list[DataField] = Field(..., description="Data schema fields")
+    data_schema: list[DataField] = Field(..., description="Data schema fields")
     ui: list[WidgetConfig] = Field(default_factory=list, description="UI widget configurations")
     
     @classmethod
@@ -32,7 +32,7 @@ class AnnotationSpec(BaseModel):
         """Extract the annotation schema portion."""
         return AnnotationSchema(
             schema_version=self.spec_version,
-            schema=self.schema
+            data_schema=self.data_schema
         )
     
     def get_ui_config(self) -> UIConfig:
@@ -41,7 +41,7 @@ class AnnotationSpec(BaseModel):
     
     def get_field(self, field_id: str) -> Optional[DataField]:
         """Get a schema field by ID."""
-        for field in self.schema:
+        for field in self.data_schema:
             if field.id == field_id:
                 return field
         return None

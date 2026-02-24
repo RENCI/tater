@@ -1,6 +1,6 @@
 {
   "spec_version": "1.0",
-  "schema": [
+  "data_schema": [
     {
       "id": "pet_type",
       "type": "single_choice",

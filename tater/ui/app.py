@@ -98,7 +98,7 @@ class TaterApp:
         """
         try:
             self.spec = AnnotationSpec.from_file(source)
-            print(f"✓ Loaded schema with {len(self.spec.schema)} fields from {source}")
+            print(f"✓ Loaded schema with {len(self.spec.data_schema)} fields from {source}")
             return True
         except FileNotFoundError:
             print(f"✗ Schema file not found: {source}")
@@ -144,7 +144,7 @@ class TaterApp:
         
         widgets = []
         
-        for field in self.spec.schema:
+        for field in self.spec.data_schema:
             widget_config = self.spec.get_widget_config(field.id)
             
             # Currently only supporting single_choice with radio_group

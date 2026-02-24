@@ -41,11 +41,11 @@ class AnnotationSchema(BaseModel):
     """Complete annotation schema definition."""
     
     schema_version: str = Field(default="1.0", description="Schema version")
-    schema: list[DataField] = Field(..., description="List of data fields to collect")
+    data_schema: list[DataField] = Field(..., description="List of data fields to collect")
     
     def get_field(self, field_id: str) -> Optional[DataField]:
         """Get a field by its ID."""
-        for field in self.schema:
+        for field in self.data_schema:
             if field.id == field_id:
                 return field
         return None
@@ -59,7 +59,7 @@ class AnnotationSchema(BaseModel):
         errors = []
         
         # Check required fields
-        for field in self.schema:
+        for field in self.data_schema:
             if field.required and field.id not in annotations:
                 errors.append(f"Required field '{field.id}' is missing")
         
