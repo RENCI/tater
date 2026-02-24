@@ -10,6 +10,7 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                 window.tater_kbd_setup = true;
                 
                 document.addEventListener('keydown', function(e) {
+                    // Left/Right arrows: Navigate between documents
                     if (e.key === 'ArrowLeft') {
                         e.preventDefault();
                         const prevBtn = document.getElementById('prev-button');
@@ -21,6 +22,28 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                         const nextBtn = document.getElementById('next-button');
                         if (nextBtn && !nextBtn.disabled) {
                             nextBtn.click();
+                        }
+                    }
+                    // Up/Down arrows: Scroll within document
+                    else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        const docViewer = document.getElementById('document-viewer');
+                        if (docViewer) {
+                            // Find the scrollable Paper element (first child)
+                            const scrollable = docViewer.querySelector('[style*="overflow"]');
+                            if (scrollable) {
+                                scrollable.scrollBy({ top: -120, behavior: 'smooth' });
+                            }
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        const docViewer = document.getElementById('document-viewer');
+                        if (docViewer) {
+                            // Find the scrollable Paper element (first child)
+                            const scrollable = docViewer.querySelector('[style*="overflow"]');
+                            if (scrollable) {
+                                scrollable.scrollBy({ top: 120, behavior: 'smooth' });
+                            }
                         }
                     }
                 });
