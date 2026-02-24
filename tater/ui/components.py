@@ -25,6 +25,7 @@ def create_document_viewer(content: str = "") -> dmc.Paper:
         ),
         p="md",
         radius="md",
+        withBorder=True,
         shadow="sm",
         style={"height": "500px", "overflowY": "auto"}
     )
