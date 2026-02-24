@@ -7,7 +7,7 @@ class WidgetConfig(BaseModel):
     """Configuration for a single UI widget."""
     
     schema_id: str = Field(..., description="ID of the schema field this widget represents")
-    widget: Literal["radio_group", "checkbox_group", "select", "textarea", "checkbox"] = Field(
+    widget: Literal["radio_group", "segmented_control", "checkbox_group", "select", "textarea", "checkbox"] = Field(
         ..., description="Type of widget to render"
     )
     label: Optional[str] = Field(None, description="Display label for the widget")

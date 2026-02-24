@@ -9,5 +9,14 @@
       "default": null,
       "description": "Select the type of pet mentioned in the document"
     }
+  ],
+  "ui": [
+    {
+      "schema_id": "pet_type",
+      "widget": "radio_group",
+      "label": "Pet Type",
+      "description": "What type of pet is mentioned?",
+      "orientation": "vertical"
+    }
   ]
 }

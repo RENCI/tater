@@ -12,7 +12,7 @@ from .components import (
     create_document_navigation,
     create_document_info
 )
-from .widgets import create_radio_group
+from .widgets import create_radio_group, create_segmented_control
 
 
 class TaterApp:
@@ -147,9 +147,13 @@ class TaterApp:
         for field in self.spec.data_schema:
             widget_config = self.spec.get_widget_config(field.id)
             
-            # Currently only supporting single_choice with radio_group
+            # Currently only supporting single_choice widgets
             if field.type == "single_choice":
-                widget = create_radio_group(field, widget_config)
+                widget_type = widget_config.widget if widget_config else "segmented_control"
+                if widget_type == "radio_group":
+                    widget = create_radio_group(field, widget_config)
+                else:
+                    widget = create_segmented_control(field, widget_config)
                 widgets.append(widget)
         
         return dmc.Paper([

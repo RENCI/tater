@@ -63,7 +63,7 @@ class AnnotationSpec(BaseModel):
     def _generate_default_widget(self, field: DataField) -> WidgetConfig:
         """Generate default widget configuration for a field."""
         widget_type_map = {
-            "single_choice": "radio_group",
+            "single_choice": "segmented_control",
             "multi_choice": "checkbox_group",
             "boolean": "checkbox",
             "free_text": "textarea",
