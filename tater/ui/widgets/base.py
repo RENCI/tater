@@ -23,3 +23,12 @@ class TaterWidget(ABC):
     def component(self):
         """Return the Dash component for this widget."""
         raise NotImplementedError
+
+    @abstractmethod
+    def to_field(self) -> "DataField":
+        """Convert this widget back to a schema field.
+        
+        Returns:
+            DataField with configuration extracted from this widget
+        """
+        raise NotImplementedError

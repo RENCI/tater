@@ -6,6 +6,7 @@ import dash_mantine_components as dmc
 
 from ..models.document import DocumentList
 from ..models.spec import AnnotationSpec
+from ..models.schema import AnnotationSchema
 from ..loaders import load_document_text
 from .components import (
     create_document_viewer,
@@ -119,6 +120,10 @@ class TaterApp:
         self.annotation_widgets = widgets
         self.annotation_panel_title = title
         
+        # Create schema from the widgets so both paths result in having self.spec
+        fields = [widget.to_field() for widget in widgets]
+        self.spec = AnnotationSpec(data_schema=AnnotationSchema(data_schema=fields))
+        
     def _setup_layout(self):
         """Set up the basic application layout."""
         # Create main content (static layout structure)
@@ -151,7 +156,7 @@ class TaterApp:
     
     def _create_annotation_panel(self):
         """Create the annotation panel with widgets based on schema."""
-        if not self.spec and not self.annotation_widgets:
+        if not self.spec:
             return None
 
         if self.annotation_widgets is not None:
@@ -205,7 +210,7 @@ class TaterApp:
             Input("current-index-store", "data")
         )
         def render_annotation_panel(_):
-            """Render the annotation panel if schema is loaded."""
+            """Render the annotation panel if schema is set."""
             if self.spec:
                 return self._create_annotation_panel()
             return None

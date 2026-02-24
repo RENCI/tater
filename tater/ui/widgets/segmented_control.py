@@ -43,6 +43,16 @@ class SegmentedControlWidget(TaterWidget):
             default=default
         )
 
+    def to_field(self) -> DataField:
+        """Convert this widget back to a schema field."""
+        return DataField(
+            id=self.schema_id,
+            type="single_choice",
+            options=self.options,
+            default=self.default,
+            description=self.description
+        )
+
     def component(self) -> dmc.Stack:
         data = [{"label": opt, "value": opt} for opt in self.options]
 

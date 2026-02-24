@@ -51,6 +51,17 @@ class RadioGroupWidget(TaterWidget):
             default=default
         )
 
+    def to_field(self) -> DataField:
+        """Convert this widget back to a schema field."""
+        return DataField(
+            id=self.schema_id,
+            type="single_choice",
+            options=self.options,
+            required=self.required,
+            default=self.default,
+            description=self.description
+        )
+
     def component(self) -> dmc.Stack:
         # Add required indicator if field is required
         if self.required:
