@@ -1,7 +1,7 @@
 """Core Tater Dash application."""
 import os
 from typing import Optional
-from dash import Dash, html, dcc, Input, Output, ctx, ClientsideFunction
+from dash import Dash, html, dcc, Input, Output, State, ctx, ClientsideFunction, no_update
 import dash_mantine_components as dmc
 
 from ..models.document import DocumentList
@@ -48,6 +48,7 @@ class TaterApp:
         self.annotation_widgets: Optional[list[TaterWidget]] = None
         self.annotations: dict[int, dict] = {}  # doc_index -> {field_id: value}
         self.current_index = 0
+        self._annotation_callbacks_set = False
         
         # Initialize Dash app
         self.app = Dash(
@@ -112,6 +113,8 @@ class TaterApp:
                     else:
                         widget = SegmentedControlWidget.from_field(field, widget_config)
                     self.annotation_widgets.append(widget)
+
+            self._setup_annotation_callbacks()
             
             return True
         except FileNotFoundError:
@@ -132,6 +135,7 @@ class TaterApp:
         # Create schema from the widgets so both paths result in having self.spec
         fields = [widget.to_field() for widget in widgets]
         self.spec = AnnotationSpec(data_schema=fields)
+        self._setup_annotation_callbacks()
         
     def _setup_layout(self):
         """Set up the basic application layout."""
@@ -188,10 +192,26 @@ class TaterApp:
         """Create main content layout (document viewer + optional annotation panel)."""
         # Document viewer only (without info and navigation)
         document_viewer_only = html.Div(id="document-viewer")
+
+        document_controls = dmc.Stack([
+            dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+            dmc.Textarea(
+                id="document-notes",
+                label="Notes",
+                autosize=True,
+                minRows=3,
+                placeholder="Add notes about this document"
+            )
+        ], gap="sm")
         
         # Two-column layout with document viewer and annotation panel
         content_grid = dmc.Grid([
-            dmc.GridCol([document_viewer_only], span={"base": 12, "md": 7}),
+            dmc.GridCol([
+                dmc.Stack([
+                    document_viewer_only,
+                    document_controls
+                ], gap="md")
+            ], span={"base": 12, "md": 7}),
             dmc.GridCol([html.Div(id="annotation-panel")], span={"base": 12, "md": 5}),
         ], gutter="xl")
         
@@ -201,6 +221,92 @@ class TaterApp:
             content_grid,
             create_document_navigation(),
         ], gap="lg")
+
+    def _setup_annotation_callbacks(self) -> None:
+        """Set up callbacks that persist and restore annotation values."""
+        if self._annotation_callbacks_set or not self.annotation_widgets:
+            return
+
+        self._annotation_callbacks_set = True
+        widget_inputs = [Input(widget.component_id, widget.value_prop) for widget in self.annotation_widgets]
+        widget_outputs = [Output(widget.component_id, widget.value_prop) for widget in self.annotation_widgets]
+
+        @self.app.callback(
+            Output("annotations-store", "data"),
+            Input("flag-document", "checked"),
+            Input("document-notes", "value"),
+            *widget_inputs,
+            State("current-index-store", "data"),
+            State("annotations-store", "data"),
+            prevent_initial_call=True
+        )
+        def save_annotations(*args):
+            checked = args[0]
+            notes = args[1]
+            values = list(args[2:2 + len(self.annotation_widgets)])
+            current_index = args[2 + len(self.annotation_widgets)]
+            annotations_data = args[3 + len(self.annotation_widgets)] or {}
+
+            if current_index is None:
+                return no_update
+
+            doc_key = str(current_index)
+            new_doc_annotations = dict(annotations_data.get(doc_key, {}))
+
+            if ctx.triggered_id == "flag-document":
+                new_doc_annotations["_flagged"] = bool(checked)
+            elif ctx.triggered_id == "document-notes":
+                new_doc_annotations["_notes"] = notes
+            else:
+                for widget, value in zip(self.annotation_widgets, values):
+                    new_doc_annotations[widget.schema_id] = value
+
+            if annotations_data.get(doc_key) == new_doc_annotations:
+                return no_update
+
+            updated = dict(annotations_data)
+            updated[doc_key] = new_doc_annotations
+            return updated
+
+
+        @self.app.callback(
+            widget_outputs,
+            Input("current-index-store", "data"),
+            State("annotations-store", "data"),
+        )
+        def restore_annotations(current_index, annotations_data):
+            if current_index is None:
+                return [None] * len(self.annotation_widgets)
+
+            doc_key = str(current_index)
+            doc_annotations = (annotations_data or {}).get(doc_key, {})
+            return [doc_annotations.get(widget.schema_id) for widget in self.annotation_widgets]
+
+        @self.app.callback(
+            Output("flag-document", "checked"),
+            Input("current-index-store", "data"),
+            State("annotations-store", "data"),
+        )
+        def restore_flag(current_index, annotations_data):
+            if current_index is None:
+                return False
+
+            doc_key = str(current_index)
+            doc_annotations = (annotations_data or {}).get(doc_key, {})
+            return bool(doc_annotations.get("_flagged", False))
+
+        @self.app.callback(
+            Output("document-notes", "value"),
+            Input("current-index-store", "data"),
+            State("annotations-store", "data"),
+        )
+        def restore_notes(current_index, annotations_data):
+            if current_index is None:
+                return ""
+
+            doc_key = str(current_index)
+            doc_annotations = (annotations_data or {}).get(doc_key, {})
+            return doc_annotations.get("_notes", "")
 
     
     def _setup_callbacks(self):

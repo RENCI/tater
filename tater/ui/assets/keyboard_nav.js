@@ -48,6 +48,15 @@ window.dash_clientside = Object.assign({}, window.dash_clientside, {
                     }
                 });
             }
+
+            // Reset scroll to top when document changes
+            const docViewer = document.getElementById('document-viewer');
+            if (docViewer) {
+                const scrollable = docViewer.querySelector('[style*="overflow"]');
+                if (scrollable) {
+                    scrollable.scrollTop = 0;
+                }
+            }
             
             // Don't update the output
             return window.dash_clientside.no_update;
