@@ -1,7 +1,6 @@
 """RadioGroup widget for single-choice annotations."""
 from typing import Optional
 import dash_mantine_components as dmc
-from dash import html
 
 from ...models.schema import DataField
 from ...models.ui_config import WidgetConfig
@@ -63,35 +62,17 @@ class RadioGroupWidget(TaterWidget):
         )
 
     def component(self) -> dmc.Stack:
-        # Add required indicator if field is required
+        # Build label with optional required badge
         if self.required:
             label_component = dmc.Group([
-                html.Span(self.label, style={"fontWeight": 500, "fontSize": "14px"}),
+                dmc.Title(self.label, order=6),
                 dmc.Badge("Required", color="red", size="xs", variant="dot")
-            ], gap="xs", mb="xs")
+            ], gap="xs")
+        else:
+            label_component = dmc.Title(self.label, order=6)
 
-            radio_group = dmc.RadioGroup(
-                id=self.component_id,
-                description=self.description,
-                value=self.default,
-                children=dmc.Stack(
-                    [dmc.Radio(label=opt, value=opt) for opt in self.options],
-                    gap="xs"
-                ) if self.orientation == "vertical" else dmc.Group(
-                    [dmc.Radio(label=opt, value=opt) for opt in self.options],
-                    gap="md"
-                ),
-                size="sm",
-                mb="md"
-            )
-
-            return dmc.Stack([label_component, radio_group], gap=0)
-
-        # Non-required field - use standard label
         radio_group = dmc.RadioGroup(
             id=self.component_id,
-            label=self.label,
-            description=self.description,
             value=self.default,
             children=dmc.Stack(
                 [dmc.Radio(label=opt, value=opt) for opt in self.options],
@@ -100,11 +81,14 @@ class RadioGroupWidget(TaterWidget):
                 [dmc.Radio(label=opt, value=opt) for opt in self.options],
                 gap="md"
             ),
-            size="sm",
-            mb="md"
+            size="sm"
         )
 
-        return radio_group
+        return dmc.Stack([
+            label_component,            
+            dmc.Text(self.description, size="sm", c="dimmed") if self.description else None,
+            radio_group
+        ], gap="xs")
 
 
 def create_radio_group(

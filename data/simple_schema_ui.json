@@ -8,6 +8,14 @@
       "required": false,
       "default": null,
       "description": "Select the type of pet mentioned in the document"
+    },
+    {
+      "id": "pet_type_2",
+      "type": "single_choice",
+      "options": ["cat", "dog", "fish"],
+      "required": false,
+      "default": null,
+      "description": "Select the type of pet mentioned in the document"
     }
   ],
   "ui": [
@@ -17,6 +25,12 @@
       "label": "Pet Type",
       "description": "What type of pet is mentioned?",
       "orientation": "vertical"
+    },
+   {
+      "schema_id": "pet_type_2",
+      "widget": "segmented_control",
+      "label": "Pet Type 2",
+      "description": "What type of pet is mentioned?"
     }
   ]
 }

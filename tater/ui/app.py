@@ -47,7 +47,6 @@ class TaterApp:
         self.documents: Optional[DocumentList] = None
         self.spec: Optional[AnnotationSpec] = None
         self.annotation_widgets: Optional[list[TaterWidget]] = None
-        self.annotation_panel_title = "Annotations"
         self.annotations: dict[int, dict] = {}  # doc_index -> {field_id: value}
         self.current_index = 0
         
@@ -102,6 +101,19 @@ class TaterApp:
         try:
             self.spec = AnnotationSpec.from_file(source)
             print(f"✓ Loaded schema with {len(self.spec.data_schema)} fields from {source}")
+            
+            # Generate widgets from schema so both paths result in same state
+            self.annotation_widgets = []
+            for field in self.spec.data_schema:
+                widget_config = self.spec.get_widget_config(field.id)
+                if field.type == "single_choice":
+                    widget_type = widget_config.widget if widget_config else "segmented_control"
+                    if widget_type == "radio_group":
+                        widget = RadioGroupWidget.from_field(field, widget_config)
+                    else:
+                        widget = SegmentedControlWidget.from_field(field, widget_config)
+                    self.annotation_widgets.append(widget)
+            
             return True
         except FileNotFoundError:
             print(f"✗ Schema file not found: {source}")
@@ -110,15 +122,13 @@ class TaterApp:
             print(f"✗ Error loading schema: {e}")
             return False
 
-    def set_annotation_widgets(self, widgets: list[TaterWidget], title: str = "Annotations") -> None:
+    def set_annotation_widgets(self, widgets: list[TaterWidget]) -> None:
         """Set custom annotation widgets for the right panel.
 
         Args:
             widgets: List of TaterWidget instances to render
-            title: Panel title shown above widgets
         """
         self.annotation_widgets = widgets
-        self.annotation_panel_title = title
         
         # Create schema from the widgets so both paths result in having self.spec
         fields = [widget.to_field() for widget in widgets]
@@ -156,31 +166,18 @@ class TaterApp:
     
     def _create_annotation_panel(self):
         """Create the annotation panel with widgets based on schema."""
-        if not self.spec:
+        if not self.annotation_widgets:
             return None
 
-        if self.annotation_widgets is not None:
-            widgets = [widget.component() for widget in self.annotation_widgets]
-        else:
-            widgets = []
-
-            for field in self.spec.data_schema:
-                widget_config = self.spec.get_widget_config(field.id)
-
-                # Currently only supporting single_choice widgets
-                if field.type == "single_choice":
-                    widget_type = widget_config.widget if widget_config else "segmented_control"
-                    if widget_type == "radio_group":
-                        widget = RadioGroupWidget.from_field(field, widget_config).component()
-                    else:
-                        widget = SegmentedControlWidget.from_field(field, widget_config).component()
-                    widgets.append(widget)
+        # Build widgets with dividers between them
+        components = []
+        for i, widget in enumerate(self.annotation_widgets):
+            components.append(widget.component())
+            if i < len(self.annotation_widgets) - 1:
+                components.append(dmc.Divider(color="gray.3"))
         
         return dmc.Paper([
-            dmc.Stack([
-                dmc.Title(self.annotation_panel_title, order=3, mb="md"),
-                *widgets
-            ], gap="md")
+            dmc.Stack(components, gap="md")
         ], p="md", withBorder=True, shadow="sm")
     
     def _create_main_content(self):
@@ -210,8 +207,8 @@ class TaterApp:
             Input("current-index-store", "data")
         )
         def render_annotation_panel(_):
-            """Render the annotation panel if schema is set."""
-            if self.spec:
+            """Render the annotation panel if widgets are loaded."""
+            if self.annotation_widgets:
                 return self._create_annotation_panel()
             return None
         

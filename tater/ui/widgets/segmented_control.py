@@ -58,13 +58,13 @@ class SegmentedControlWidget(TaterWidget):
 
         return dmc.Stack([
             dmc.Title(self.label, order=6),
+            dmc.Text(self.description, size="sm", c="dimmed") if self.description else None,
             dmc.SegmentedControl(
                 id=self.component_id,
                 data=data,
                 value=self.default,
                 fullWidth=True
-            ),
-            dmc.Text(self.description, size="sm", c="dimmed") if self.description else None
+            )
         ], gap="xs")
 
 
