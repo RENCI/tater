@@ -312,8 +312,9 @@ class TaterApp:
                     new_doc_annotations[widget.schema_id] = value
 
             if annotations_data.get(doc_key) == new_doc_annotations:
+                # No actual change - this is a restore or no-op
                 return no_update
-
+            
             updated = dict(annotations_data)
             updated[doc_key] = new_doc_annotations
             return updated
@@ -366,9 +367,16 @@ class TaterApp:
             prevent_initial_call=True
         )
         def autosave_on_navigation(current_index, annotations_data):
-            if current_index is None or not self.annotations_path:
+            # Save on every navigation to a different document
+            if (current_index is None or 
+                current_index == self.current_index or  # Haven't actually navigated
+                not self.annotations_path):
+                self.current_index = current_index
                 return no_update, True
 
+            # We've navigated - save
+            self.current_index = current_index
+            
             path = Path(self.annotations_path)
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -379,27 +387,20 @@ class TaterApp:
                     title="Saved",
                     color="teal",
                     withCloseButton=False,
-                    icon=dmc.Text("✓", size="lg")
+                    icon=dmc.Text("✓", size="lg"),
+                    duration=3000
                 )
-                return alert, False
+                return alert, True
             except Exception as exc:
                 alert = dmc.Alert(
                     str(exc),
                     title="Save failed",
                     color="red",
                     withCloseButton=False,
-                    icon=dmc.Text("✗", size="lg")
+                    icon=dmc.Text("✗", size="lg"),
+                    duration=3000
                 )
-                return alert, False
-
-        @self.app.callback(
-            Output("save-status", "children", allow_duplicate=True),
-            Output("save-status-timer", "disabled", allow_duplicate=True),
-            Input("save-status-timer", "n_intervals"),
-            prevent_initial_call=True
-        )
-        def clear_save_status(_):
-            return "", True
+                return alert, True
 
     
     def _setup_callbacks(self):
@@ -591,11 +592,9 @@ class TaterApp:
                 doc_annotations["_visited"] = True
                 updated = dict(annotations_data)
                 updated[doc_key] = doc_annotations
-                self.current_index = new_index
                 return new_index, updated
             
-            self.current_index = new_index
-            return self.current_index, no_update
+            return current_index, no_update
         
         # Clientside callback for direct keyboard handling
         self.app.clientside_callback(
