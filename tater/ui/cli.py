@@ -24,6 +24,11 @@ def parse_args() -> Namespace:
         help="Path to annotation schema file (JSON)"
     )
     parser.add_argument(
+        "--annotations",
+        required=False,
+        help="Path to save annotations JSON"
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=os.getenv("TATER_DEBUG", "").lower() in ("true", "1", "yes"),

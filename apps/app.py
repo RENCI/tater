@@ -12,7 +12,8 @@ def main():
     # Create the app
     app = TaterApp(
         title="tater - schema",
-        theme="light"
+        theme="light",
+        annotations_path=args.annotations
     )
     
     # Load documents from the provided file

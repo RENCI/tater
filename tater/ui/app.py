@@ -1,5 +1,7 @@
 """Core Tater Dash application."""
+import json
 import os
+from pathlib import Path
 from typing import Optional
 from dash import Dash, html, dcc, Input, Output, State, ctx, ClientsideFunction, no_update
 import dash_mantine_components as dmc
@@ -33,6 +35,7 @@ class TaterApp:
         title: str = "Tater Annotation Tool",
         theme: str = "light",
         external_stylesheets: Optional[list] = None,
+        annotations_path: Optional[str] = None,
     ):
         """Initialize the Tater application.
         
@@ -40,6 +43,7 @@ class TaterApp:
             title: Application title shown in browser tab
             theme: UI theme ('light' or 'dark')
             external_stylesheets: Additional CSS stylesheets to include
+            annotations_path: Path to save annotations JSON on navigation
         """
         self.title = title
         self.theme = theme
@@ -49,6 +53,7 @@ class TaterApp:
         self.annotations: dict[int, dict] = {}  # doc_index -> {field_id: value}
         self.current_index = 0
         self._annotation_callbacks_set = False
+        self.annotations_path = annotations_path
         
         # Initialize Dash app
         self.app = Dash(
@@ -79,6 +84,11 @@ class TaterApp:
             else:
                 print(f"✗ Unsupported file format: {source}")
                 return False
+            
+            # Set default annotations path if not provided
+            if self.annotations_path is None:
+                doc_path = Path(source)
+                self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
             print(f"✓ Loaded {len(self.documents.documents)} documents from {source}")
             return True
@@ -149,6 +159,7 @@ class TaterApp:
                 dcc.Store(id="current-index-store", data=0),
                 dcc.Store(id="documents-store", data=None),
                 dcc.Store(id="annotations-store", data={}),
+                dcc.Interval(id="save-status-timer", interval=2500, n_intervals=0, disabled=True),
                 
                 dmc.Container([
                     dmc.Stack([
@@ -219,6 +230,7 @@ class TaterApp:
         return dmc.Stack([
             create_document_info(),
             content_grid,
+            html.Div(id="save-status", style={"position": "fixed", "top": "20px", "right": "20px", "zIndex": 1000}),
             create_document_navigation(),
         ], gap="lg")
 
@@ -307,6 +319,49 @@ class TaterApp:
             doc_key = str(current_index)
             doc_annotations = (annotations_data or {}).get(doc_key, {})
             return doc_annotations.get("_notes", "")
+
+        @self.app.callback(
+            Output("save-status", "children"),
+            Output("save-status-timer", "disabled"),
+            Input("current-index-store", "data"),
+            State("annotations-store", "data"),
+            prevent_initial_call=True
+        )
+        def autosave_on_navigation(current_index, annotations_data):
+            if current_index is None or not self.annotations_path:
+                return no_update, True
+
+            path = Path(self.annotations_path)
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("w", encoding="utf-8") as f:
+                    json.dump(annotations_data or {}, f, indent=2)
+                alert = dmc.Alert(
+                    "Annotations saved successfully",
+                    title="Saved",
+                    color="teal",
+                    withCloseButton=False,
+                    icon=dmc.Text("✓", size="lg")
+                )
+                return alert, False
+            except Exception as exc:
+                alert = dmc.Alert(
+                    str(exc),
+                    title="Save failed",
+                    color="red",
+                    withCloseButton=False,
+                    icon=dmc.Text("✗", size="lg")
+                )
+                return alert, False
+
+        @self.app.callback(
+            Output("save-status", "children", allow_duplicate=True),
+            Output("save-status-timer", "disabled", allow_duplicate=True),
+            Input("save-status-timer", "n_intervals"),
+            prevent_initial_call=True
+        )
+        def clear_save_status(_):
+            return "", True
 
     
     def _setup_callbacks(self):

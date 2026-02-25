@@ -46,8 +46,9 @@ def main() -> None:
     ]
 
     app = TaterApp(
-        title="tater - manual", 
-        theme="light"
+        title="tater - manual",
+        theme="light",
+        annotations_path=args.annotations
     )
     if not app.load_documents(args.documents):
         return
