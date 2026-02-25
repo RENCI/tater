@@ -197,6 +197,7 @@ class TaterApp:
                 dcc.Store(id="current-index-store", data=0),
                 dcc.Store(id="documents-store", data=None),
                 dcc.Store(id="annotations-store", data={}),
+                dcc.Store(id="hide-completed-store", data=False),
                 dcc.Interval(id="save-status-timer", interval=2500, n_intervals=0, disabled=True),
                 
                 dmc.Container([
@@ -426,9 +427,10 @@ class TaterApp:
              Output("document-selector-button", "children"),
              Output("document-progress", "value")],
             Input("current-index-store", "data"),
-            Input("annotations-store", "data")
+            Input("annotations-store", "data"),
+            Input("hide-completed-store", "data")
         )
-        def update_document_display(current_index, annotations_data):
+        def update_document_display(current_index, annotations_data, hide_completed):
             """Update the document display when index changes."""
             if not self.documents or not self.documents.documents:
                 return (
@@ -497,7 +499,7 @@ class TaterApp:
                 else:
                     metadata_text = str(doc.metadata)
             
-            # Navigation options with status indicators
+            # Navigation options with status indicators (hide completed if checked)
             dropdown_items = []
             for i, d in enumerate(self.documents.documents):
                 key = str(i)
@@ -507,6 +509,11 @@ class TaterApp:
                 has_visited = d_annotations.get("_visited", False)
                 if i == current_index and not has_visited and d_status == "complete":
                     d_status = "in-progress"
+                
+                # Hide completed if checkbox is checked
+                if hide_completed and d_status == "complete":
+                    continue
+                
                 dropdown_items.append(
                     dmc.MenuItem(
                         dmc.Group(
@@ -558,6 +565,14 @@ class TaterApp:
                 current_doc_label,
                 progress
             )
+        
+        @self.app.callback(
+            Output("hide-completed-store", "data"),
+            Input("hide-completed-filter", "checked")
+        )
+        def update_hide_completed(checked):
+            """Update hide completed filter when checkbox changes."""
+            return checked
         
         @self.app.callback(
             Output("current-index-store", "data"),

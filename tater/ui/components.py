@@ -49,26 +49,34 @@ def create_document_navigation() -> dmc.Flex:
             style={"flex": "1 1 0", "minWidth": 0}
         ),
         dmc.Box(
-            dmc.Menu(
-                [
-                    dmc.MenuTarget(
-                        dmc.Button(
-                            "Select a document",
-                            id="document-selector-button",
-                            variant="outline",
-                            size="sm",
-                            fullWidth=True,
-                            justify="flex-start"
+            dmc.Stack([
+                dmc.Menu(
+                    [
+                        dmc.MenuTarget(
+                            dmc.Button(
+                                "Select a document",
+                                id="document-selector-button",
+                                variant="outline",
+                                size="sm",
+                                fullWidth=True,
+                                justify="flex-start"
+                            ),
+                            boxWrapperProps={"className": "menu-target-wrapper"}
                         ),
-                        boxWrapperProps={"className": "menu-target-wrapper"}
-                    ),
-                    dmc.MenuDropdown(id="document-menu-dropdown", children=[])
-                ],
-                position="bottom-start",
-                withArrow=True,
-                withinPortal=True,
-                width="target"
-            ),
+                        dmc.MenuDropdown(id="document-menu-dropdown", children=[])
+                    ],
+                    position="bottom-start",
+                    withArrow=True,
+                    withinPortal=True,
+                    width="target"
+                ),
+                dmc.Checkbox(
+                    id="hide-completed-filter",
+                    label="Hide completed",
+                    checked=False,
+                    size="xs"
+                )
+            ], gap="xs"),
             style={"flex": "1 1 0", "minWidth": 0}
         ),
         dmc.Box(
