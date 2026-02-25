@@ -424,7 +424,6 @@ class TaterApp:
              Output("prev-button", "disabled"),
              Output("next-button", "disabled"),
              Output("document-menu-dropdown", "children"),
-             Output("document-selector-button", "children"),
              Output("document-progress", "value")],
             Input("current-index-store", "data"),
             Input("annotations-store", "data"),
@@ -440,7 +439,6 @@ class TaterApp:
                     True,
                     True,
                     [],
-                    "Select a document",
                     0
                 )
             
@@ -534,21 +532,6 @@ class TaterApp:
                     )
                 )
 
-            current_doc_label = dmc.Group(
-                [
-                    dmc.Text(f"{current_index + 1}. {doc.file_path.split('/')[-1]}", size="sm"),
-                    dmc.Badge(
-                        status_labels.get(status, status),
-                        color=status_colors.get(status, "gray"),
-                        variant="light",
-                        size="xs"
-                    )
-                ],
-                gap="xs",
-                wrap="nowrap",
-                justify="space-between"
-            )
-            
             # Progress percentage
             progress = ((current_index + 1) / len(self.documents.documents)) * 100
             
@@ -562,7 +545,6 @@ class TaterApp:
                 prev_disabled,
                 next_disabled,
                 dropdown_items,
-                current_doc_label,
                 progress
             )
         

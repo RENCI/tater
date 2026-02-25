@@ -54,12 +54,12 @@ def create_document_navigation() -> dmc.Flex:
                     [
                         dmc.MenuTarget(
                             dmc.Button(
-                                "Select a document",
+                                "Select document",
                                 id="document-selector-button",
                                 variant="outline",
                                 size="sm",
                                 fullWidth=True,
-                                justify="flex-start"
+                                justify="center"
                             ),
                             boxWrapperProps={"className": "menu-target-wrapper"}
                         ),
