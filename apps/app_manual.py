@@ -18,35 +18,41 @@ PetType = Literal["cat", "dog", "fish"]
 
 class PetAnnotationSchema(BaseModel):
     """Annotation schema for pet documents."""
-    pet_type: Optional[PetType] = None
+    pet_type: PetType = None
+    pet_type_2: Optional[PetType] = None
 
 
 def main() -> None:
     args = parse_args()
     
-    # Define widgets manually using the same type options
+    # Define widgets manually to mirror data/simple_schema_ui.json
     widgets = [
-        SegmentedControlWidget(
+        RadioGroupWidget(
             schema_id="pet_type",
             label="Pet Type",
-            description="Select the type of pet mentioned in the document",
+            description="What type of pet is mentioned?",
             options=list(PetType.__args__),
+            orientation="vertical",
+            required=True,
             default=None
         ),
-        # Alternative: use RadioGroup instead
-        # RadioGroupWidget(
-        #     schema_id="pet_type",
-        #     label="Pet Type",
-        #     options=list(PetType.__args__),
-        #     orientation="horizontal"
-        # )
+        SegmentedControlWidget(
+            schema_id="pet_type_2",
+            label="Pet Type 2",
+            description="What type of pet is mentioned?",
+            options=list(PetType.__args__),
+            default=None
+        )
     ]
 
-    app = TaterApp(title="Manual Widget Hookup", theme="light")
+    app = TaterApp(
+        title="tater - manual", 
+        theme="light"
+    )
     if not app.load_documents(args.documents):
         return
 
-    app.set_annotation_widgets(widgets, title="Annotations")
+    app.set_annotation_widgets(widgets)
     app.run(debug=args.debug, port=args.port, host=args.host)
 
 

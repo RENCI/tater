@@ -11,7 +11,7 @@ def main():
     
     # Create the app
     app = TaterApp(
-        title="tater",
+        title="tater - schema",
         theme="light"
     )
     

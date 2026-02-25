@@ -62,11 +62,11 @@ class RadioGroupWidget(TaterWidget):
         )
 
     def component(self) -> dmc.Stack:
-        # Build label with optional required badge
+        # Build label with optional required indicator
         if self.required:
             label_component = dmc.Group([
-                dmc.Title(self.label, order=6),
-                dmc.Badge("Required", color="red", size="xs", variant="dot")
+                dmc.Text("*", c="red", fw=700, size="sm"),
+                dmc.Title(self.label, order=6)
             ], gap="xs")
         else:
             label_component = dmc.Title(self.label, order=6)
@@ -85,7 +85,7 @@ class RadioGroupWidget(TaterWidget):
         )
 
         return dmc.Stack([
-            label_component,            
+            label_component,
             dmc.Text(self.description, size="sm", c="dimmed") if self.description else None,
             radio_group
         ], gap="xs")

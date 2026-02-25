@@ -16,11 +16,13 @@ class SegmentedControlWidget(TaterWidget):
         label: Optional[str] = None,
         description: Optional[str] = None,
         options: Optional[list[str]] = None,
+        required: bool = False,
         default: Optional[str] = None
     ) -> None:
         label = label or schema_id.replace("_", " ").title()
         super().__init__(schema_id=schema_id, label=label, description=description)
         self.options = options or []
+        self.required = required
         self.default = default
 
     @classmethod
@@ -40,6 +42,7 @@ class SegmentedControlWidget(TaterWidget):
             label=label,
             description=description,
             options=options,
+            required=field.required,
             default=default
         )
 
@@ -49,6 +52,7 @@ class SegmentedControlWidget(TaterWidget):
             id=self.schema_id,
             type="single_choice",
             options=self.options,
+            required=self.required,
             default=self.default,
             description=self.description
         )
@@ -56,8 +60,16 @@ class SegmentedControlWidget(TaterWidget):
     def component(self) -> dmc.Stack:
         data = [{"label": opt, "value": opt} for opt in self.options]
 
+        if self.required:
+            label_component = dmc.Group([
+                dmc.Text("*", c="red", fw=700, size="sm"),
+                dmc.Title(self.label, order=6)
+            ], gap="xs")
+        else:
+            label_component = dmc.Title(self.label, order=6)
+
         return dmc.Stack([
-            dmc.Title(self.label, order=6),
+            label_component,
             dmc.Text(self.description, size="sm", c="dimmed") if self.description else None,
             dmc.SegmentedControl(
                 id=self.component_id,

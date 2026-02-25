@@ -5,7 +5,7 @@
       "id": "pet_type",
       "type": "single_choice",
       "options": ["cat", "dog", "fish"],
-      "required": false,
+      "required": true,
       "default": null,
       "description": "Select the type of pet mentioned in the document"
     },

@@ -6,7 +6,6 @@ import dash_mantine_components as dmc
 
 from ..models.document import DocumentList
 from ..models.spec import AnnotationSpec
-from ..models.schema import AnnotationSchema
 from ..loaders import load_document_text
 from .components import (
     create_document_viewer,
@@ -132,7 +131,7 @@ class TaterApp:
         
         # Create schema from the widgets so both paths result in having self.spec
         fields = [widget.to_field() for widget in widgets]
-        self.spec = AnnotationSpec(data_schema=AnnotationSchema(data_schema=fields))
+        self.spec = AnnotationSpec(data_schema=fields)
         
     def _setup_layout(self):
         """Set up the basic application layout."""
@@ -172,10 +171,14 @@ class TaterApp:
 
         # Build widgets with dividers between them
         components = []
+        has_required = any(getattr(widget, "required", False) for widget in self.annotation_widgets)
         for i, widget in enumerate(self.annotation_widgets):
             components.append(widget.component())
             if i < len(self.annotation_widgets) - 1:
                 components.append(dmc.Divider())
+
+        if has_required:
+            components.append(dmc.Text("[* Required]", size="xs", c="red"))
         
         return dmc.Paper([
             dmc.Stack(components, gap="md")
