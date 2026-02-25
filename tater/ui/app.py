@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-from dash import Dash, html, dcc, Input, Output, State, ctx, ClientsideFunction, no_update
+from dash import Dash, html, dcc, Input, Output, State, ctx, ClientsideFunction, no_update, ALL
 import dash_mantine_components as dmc
 
 from ..models.document import DocumentList
@@ -146,6 +146,44 @@ class TaterApp:
         fields = [widget.to_field() for widget in widgets]
         self.spec = AnnotationSpec(data_schema=fields)
         self._setup_annotation_callbacks()
+    
+    def _compute_status(self, doc_annotations: dict) -> str:
+        """Compute document status based on annotations.
+        
+        Args:
+            doc_annotations: Dictionary of annotations for a document
+            
+        Returns:
+            Status string: 'not-started', 'in-progress', or 'complete'
+        """
+        if not self.annotation_widgets:
+            return "not-started"
+        
+        # Check for any filled annotations (widget fields, notes, or flag)
+        has_widget_annotations = any(
+            v is not None and v != "" 
+            for k, v in doc_annotations.items() 
+            if not k.startswith("_")
+        )
+        has_notes = bool(doc_annotations.get("_notes", "").strip())
+        is_flagged = doc_annotations.get("_flagged", False)
+        
+        # If no annotations, notes, or flag, it's not started
+        if not has_widget_annotations and not has_notes and not is_flagged:
+            return "not-started"
+        
+        # Check if all required fields have values
+        required_widgets = [w for w in self.annotation_widgets if getattr(w, "required", False)]
+        if required_widgets:
+            for widget in required_widgets:
+                value = doc_annotations.get(widget.schema_id)
+                if value is None or value == "":
+                    return "in-progress"
+            # All required fields have values
+            return "complete"
+        else:
+            # No required fields, so any annotation/note/flag means complete
+            return "complete"
         
     def _setup_layout(self):
         """Set up the basic application layout."""
@@ -383,11 +421,13 @@ class TaterApp:
              Output("document-metadata", "children"),
              Output("prev-button", "disabled"),
              Output("next-button", "disabled"),
-             Output("document-selector", "data"),
+             Output("document-menu-dropdown", "children"),
+             Output("document-selector-button", "children"),
              Output("document-progress", "value")],
-            Input("current-index-store", "data")
+            Input("current-index-store", "data"),
+            Input("annotations-store", "data")
         )
-        def update_document_display(current_index):
+        def update_document_display(current_index, annotations_data):
             """Update the document display when index changes."""
             if not self.documents or not self.documents.documents:
                 return (
@@ -397,6 +437,7 @@ class TaterApp:
                     True,
                     True,
                     [],
+                    "Select a document",
                     0
                 )
             
@@ -409,8 +450,42 @@ class TaterApp:
             else:
                 viewer = create_document_viewer(content)
             
-            # Document title
-            title = f"Document {current_index + 1} of {len(self.documents.documents)}"
+            # Get current document status (don't show complete if not yet visited)
+            doc_key = str(current_index)
+            doc_annotations = (annotations_data or {}).get(doc_key, {})
+            status = self._compute_status(doc_annotations)
+            # Current document can't be marked complete until navigating away at least once
+            has_visited = doc_annotations.get("_visited", False)
+            if not has_visited and status == "complete":
+                status = "in-progress"
+            
+            # Document title with status
+            status_labels = {
+                "not-started": "Not Started",
+                "in-progress": "In Progress",
+                "complete": "Complete"
+            }
+            status_colors = {
+                "not-started": "gray",
+                "in-progress": "blue",
+                "complete": "teal"
+            }
+            status_badge = dmc.Badge(
+                status_labels.get(status, status),
+                color=status_colors.get(status, "gray"),
+                variant="light"
+            )
+            title = dmc.Group(
+                [
+                    dmc.Text(
+                        f"Document {current_index + 1} of {len(self.documents.documents)}",
+                        fw=500,
+                        size="lg"
+                    ),
+                    status_badge
+                ],
+                gap="sm"
+            )
             
             # Metadata
             metadata_text = ""
@@ -421,14 +496,50 @@ class TaterApp:
                 else:
                     metadata_text = str(doc.metadata)
             
-            # Navigation options
-            dropdown_options = [
-                {
-                    "label": f"{i + 1}. {doc.file_path.split('/')[-1]}",
-                    "value": str(i)
-                }
-                for i, doc in enumerate(self.documents.documents)
-            ]
+            # Navigation options with status indicators
+            dropdown_items = []
+            for i, d in enumerate(self.documents.documents):
+                key = str(i)
+                d_annotations = (annotations_data or {}).get(key, {})
+                d_status = self._compute_status(d_annotations)
+                # Current document can't be marked complete until navigating away at least once
+                has_visited = d_annotations.get("_visited", False)
+                if i == current_index and not has_visited and d_status == "complete":
+                    d_status = "in-progress"
+                dropdown_items.append(
+                    dmc.MenuItem(
+                        dmc.Group(
+                            [
+                                dmc.Text(f"{i + 1}. {d.file_path.split('/')[-1]}", size="sm"),
+                                dmc.Badge(
+                                    status_labels.get(d_status, d_status),
+                                    color=status_colors.get(d_status, "gray"),
+                                    variant="light",
+                                    size="xs"
+                                )
+                            ],
+                            gap="xs",
+                            wrap="nowrap",
+                            justify="space-between"
+                        ),
+                        id={"type": "document-menu-item", "index": i}
+                    )
+                )
+
+            current_doc_label = dmc.Group(
+                [
+                    dmc.Text(f"{current_index + 1}. {doc.file_path.split('/')[-1]}", size="sm"),
+                    dmc.Badge(
+                        status_labels.get(status, status),
+                        color=status_colors.get(status, "gray"),
+                        variant="light",
+                        size="xs"
+                    )
+                ],
+                gap="xs",
+                wrap="nowrap",
+                justify="space-between"
+            )
             
             # Progress percentage
             progress = ((current_index + 1) / len(self.documents.documents)) * 100
@@ -442,31 +553,49 @@ class TaterApp:
                 metadata_text,
                 prev_disabled,
                 next_disabled,
-                dropdown_options,
+                dropdown_items,
+                current_doc_label,
                 progress
             )
         
         @self.app.callback(
             Output("current-index-store", "data"),
+            Output("annotations-store", "data", allow_duplicate=True),
             [Input("prev-button", "n_clicks"),
              Input("next-button", "n_clicks"),
-             Input("document-selector", "value")],
-            prevent_initial_call=True
+             Input({"type": "document-menu-item", "index": ALL}, "n_clicks")],
+            State("current-index-store", "data"),
+            State("annotations-store", "data"),
+            prevent_initial_call=True,
+            allow_duplicate=True
         )
-        def handle_navigation(prev_clicks, next_clicks, selected_value):
-            """Handle document navigation."""
+        def handle_navigation(prev_clicks, next_clicks, menu_clicks, current_index, annotations_data):
+            """Handle document navigation and mark previous document as visited."""
             if not self.documents:
-                return 0
+                return self.current_index, no_update
             
             # Determine new index based on which input triggered
+            new_index = current_index
             if ctx.triggered_id == "prev-button" and self.current_index > 0:
-                self.current_index -= 1
+                new_index = self.current_index - 1
             elif ctx.triggered_id == "next-button" and self.current_index < len(self.documents.documents) - 1:
-                self.current_index += 1
-            elif ctx.triggered_id == "document-selector" and selected_value:
-                self.current_index = int(selected_value)
+                new_index = self.current_index + 1
+            elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "document-menu-item":
+                new_index = int(ctx.triggered_id.get("index"))
             
-            return self.current_index
+            # Mark the current document as visited when navigating away
+            if new_index != current_index:
+                annotations_data = annotations_data or {}
+                doc_key = str(current_index)
+                doc_annotations = dict(annotations_data.get(doc_key, {}))
+                doc_annotations["_visited"] = True
+                updated = dict(annotations_data)
+                updated[doc_key] = doc_annotations
+                self.current_index = new_index
+                return new_index, updated
+            
+            self.current_index = new_index
+            return self.current_index, no_update
         
         # Clientside callback for direct keyboard handling
         self.app.clientside_callback(

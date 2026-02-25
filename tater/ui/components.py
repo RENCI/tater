@@ -31,33 +31,57 @@ def create_document_viewer(content: str = "") -> dmc.Paper:
     )
 
 
-def create_document_navigation() -> dmc.Group:
+def create_document_navigation() -> dmc.Flex:
     """Create document navigation controls.
     
     Returns:
-        A Mantine Group containing navigation buttons
+        A Mantine Flex component containing navigation buttons
     """
-    return dmc.Group([
-        dmc.Button(
-            "← Previous",
-            id="prev-button",
-            variant="outline",
-            size="sm"
+    return dmc.Flex([
+        dmc.Box(
+            dmc.Button(
+                "← Previous",
+                id="prev-button",
+                variant="outline",
+                size="sm",
+                fullWidth=True
+            ),
+            style={"flex": "1 1 0", "minWidth": 0}
         ),
-        dmc.Select(
-            id="document-selector",
-            placeholder="Select a document",
-            searchable=True,
-            clearable=False,
-            style={"flex": 1}
+        dmc.Box(
+            dmc.Menu(
+                [
+                    dmc.MenuTarget(
+                        dmc.Button(
+                            "Select a document",
+                            id="document-selector-button",
+                            variant="outline",
+                            size="sm",
+                            fullWidth=True,
+                            justify="flex-start"
+                        ),
+                        boxWrapperProps={"className": "menu-target-wrapper"}
+                    ),
+                    dmc.MenuDropdown(id="document-menu-dropdown", children=[])
+                ],
+                position="bottom-start",
+                withArrow=True,
+                withinPortal=True,
+                width="target"
+            ),
+            style={"flex": "1 1 0", "minWidth": 0}
         ),
-        dmc.Button(
-            "Next →",
-            id="next-button",
-            variant="outline",
-            size="sm"
+        dmc.Box(
+            dmc.Button(
+                "Next →",
+                id="next-button",
+                variant="outline",
+                size="sm",
+                fullWidth=True
+            ),
+            style={"flex": "1 1 0", "minWidth": 0}
         ),
-    ], grow=True, gap="md")
+    ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
 
 
 def create_document_info() -> html.Div:
