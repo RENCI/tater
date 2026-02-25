@@ -11,7 +11,7 @@ def main():
     
     # Create the app
     app = TaterApp(
-        title="Basic Annotation App",
+        title="tater",
         theme="light"
     )
     

@@ -141,6 +141,7 @@ class TaterApp:
         
         self.app.layout = dmc.MantineProvider(
             theme={"colorScheme": self.theme},
+            forceColorScheme=self.theme,
             children=[
                 dcc.Store(id="current-index-store", data=0),
                 dcc.Store(id="documents-store", data=None),
@@ -174,7 +175,7 @@ class TaterApp:
         for i, widget in enumerate(self.annotation_widgets):
             components.append(widget.component())
             if i < len(self.annotation_widgets) - 1:
-                components.append(dmc.Divider(color="gray.3"))
+                components.append(dmc.Divider())
         
         return dmc.Paper([
             dmc.Stack(components, gap="md")
