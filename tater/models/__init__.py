@@ -1,17 +1,7 @@
-"""Core Tater data models."""
-
-from .document import Document, DocumentList, DocumentMetadata
-from .schema import DataField, AnnotationSchema
-from .ui_config import WidgetConfig, UIConfig
-from .spec import AnnotationSpec
+"""Tater data models."""
+from tater.models.document import Document, DocumentMetadata
 
 __all__ = [
-    "Document", 
-    "DocumentList", 
+    "Document",
     "DocumentMetadata",
-    "DataField",
-    "AnnotationSchema",
-    "WidgetConfig",
-    "UIConfig",
-    "AnnotationSpec"
 ]

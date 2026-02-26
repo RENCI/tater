@@ -9,7 +9,7 @@ from typing import Optional, Literal
 from pydantic import BaseModel
 
 from tater import TaterApp, parse_args
-from tater.ui.widgets import SegmentedControlWidget, RadioGroupWidget
+from tater.widgets import SegmentedControlWidget, RadioGroupWidget
 
 
 # Define type once

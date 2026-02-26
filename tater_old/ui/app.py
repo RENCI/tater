@@ -8,6 +8,7 @@ import dash_mantine_components as dmc
 
 from ..models.document import DocumentList
 from ..models.spec import AnnotationSpec
+from ..models.annotation_file import AnnotationFile, DocumentMetadata
 from ..loaders import load_document_text
 from .components import (
     create_document_viewer,
@@ -147,11 +148,12 @@ class TaterApp:
         self.spec = AnnotationSpec(data_schema=fields)
         self._setup_annotation_callbacks()
     
-    def _compute_status(self, doc_annotations: dict) -> str:
-        """Compute document status based on annotations.
+    def _compute_status(self, doc_annotations: dict, doc_metadata: dict = None) -> str:
+        """Compute document status based on annotations and metadata.
         
         Args:
             doc_annotations: Dictionary of annotations for a document
+            doc_metadata: Dictionary of document metadata (flagged, notes, visited)
             
         Returns:
             Status string: 'not-started', 'in-progress', or 'complete'
@@ -159,14 +161,15 @@ class TaterApp:
         if not self.annotation_widgets:
             return "not-started"
         
+        doc_metadata = doc_metadata or {}
+        
         # Check for any filled annotations (widget fields, notes, or flag)
         has_widget_annotations = any(
             v is not None and v != "" 
-            for k, v in doc_annotations.items() 
-            if not k.startswith("_")
+            for k, v in doc_annotations.items()
         )
-        has_notes = bool(doc_annotations.get("_notes", "").strip())
-        is_flagged = doc_annotations.get("_flagged", False)
+        has_notes = bool(doc_metadata.get("notes", "").strip())
+        is_flagged = doc_metadata.get("flagged", False)
         
         # If no annotations, notes, or flag, it's not started
         if not has_widget_annotations and not has_notes and not is_flagged:
@@ -197,6 +200,7 @@ class TaterApp:
                 dcc.Store(id="current-index-store", data=0),
                 dcc.Store(id="documents-store", data=None),
                 dcc.Store(id="annotations-store", data={}),
+                dcc.Store(id="document-metadata-store", data={}),
                 dcc.Store(id="hide-completed-store", data=False),
                 dcc.Interval(id="save-status-timer", interval=2500, n_intervals=0, disabled=True),
                 
@@ -284,11 +288,13 @@ class TaterApp:
 
         @self.app.callback(
             Output("annotations-store", "data"),
+            Output("document-metadata-store", "data"),
             Input("flag-document", "checked"),
             Input("document-notes", "value"),
             *widget_inputs,
             State("current-index-store", "data"),
             State("annotations-store", "data"),
+            State("document-metadata-store", "data"),
             prevent_initial_call=True
         )
         def save_annotations(*args):
@@ -297,28 +303,37 @@ class TaterApp:
             values = list(args[2:2 + len(self.annotation_widgets)])
             current_index = args[2 + len(self.annotation_widgets)]
             annotations_data = args[3 + len(self.annotation_widgets)] or {}
+            metadata_data = args[4 + len(self.annotation_widgets)] or {}
 
             if current_index is None:
-                return no_update
+                return no_update, no_update
 
             doc_key = str(current_index)
             new_doc_annotations = dict(annotations_data.get(doc_key, {}))
+            new_doc_metadata = dict(metadata_data.get(doc_key, {}))
 
+            # Update annotations or metadata based on what triggered the callback
             if ctx.triggered_id == "flag-document":
-                new_doc_annotations["_flagged"] = bool(checked)
+                new_doc_metadata["flagged"] = bool(checked)
             elif ctx.triggered_id == "document-notes":
-                new_doc_annotations["_notes"] = notes
+                new_doc_metadata["notes"] = notes
             else:
+                # Widget values
                 for widget, value in zip(self.annotation_widgets, values):
                     new_doc_annotations[widget.schema_id] = value
 
-            if annotations_data.get(doc_key) == new_doc_annotations:
+            if annotations_data.get(doc_key) == new_doc_annotations and \
+               metadata_data.get(doc_key) == new_doc_metadata:
                 # No actual change - this is a restore or no-op
-                return no_update
+                return no_update, no_update
             
-            updated = dict(annotations_data)
-            updated[doc_key] = new_doc_annotations
-            return updated
+            updated_annotations = dict(annotations_data)
+            updated_annotations[doc_key] = new_doc_annotations
+            
+            updated_metadata = dict(metadata_data)
+            updated_metadata[doc_key] = new_doc_metadata
+            
+            return updated_annotations, updated_metadata
 
 
         @self.app.callback(
@@ -337,37 +352,38 @@ class TaterApp:
         @self.app.callback(
             Output("flag-document", "checked"),
             Input("current-index-store", "data"),
-            State("annotations-store", "data"),
+            State("document-metadata-store", "data"),
         )
-        def restore_flag(current_index, annotations_data):
+        def restore_flag(current_index, metadata_data):
             if current_index is None:
                 return False
 
             doc_key = str(current_index)
-            doc_annotations = (annotations_data or {}).get(doc_key, {})
-            return bool(doc_annotations.get("_flagged", False))
+            doc_metadata = (metadata_data or {}).get(doc_key, {})
+            return bool(doc_metadata.get("flagged", False))
 
         @self.app.callback(
             Output("document-notes", "value"),
             Input("current-index-store", "data"),
-            State("annotations-store", "data"),
+            State("document-metadata-store", "data"),
         )
-        def restore_notes(current_index, annotations_data):
+        def restore_notes(current_index, metadata_data):
             if current_index is None:
                 return ""
 
             doc_key = str(current_index)
-            doc_annotations = (annotations_data or {}).get(doc_key, {})
-            return doc_annotations.get("_notes", "")
+            doc_metadata = (metadata_data or {}).get(doc_key, {})
+            return doc_metadata.get("notes", "")
 
         @self.app.callback(
             Output("save-status", "children"),
             Output("save-status-timer", "disabled"),
             Input("current-index-store", "data"),
             State("annotations-store", "data"),
+            State("document-metadata-store", "data"),
             prevent_initial_call=True
         )
-        def autosave_on_navigation(current_index, annotations_data):
+        def autosave_on_navigation(current_index, annotations_data, metadata_data):
             # Save on every navigation to a different document
             if (current_index is None or 
                 current_index == self.current_index or  # Haven't actually navigated
@@ -380,9 +396,15 @@ class TaterApp:
             
             path = Path(self.annotations_path)
             try:
+                documents_data = [doc.model_dump() for doc in (self.documents.documents if self.documents else [])]
+                annotation_file = AnnotationFile.from_documents_and_data(
+                    documents_data,
+                    annotations_data or {},
+                    metadata_data or {}
+                )
                 path.parent.mkdir(parents=True, exist_ok=True)
                 with path.open("w", encoding="utf-8") as f:
-                    json.dump(annotations_data or {}, f, indent=2)
+                    json.dump(annotation_file.model_dump(), f, indent=2)
                 alert = dmc.Alert(
                     "Annotations saved successfully",
                     title="Saved",
@@ -427,9 +449,10 @@ class TaterApp:
              Output("document-progress", "value")],
             Input("current-index-store", "data"),
             Input("annotations-store", "data"),
+            Input("document-metadata-store", "data"),
             Input("hide-completed-store", "data")
         )
-        def update_document_display(current_index, annotations_data, hide_completed):
+        def update_document_display(current_index, annotations_data, metadata_data, hide_completed):
             """Update the document display when index changes."""
             if not self.documents or not self.documents.documents:
                 return (
@@ -451,12 +474,13 @@ class TaterApp:
             else:
                 viewer = create_document_viewer(content)
             
-            # Get current document status (don't show complete if not yet visited)
+            # Get current document status
             doc_key = str(current_index)
             doc_annotations = (annotations_data or {}).get(doc_key, {})
-            status = self._compute_status(doc_annotations)
+            doc_metadata = (metadata_data or {}).get(doc_key, {})
+            status = self._compute_status(doc_annotations, doc_metadata)
             # Current document can't be marked complete until navigating away at least once
-            has_visited = doc_annotations.get("_visited", False)
+            has_visited = doc_metadata.get("visited", False)
             if not has_visited and status == "complete":
                 status = "in-progress"
             
@@ -502,10 +526,11 @@ class TaterApp:
             for i, d in enumerate(self.documents.documents):
                 key = str(i)
                 d_annotations = (annotations_data or {}).get(key, {})
-                d_status = self._compute_status(d_annotations)
+                d_metadata = (metadata_data or {}).get(key, {})
+                d_status = self._compute_status(d_annotations, d_metadata)
                 # Current document can't be marked complete until navigating away at least once
-                has_visited = d_annotations.get("_visited", False)
-                if i == current_index and not has_visited and d_status == "complete":
+                d_has_visited = d_metadata.get("visited", False)
+                if i == current_index and not d_has_visited and d_status == "complete":
                     d_status = "in-progress"
                 
                 # Hide completed if checkbox is checked
@@ -559,18 +584,20 @@ class TaterApp:
         @self.app.callback(
             Output("current-index-store", "data"),
             Output("annotations-store", "data", allow_duplicate=True),
+            Output("document-metadata-store", "data", allow_duplicate=True),
             [Input("prev-button", "n_clicks"),
              Input("next-button", "n_clicks"),
              Input({"type": "document-menu-item", "index": ALL}, "n_clicks")],
             State("current-index-store", "data"),
             State("annotations-store", "data"),
+            State("document-metadata-store", "data"),
             prevent_initial_call=True,
             allow_duplicate=True
         )
-        def handle_navigation(prev_clicks, next_clicks, menu_clicks, current_index, annotations_data):
+        def handle_navigation(prev_clicks, next_clicks, menu_clicks, current_index, annotations_data, metadata_data):
             """Handle document navigation and mark previous document as visited."""
             if not self.documents:
-                return self.current_index, no_update
+                return self.current_index, no_update, no_update
             
             # Determine new index based on which input triggered
             new_index = current_index
@@ -583,15 +610,15 @@ class TaterApp:
             
             # Mark the current document as visited when navigating away
             if new_index != current_index:
-                annotations_data = annotations_data or {}
+                metadata_data = metadata_data or {}
                 doc_key = str(current_index)
-                doc_annotations = dict(annotations_data.get(doc_key, {}))
-                doc_annotations["_visited"] = True
-                updated = dict(annotations_data)
-                updated[doc_key] = doc_annotations
-                return new_index, updated
+                doc_metadata = dict(metadata_data.get(doc_key, {}))
+                doc_metadata["visited"] = True
+                updated_metadata = dict(metadata_data)
+                updated_metadata[doc_key] = doc_metadata
+                return new_index, no_update, updated_metadata
             
-            return current_index, no_update
+            return current_index, no_update, no_update
         
         # Clientside callback for direct keyboard handling
         self.app.clientside_callback(

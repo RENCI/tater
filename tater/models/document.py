@@ -1,41 +1,56 @@
-"""Document models for Tater."""
-from typing import Optional, Dict, Any
-from pydantic import BaseModel
+"""Document and metadata models for Tater."""
+from typing import Optional, Any
+from pydantic import BaseModel, Field
 
 
 class DocumentMetadata(BaseModel):
-    """Metadata for a document."""
-    class Config:
-        extra = "allow"  # Allow arbitrary fields
+    """System-managed metadata for tracking annotation progress."""
+    
+    flagged: bool = Field(False, description="Whether this document is flagged for review")
+    notes: str = Field("", description="Annotator notes about this document")
+    visited: bool = Field(False, description="Whether this document has been viewed")
 
 
 class Document(BaseModel):
-    """Document model."""
-    file_path: str
-    metadata: Optional[DocumentMetadata | Dict[str, Any]] = None
-
-
-class DocumentList(BaseModel):
-    """List of documents."""
-    documents: list[Document]
+    """Represents a document to be annotated."""
+    
+    id: str = Field(description="Unique document identifier")
+    file_path: str = Field(description="Path to the document file")
+    name: Optional[str] = Field(None, description="Human-readable document name")
+    info: Optional[dict[str, Any]] = Field(None, description="User-supplied metadata/information")
+    metadata: DocumentMetadata = Field(default_factory=DocumentMetadata, description="System-managed metadata")
     
     @classmethod
-    def from_json_file(cls, path: str) -> "DocumentList":
-        """Load document list from JSON file."""
-        import json
-        with open(path, 'r') as f:
-            data = json.load(f)
+    def from_dict(cls, doc_dict: dict[str, Any], index: int = 0) -> "Document":
+        """
+        Create a Document from a dictionary, handling normalization.
+        
+        Args:
+            doc_dict: Dictionary containing document data
+            index: Document index for auto-generating ID if needed
+            
+        Returns:
+            Validated Document instance
+        """
+        # Make a copy to avoid mutating original
+        data = doc_dict.copy()
+        
+        # Generate ID if not provided
+        if "id" not in data:
+            data["id"] = f"doc_{index:03d}"
+        
         return cls(**data)
     
-    @classmethod
-    def from_csv_file(cls, path: str) -> "DocumentList":
-        """Load document list from CSV file."""
-        import csv
-        with open(path, 'r') as f:
-            reader = csv.DictReader(f)
-            documents = []
-            for row in reader:
-                file_path = row.pop('file_path')
-                metadata = {k: v for k, v in row.items() if v} if row else None
-                documents.append(Document(file_path=file_path, metadata=metadata))
-        return cls(documents=documents)
+    def load_content(self) -> str:
+        """
+        Load and return the document's text content.
+        
+        Returns:
+            The document's text content
+            
+        Raises:
+            FileNotFoundError: If the file doesn't exist
+            IOError: If there's an error reading the file
+        """
+        with open(self.file_path, 'r', encoding='utf-8') as f:
+            return f.read()
