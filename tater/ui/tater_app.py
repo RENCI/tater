@@ -85,6 +85,11 @@ class TaterApp:
             widgets: List of TaterWidget instances
         """
         self.widgets = widgets
+        
+        # Finalize all field paths for nested widgets
+        for widget in self.widgets:
+            widget._finalize_paths()
+        
         self._setup_layout()
         self._setup_callbacks()
 

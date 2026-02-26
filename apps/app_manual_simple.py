@@ -1,9 +1,6 @@
-"""Manual widget hookup example using Pydantic schema.
+"""Simple flat schema example - no nesting.
 
-This app shows how to:
-1. Define annotation types once
-2. Use them in both the Pydantic schema and widgets
-3. Use TaterApp without load_schema()
+Tater app with just flat fields.
 """
 from typing import Optional, Literal
 from pydantic import BaseModel
@@ -12,44 +9,42 @@ from tater import TaterApp, parse_args
 from tater.widgets import SegmentedControlWidget, RadioGroupWidget
 
 
-# Define type once
+# Define types
 PetType = Literal["cat", "dog", "fish"]
+SentimentType = Literal["positive", "negative", "neutral"]
 
 
-class PetAnnotationSchema(BaseModel):
-    """Annotation schema for pet documents."""
-    pet_type: PetType = None
-    pet_type_2: Optional[PetType] = None
+class SimpleAnnotation(BaseModel):
+    """Simple flat annotation schema - no nested models."""
+    pet_type: Optional[PetType] = None
+    sentiment: Optional[SentimentType] = None
 
 
 def main() -> None:
     args = parse_args()
     
-    # Define widgets manually to mirror data/simple_schema_ui.json
     widgets = [
         RadioGroupWidget(
             schema_id="pet_type",
             label="Pet Type",
             description="What type of pet is mentioned?",
-            options=list(PetType.__args__),
+            options=["cat", "dog", "fish"],
             orientation="vertical",
-            required=True,
-            default=None
         ),
         SegmentedControlWidget(
-            schema_id="pet_type_2",
-            label="Pet Type 2",
-            description="What type of pet is mentioned?",
-            options=list(PetType.__args__),
-            default=None
+            schema_id="sentiment",
+            label="Sentiment",
+            description="Overall sentiment of the document",
+            options=["positive", "negative", "neutral"],
         )
     ]
 
     app = TaterApp(
-        title="tater - manual",
+        title="Simple Annotation",
         theme="light",
         annotations_path=args.annotations
     )
+    
     if not app.load_documents(args.documents):
         return
 
