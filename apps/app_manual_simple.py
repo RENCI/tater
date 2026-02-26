@@ -25,14 +25,14 @@ def main() -> None:
     
     widgets = [
         RadioGroupWidget(
-            schema_id="pet_type",
+            schema_field="pet_type",
             label="Pet Type",
             description="What type of pet is mentioned?",
             options=["cat", "dog", "fish"],
             orientation="vertical",
         ),
         SegmentedControlWidget(
-            schema_id="sentiment",
+            schema_field="sentiment",
             label="Sentiment",
             description="Overall sentiment of the document",
             options=["positive", "negative", "neutral"],

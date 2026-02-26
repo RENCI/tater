@@ -89,6 +89,10 @@ class TaterApp:
         # Finalize all field paths for nested widgets
         for widget in self.widgets:
             widget._finalize_paths()
+
+        # Register any widget-specific callbacks
+        for widget in self.widgets:
+            widget.register_callbacks(self.app)
         
         self._setup_layout()
         self._setup_callbacks()
@@ -98,11 +102,14 @@ class TaterApp:
         # Create annotation fields from widgets
         annotation_fields = []
         for widget in self.widgets:
-            field_container = dmc.Stack([
-                dmc.Text(widget.label, fw=500, size="sm"),
-                widget.component(),
-                dmc.Text(widget.description or "", size="xs", c="dimmed") if widget.description else None,
-            ], gap="xs", mt="md")
+            if widget.renders_own_label:
+                field_container = widget.component()
+            else:
+                field_container = dmc.Stack([
+                    dmc.Text(widget.label, fw=500, size="sm"),
+                    widget.component(),
+                    dmc.Text(widget.description or "", size="xs", c="dimmed") if widget.description else None,
+                ], gap="xs", mt="md")
             annotation_fields.append(field_container)
 
         self.app.layout = dmc.MantineProvider(

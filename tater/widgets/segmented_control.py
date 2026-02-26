@@ -10,32 +10,29 @@ class SegmentedControlWidget(TaterWidget):
 
     def __init__(
         self,
+        schema_field: str,
         label: str,
         options: list[str],
-        field_path: Optional[str] = None,
         description: Optional[str] = None,
         required: bool = False,
         default: Optional[str] = None,
-        schema_id: Optional[str] = None,
     ):
         """
         Initialize SegmentedControl widget.
 
         Args:
+            schema_field: Field name in the Pydantic schema
             label: Human-readable label
             options: List of option strings
-            field_path: Dotted path to field (e.g., "sentiment")
             description: Optional help text
             required: Whether field is required
             default: Default selected value
-            schema_id: Alias for field_path (for backwards compatibility)
         """
         super().__init__(
-            field_path=field_path,
+            schema_field=schema_field,
             label=label,
             description=description,
             required=required,
-            schema_id=schema_id,
         )
         self.options = options
         self.default = default

@@ -8,29 +8,22 @@ class TaterWidget(ABC):
 
     def __init__(
         self,
-        field_path: Optional[str] = None,
+        schema_field: str,
         label: str = "",
         description: Optional[str] = None,
         required: bool = False,
-        schema_id: Optional[str] = None,
     ):
         """
         Initialize a widget.
 
         Args:
-            field_path: Dotted path to field (e.g., "sentiment" or "address.street")
+            schema_field: Field name in the Pydantic schema (e.g., "sentiment" or "owner")
             label: Human-readable label for the widget
             description: Optional help text
             required: Whether this field is required
-            schema_id: Alias for field_path (for backwards compatibility)
         """
-        # Support both field_path and schema_id
-        local_path = schema_id if schema_id is not None else field_path
-        if local_path is None:
-            raise ValueError("Either field_path or schema_id must be provided")
-        
         # Two-phase initialization for nested paths
-        self._local_path = local_path
+        self._local_path = schema_field
         self._full_path: Optional[str] = None
         
         self.label = label
@@ -65,10 +58,19 @@ class TaterWidget(ABC):
         else:
             self._full_path = self._local_path
 
+    def register_callbacks(self, app: Any) -> None:
+        """Register any widget-specific callbacks with the Dash app."""
+        return None
+
     @property
     def component_id(self) -> str:
         """Return unique component ID for Dash."""
         return f"annotation-{self.field_path}"
+
+    @property
+    def renders_own_label(self) -> bool:
+        """Whether this widget renders its own label in component()."""
+        return False
 
     @abstractmethod
     def component(self) -> Any:

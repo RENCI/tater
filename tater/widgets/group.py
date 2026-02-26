@@ -10,30 +10,27 @@ class GroupWidget(TaterWidget):
 
     def __init__(
         self,
+        schema_field: str,
         label: str,
         children: list[TaterWidget],
-        field_path: Optional[str] = None,
         description: Optional[str] = None,
         required: bool = False,
-        schema_id: Optional[str] = None,
     ):
         """
         Initialize GroupWidget.
 
         Args:
+            schema_field: Field name in the Pydantic schema
             label: Human-readable label for the group
             children: List of child widgets
-            field_path: Path to the nested model field (e.g., "address")
             description: Optional help text
             required: Whether this group is required
-            schema_id: Alias for field_path
         """
         super().__init__(
-            field_path=field_path,
+            schema_field=schema_field,
             label=label,
             description=description,
             required=required,
-            schema_id=schema_id,
         )
         self.children = children
 
@@ -74,6 +71,16 @@ class GroupWidget(TaterWidget):
             dmc.Text(self.description or "", size="xs", c="dimmed", mb="sm") if self.description else None,
             dmc.Stack(child_components, gap="sm"),
         ], withBorder=True, p="md", mt="md")
+
+    @property
+    def renders_own_label(self) -> bool:
+        """GroupWidget renders its own label and description."""
+        return True
+
+    def register_callbacks(self, app) -> None:
+        """Register callbacks for any child widgets that need them."""
+        for child in self.children:
+            child.register_callbacks(app)
 
     def to_python_type(self) -> type:
         """Return dict since this represents a nested model."""

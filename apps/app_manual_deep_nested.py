@@ -37,29 +37,29 @@ def main() -> None:
     # Define widgets with two levels of GroupWidget nesting
     widgets = [
         SegmentedControlWidget(
-            schema_id="document_sentiment",
+            schema_field="document_sentiment",
             label="Document Sentiment",
             description="Top-level field",
             options=["positive", "negative", "neutral"],
         ),
         GroupWidget(
-            schema_id="address",
+            schema_field="address",
             label="Address",
             description="First level of nesting",
             children=[
                 RadioGroupWidget(
-                    schema_id="pet_type",  # Will become "address.pet_type"
+                    schema_field="pet_type",  # Will become "address.pet_type"
                     label="Pet Type at Address",
                     options=["cat", "dog", "fish"],
                     orientation="vertical",
                 ),
                 GroupWidget(
-                    schema_id="location",  # Will become "address.location"
+                    schema_field="location",  # Will become "address.location"
                     label="Location Details",
                     description="Second level of nesting",
                     children=[
                         SegmentedControlWidget(
-                            schema_id="sentiment",  # Will become "address.location.sentiment"
+                            schema_field="sentiment",  # Will become "address.location.sentiment"
                             label="Location Sentiment",
                             description="Three levels deep!",
                             options=["positive", "negative", "neutral"],

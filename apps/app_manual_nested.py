@@ -32,23 +32,23 @@ def main() -> None:
     # Define widgets with one GroupWidget for nested model
     widgets = [
         SegmentedControlWidget(
-            schema_id="document_sentiment",
+            schema_field="document_sentiment",
             label="Document Sentiment",
             description="Overall sentiment of the entire document",
             options=["positive", "negative", "neutral"],
         ),
         GroupWidget(
-            schema_id="owner",
+            schema_field="owner",
             label="Owner Information",
             description="Information about the pet owner",
             children=[
                 SegmentedControlWidget(
-                    schema_id="sentiment",  # Will become "owner.sentiment"
+                    schema_field="sentiment",
                     label="Owner Sentiment",
                     options=["positive", "negative", "neutral"],
                 ),
                 RadioGroupWidget(
-                    schema_id="pet_type",  # Will become "owner.pet_type"
+                    schema_field="pet_type",
                     label="Owner's Pet Type",
                     options=["cat", "dog", "fish"],
                     orientation="vertical",
