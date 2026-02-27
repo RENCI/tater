@@ -18,7 +18,7 @@ class TaterApp:
         self,
         title: str = "Tater",
         theme: str = "light",
-        annotations_path: str = "annotations.json",
+        annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None
     ):
         """
@@ -75,6 +75,12 @@ class TaterApp:
                     return False
             
             self.documents = documents
+            
+            # Set default annotations path if not provided
+            if self.annotations_path is None:
+                doc_path = Path(source)
+                self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
+            
             print(f"Loaded {len(self.documents)} documents from {source}")
             return True
         except Exception as e:
@@ -107,35 +113,53 @@ class TaterApp:
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""
-        # Create annotation fields from widgets
-        annotation_fields = []
-        for widget in self.widgets:
+        # Create annotation fields from widgets with dividers between them
+        annotation_components = []
+        has_required = any(getattr(widget, "required", False) for widget in self.widgets)
+        
+        for i, widget in enumerate(self.widgets):
             if widget.renders_own_label:
                 field_container = widget.component()
             else:
-                field_container = dmc.Stack([
+                components_list = [
                     dmc.Text(widget.label, fw=500, size="sm"),
-                    widget.component(),
-                    dmc.Text(widget.description or "", size="xs", c="dimmed") if widget.description else None,
-                ], gap="xs", mt="md")
-            annotation_fields.append(field_container)
+                ]
+                if widget.description:
+                    components_list.append(
+                        dmc.Text(widget.description, size="xs", c="dimmed")
+                    )
+                components_list.append(widget.component())
+                
+                field_container = dmc.Stack(components_list, gap="xs", mt="md")
+            
+            annotation_components.append(field_container)
+            
+            # Add divider between widgets (not after last one)
+            if i < len(self.widgets) - 1:
+                annotation_components.append(dmc.Divider())
+        
+        # Add required marker if any widgets are required
+        if has_required:
+            annotation_components.append(dmc.Text("[* Required]", size="xs", c="red"))
 
-        # Document viewer component
-        document_viewer = html.Pre(
-            id="document-content",
-            style={
-                "whiteSpace": "pre-wrap",
-                "wordWrap": "break-word",
-                "fontFamily": "monospace",
-                "fontSize": "0.9rem",
-                "lineHeight": "1.5",
-                "padding": "12px",
-                "border": "1px solid #dee2e6",
-                "borderRadius": "4px",
-                "height": "500px",
-                "overflowY": "auto",
-                "backgroundColor": "#f8f9fa"
-            }
+        # Document viewer component (wrapped in Paper)
+        document_viewer = dmc.Paper(
+            html.Pre(
+                id="document-content",
+                style={
+                    "whiteSpace": "pre-wrap",
+                    "wordWrap": "break-word",
+                    "fontFamily": "monospace",
+                    "fontSize": "0.9rem",
+                    "lineHeight": "1.5",
+                    "margin": 0,
+                    "height": "500px",
+                    "overflowY": "auto",
+                }
+            ),
+            p="md",
+            withBorder=True,
+            shadow="sm"
         )
 
         # Document controls (flag and notes)
@@ -166,7 +190,7 @@ class TaterApp:
             ], span={"base": 12, "md": 7}),
             dmc.GridCol([
                 dmc.Paper(
-                    dmc.Stack(annotation_fields, gap="md"),
+                    dmc.Stack(annotation_components, gap="md"),
                     p="md",
                     withBorder=True,
                     shadow="sm"
@@ -222,8 +246,30 @@ class TaterApp:
             ]
         )
 
+    def _save_annotations_to_file(self) -> None:
+        """Save all annotations to the annotations file."""
+        try:
+            path = Path(self.annotations_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Convert Pydantic models to dicts for JSON serialization
+            annotations_dict = {}
+            for doc_id, annotation in self.annotations.items():
+                if isinstance(annotation, BaseModel):
+                    annotations_dict[doc_id] = annotation.model_dump()
+                else:
+                    annotations_dict[doc_id] = annotation
+            
+            with open(path, 'w') as f:
+                json.dump(annotations_dict, f, indent=2)
+        except Exception as e:
+            print(f"Error saving annotations: {e}")
+
     def _setup_callbacks(self) -> None:
         """Setup Dash callbacks for interactivity."""
+        
+        # Track previous doc_id for autosave on navigation
+        previous_doc_id = [None]
         
         # Update document display and info
         @self.app.callback(
@@ -249,25 +295,33 @@ class TaterApp:
                 content = f"Error loading file: {e}"
             
             doc_index = next((i for i, d in enumerate(self.documents) if d.id == doc_id), 0)
-            title = doc.name or f"Document {doc_index + 1}"
-            metadata = f"Document {doc_index + 1} of {len(self.documents)}"
+            title = f"Document {doc_index + 1} of {len(self.documents)}"
+            
+            # Format metadata from document info dict (without document count)
+            metadata_parts = []
+            if doc.info:
+                for key, value in doc.info.items():
+                    metadata_parts.append(f"{key}: {value}")
+            metadata = " | ".join(metadata_parts) if metadata_parts else ""
+            
             progress = ((doc_index + 1) / len(self.documents)) * 100 if self.documents else 0
             
             return content, title, metadata, progress
 
-        # Navigation buttons
+        # Autosave and navigation buttons
         @self.app.callback(
             Output("current-doc-id", "data"),
+            Output("save-status", "children"),
             [Input("btn-prev", "n_clicks"),
              Input("btn-next", "n_clicks")],
             State("current-doc-id", "data"),
             prevent_initial_call=True
         )
         def navigate(prev_clicks, next_clicks, current_doc_id):
-            from dash import ctx
+            from dash import ctx, no_update
             
             if not ctx.triggered or not self.documents:
-                return current_doc_id
+                return current_doc_id, no_update
             
             # Find current index from current doc_id
             current_index = next((i for i, d in enumerate(self.documents) if d.id == current_doc_id), 0)
@@ -278,8 +332,21 @@ class TaterApp:
             elif button_id == "btn-next" and current_index < len(self.documents) - 1:
                 current_index += 1
             
+            # Save annotations before navigating
+            self._save_annotations_to_file()
+            
+            # Show save status
+            alert = dmc.Alert(
+                "Annotations saved",
+                title="Saved",
+                color="teal",
+                withCloseButton=False,
+                icon=dmc.Text("✓", size="lg"),
+                duration=2000
+            )
+            
             doc_id = self.documents[current_index].id if current_index < len(self.documents) else ""
-            return doc_id
+            return doc_id, alert
 
         # Handle flag-document changes
         @self.app.callback(

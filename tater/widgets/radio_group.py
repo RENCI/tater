@@ -49,7 +49,7 @@ class RadioGroupWidget(TaterWidget):
 
         return dmc.RadioGroup(
             id=self.component_id,
-            children=radio_items,
+            children=dmc.Stack(radio_items, gap="xs"),
             value=self.default,
         )
 
