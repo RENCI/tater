@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dash import Input, Output, State
+from dash import Input, Output, State, ALL
 import dash_mantine_components as dmc
 from tater.ui import value_helpers
 
@@ -56,7 +56,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
         return content, title, metadata, progress
 
-    # Autosave and navigation buttons
+    # Button navigation
     @app.callback(
         Output("current-doc-id", "data"),
         Output("timing-store", "data"),
@@ -66,14 +66,12 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         State("timing-store", "data"),
         prevent_initial_call=True
     )
-    def navigate(prev_clicks, next_clicks, current_doc_id, timing_data):
+    def navigate_buttons(prev_clicks, next_clicks, current_doc_id, timing_data):
         from dash import ctx, no_update
-        import time
 
         if not ctx.triggered or not tater_app.documents:
-            return current_doc_id, no_update
+            return no_update, no_update
 
-        # Find current index from current doc_id
         current_index = next((i for i, d in enumerate(tater_app.documents) if d.id == current_doc_id), 0)
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
@@ -81,40 +79,46 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             current_index -= 1
         elif button_id == "btn-next" and current_index < len(tater_app.documents) - 1:
             current_index += 1
+        else:
+            return no_update, no_update
 
+        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, current_index, timing_data)
+        return doc_id, new_timing
 
-        # Accumulate annotation_seconds for the document being left
-        from tater.models.document import DocumentMetadata
-        now = time.time()
-        if current_doc_id:
-            if current_doc_id not in tater_app.metadata:
-                tater_app.metadata[current_doc_id] = DocumentMetadata()
-            # Use timing_data["doc_start_time"] to know when user started viewing this doc
-            start = None
-            if timing_data and timing_data.get("doc_start_time"):
-                start = timing_data["doc_start_time"]
-            if start:
-                elapsed = now - start
-                tater_app.metadata[current_doc_id].annotation_seconds += elapsed
+    # Menu item navigation
+    @app.callback(
+        Output("current-doc-id", "data", allow_duplicate=True),
+        Output("timing-store", "data", allow_duplicate=True),
+        Input({"type": "document-menu-item", "index": ALL}, "n_clicks"),
+        State("current-doc-id", "data"),
+        State("timing-store", "data"),
+        prevent_initial_call=True
+    )
+    def navigate_menu_item(menu_clicks, current_doc_id, timing_data):
+        from dash import ctx, no_update
 
-        # Determine new doc_id after navigation
-        doc_id = tater_app.documents[current_index].id if current_index < len(tater_app.documents) else ""
+        if not ctx.triggered or not tater_app.documents:
+            return no_update, no_update
 
-        # No need to update annotation_seconds for the document being entered (will be tracked on next navigation)
+        triggered = ctx.triggered[0]
+        if not triggered["value"]:
+            return no_update, no_update
 
-        # Save annotations before navigating
-        tater_app._save_annotations_to_file()
+        import json as _json
+        prop_id = triggered["prop_id"].split(".")[0]
+        new_index = _json.loads(prop_id)["index"]
 
-        # Update timing store with save time and reset doc timer
-        if timing_data is None:
-            timing_data = {}
-        timing_data["last_save_time"] = time.time()
-        timing_data["doc_start_time"] = time.time()  # Reset for new doc
-        if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
-            timing_data["session_start_time"] = time.time()
+        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, new_index, timing_data)
+        return doc_id, new_timing
 
-        doc_id = tater_app.documents[current_index].id if current_index < len(tater_app.documents) else ""
-        return doc_id, timing_data
+    # Refresh menu dropdown with status badges after any navigation or status change
+    @app.callback(
+        Output("document-menu-dropdown", "children"),
+        Input("timing-store", "data"),
+        Input("status-store", "data"),
+    )
+    def update_menu_items(timing_data, status_data):
+        return _build_menu_items(tater_app)
 
     # Handle flag-document changes
     @app.callback(
@@ -176,20 +180,34 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     # Handle document changes to initialize timing
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
         Input("current-doc-id", "data"),
         State("timing-store", "data"),
         prevent_initial_call='initial_duplicate',
     )
     def on_doc_change(doc_id, timing_data):
         import time
+        from tater.models.document import DocumentMetadata
+
+        if doc_id:
+            if doc_id not in tater_app.metadata:
+                tater_app.metadata[doc_id] = DocumentMetadata()
+            tater_app.metadata[doc_id].visited = True
+            update_status_for_doc(tater_app, doc_id)
+
         if timing_data is None:
             timing_data = {}
         timing_data["doc_start_time"] = time.time()
         if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
             timing_data["session_start_time"] = time.time()
-        return timing_data
+
+        status = tater_app.metadata[doc_id].status if doc_id and doc_id in tater_app.metadata else "not_started"
+        return timing_data, status
 
     # Update footer text every second
+
+    _STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
+    _STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
 
     @app.callback(
         Output("save-status-text", "children"),
@@ -212,14 +230,12 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
 
         # Doc time: show total annotation_seconds for current doc, plus current session time if viewing
-        from tater.models.document import DocumentMetadata
         total_seconds = 0.0
         meta = tater_app.metadata.get(doc_id)
         if meta:
             total_seconds = meta.annotation_seconds
         # If currently viewing, add time since doc_start_time
         if timing_data and timing_data.get("doc_start_time"):
-            # Only add if this doc is the one being viewed
             total_seconds += now - timing_data["doc_start_time"]
 
         # Format as h/m/s
@@ -236,6 +252,16 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             timing_text = f"Doc time: {hours}h {minutes}m"
 
         return save_text, timing_text
+
+    @app.callback(
+        Output("status-badge", "children"),
+        Output("status-badge", "color"),
+        Input("status-store", "data"),
+    )
+    def update_status_badge(status):
+        label = _STATUS_LABELS.get(status, status)
+        color = _STATUS_COLORS.get(status, "gray")
+        return label, color
 
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
@@ -258,6 +284,7 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
     Skips GroupWidget children (processes them recursively instead).
     Skips ListableWidget item widgets - ListableWidget handles its own value capture.
     """
+    from tater.widgets.base import ControlWidget
     from tater.widgets.group import GroupWidget
     from tater.widgets.listable import ListableWidget
 
@@ -270,8 +297,7 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
             # Recursively process GroupWidget children
             if hasattr(widget, "children") and widget.children:
                 captured.extend(_collect_value_capture_widgets(widget.children))
-        else:
-            # Regular value-capturing widget
+        elif isinstance(widget, ControlWidget):
             captured.append(widget)
 
     return captured
@@ -289,13 +315,14 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
     # Callback for updating self.annotations when widget value changes
     @app.callback(
         Output(widget_id, "id"),  # Dummy output, just to trigger
+        Output("status-store", "data", allow_duplicate=True),
         Input(widget_id, value_prop),
         State("current-doc-id", "data"),
         prevent_initial_call=True
     )
     def capture_value(value, doc_id):
         if not doc_id:
-            return widget_id
+            return widget_id, "not_started"
 
         if tater_app.schema_model:
             # Using Pydantic models - get or create instance
@@ -311,7 +338,9 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
                 tater_app.annotations[doc_id] = {}
             value_helpers.set_nested_value(tater_app.annotations[doc_id], field_path, value)
 
-        return widget_id
+        update_status_for_doc(tater_app, doc_id)
+        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+        return widget_id, status
 
     # Callback for updating widget value when document changes
     @app.callback(
@@ -338,3 +367,104 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
                 return default_value
             return empty_value
         return value
+
+
+def update_status_for_doc(tater_app: TaterApp, doc_id: str) -> None:
+    """Compute and store the annotation status for a document."""
+    from tater.models.document import DocumentMetadata
+
+    if not doc_id:
+        return
+    if doc_id not in tater_app.metadata:
+        tater_app.metadata[doc_id] = DocumentMetadata()
+    meta = tater_app.metadata[doc_id]
+
+    if not meta.visited:
+        meta.status = "not_started"
+        return
+
+    required_widgets = [w for w in _collect_value_capture_widgets(tater_app.widgets) if w.required]
+    if not required_widgets:
+        meta.status = "in_progress"
+        return
+
+    annotation = tater_app.annotations.get(doc_id)
+    if not annotation:
+        meta.status = "in_progress"
+        return
+
+    for widget in required_widgets:
+        value = value_helpers.get_model_value(annotation, widget.field_path)
+        if not _has_value(value):
+            meta.status = "in_progress"
+            return
+
+    meta.status = "complete"
+
+
+def _has_value(value) -> bool:
+    """Return True if a field value is considered filled (non-empty, non-None)."""
+    if value is None:
+        return False
+    if isinstance(value, str) and not value.strip():
+        return False
+    if isinstance(value, list) and len(value) == 0:
+        return False
+    return True
+
+
+def _build_menu_items(tater_app: TaterApp) -> list:
+    """Build document menu items with status badges."""
+    status_labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
+    status_colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
+    items = []
+    for i, doc in enumerate(tater_app.documents):
+        meta = tater_app.metadata.get(doc.id)
+        status = meta.status if meta else "not_started"
+        items.append(
+            dmc.MenuItem(
+                dmc.Group(
+                    [
+                        dmc.Text(f"{i + 1}. {doc.file_path.split('/')[-1]}", size="sm"),
+                        dmc.Badge(
+                            status_labels.get(status, status),
+                            color=status_colors.get(status, "gray"),
+                            variant="light",
+                            size="xs",
+                        ),
+                    ],
+                    gap="xs",
+                    wrap="nowrap",
+                    justify="space-between",
+                ),
+                id={"type": "document-menu-item", "index": i},
+            )
+        )
+    return items
+
+
+def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int, timing_data: dict) -> tuple:
+    """Shared navigation logic: accumulate timing, save, and return new doc_id and timing."""
+    import time
+    from tater.models.document import DocumentMetadata
+
+    now = time.time()
+    if current_doc_id:
+        if current_doc_id not in tater_app.metadata:
+            tater_app.metadata[current_doc_id] = DocumentMetadata()
+        start = timing_data.get("doc_start_time") if timing_data else None
+        if start:
+            tater_app.metadata[current_doc_id].annotation_seconds += now - start
+        update_status_for_doc(tater_app, current_doc_id)
+
+    doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""
+    tater_app._save_annotations_to_file()
+
+    if timing_data is None:
+        timing_data = {}
+    timing_data["last_save_time"] = time.time()
+    timing_data["doc_start_time"] = time.time()
+    if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
+        timing_data["session_start_time"] = time.time()
+
+    return doc_id, timing_data

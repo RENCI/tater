@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class SliderWidget(TaterWidget):
+class SliderWidget(ControlWidget):
     """Widget for selecting a numeric value via a slider."""
 
     def __init__(
@@ -13,7 +13,6 @@ class SliderWidget(TaterWidget):
         schema_field: str,
         label: str,
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[float] = None,
         min_value: float = 0,
         max_value: float = 100,
@@ -23,7 +22,6 @@ class SliderWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.default = default
         self.min_value = min_value

@@ -113,6 +113,11 @@ class TaterApp:
         for widget in self.widgets:
             widget._finalize_paths()
 
+        # Resolve required status from schema for all leaf widgets
+        from tater.ui.callbacks import _collect_value_capture_widgets
+        for widget in _collect_value_capture_widgets(self.widgets):
+            widget.resolve_required(self.schema_model)
+
         # Register any widget-specific callbacks
         for widget in self.widgets:
             widget.register_callbacks(self.app)
@@ -149,7 +154,8 @@ class TaterApp:
                         flagged=meta.get("flagged_for_review", False),
                         notes=meta.get("notes", ""),
                         annotation_seconds=meta.get("annotation_seconds", 0.0),
-                        visited=meta.get("visited", False)
+                        visited=meta.get("visited", False),
+                        status=meta.get("status", "not_started"),
                     )
                 else:
                     # Old format (flat) - treat as annotations only

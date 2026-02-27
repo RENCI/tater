@@ -2,9 +2,9 @@
 from typing import Optional, List
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
-class MultiSelectWidget(TaterWidget):
+class MultiSelectWidget(ControlWidget):
     """Widget for selecting multiple options from a list."""
 
     def __init__(
@@ -13,7 +13,6 @@ class MultiSelectWidget(TaterWidget):
         label: str,
         options: list[str],
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[List[str]] = None,
     ):
         """
@@ -24,14 +23,12 @@ class MultiSelectWidget(TaterWidget):
             label: Human-readable label
             options: List of option strings
             description: Optional help text
-            required: Whether field is required
             default: Default selected values (list)
         """
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.options = options
         self.default = default or []

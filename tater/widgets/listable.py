@@ -8,10 +8,10 @@ from dash import dcc, html, Input, Output, State, ctx, ALL
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ContainerWidget, TaterWidget
 
 
-class ListableWidget(TaterWidget):
+class ListableWidget(ContainerWidget):
     """Widget for managing a list of repeated field groups."""
 
     def __init__(
@@ -20,7 +20,6 @@ class ListableWidget(TaterWidget):
         label: str,
         item_widgets: list[TaterWidget],
         description: Optional[str] = None,
-        required: bool = False,
         add_label: str = "Add",
         delete_label: str = "Delete",
         initial_count: int = 1,
@@ -33,7 +32,6 @@ class ListableWidget(TaterWidget):
             label: Human-readable label for the list
             item_widgets: Widgets that make up a single list item
             description: Optional help text
-            required: Whether this list is required
             add_label: Label for the add button
             delete_label: Label for the delete button
             initial_count: Number of items to start with
@@ -42,7 +40,6 @@ class ListableWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.item_widgets = item_widgets
         self.add_label = add_label
@@ -144,11 +141,6 @@ class ListableWidget(TaterWidget):
             dmc.Stack(self._render_items(store_data["indices"], None, None), id=self._items_id(), gap="md"),
             dcc.Store(id=self._store_id(), data=store_data),
         ], gap="sm", mt="md")
-
-    @property
-    def renders_own_label(self) -> bool:
-        """ListableWidget renders its own label and description."""
-        return True
 
     def register_callbacks(self, app: Any) -> None:
         """Register callbacks to manage list structure and capture item values."""

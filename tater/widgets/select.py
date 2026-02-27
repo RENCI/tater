@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class SelectWidget(TaterWidget):
+class SelectWidget(ControlWidget):
     """Widget for selecting a single option from a dropdown."""
 
     def __init__(
@@ -14,14 +14,12 @@ class SelectWidget(TaterWidget):
         label: str,
         options: list[str],
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[str] = None,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.options = options
         self.default = default

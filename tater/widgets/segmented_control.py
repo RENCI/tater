@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class SegmentedControlWidget(TaterWidget):
+class SegmentedControlWidget(ControlWidget):
     """Widget for selecting from a list of mutually exclusive options."""
 
     def __init__(
@@ -14,7 +14,6 @@ class SegmentedControlWidget(TaterWidget):
         label: str,
         options: list[str],
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[str] = None,
     ):
         """
@@ -25,14 +24,12 @@ class SegmentedControlWidget(TaterWidget):
             label: Human-readable label
             options: List of option strings
             description: Optional help text
-            required: Whether field is required
             default: Default selected value
         """
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.options = options
         self.default = default

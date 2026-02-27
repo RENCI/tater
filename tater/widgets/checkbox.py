@@ -3,10 +3,10 @@ from typing import Optional
 
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class CheckboxWidget(TaterWidget):
+class CheckboxWidget(ControlWidget):
     """Widget for boolean yes/no annotations."""
 
     def __init__(
@@ -14,7 +14,6 @@ class CheckboxWidget(TaterWidget):
         schema_field: str,
         label: str,
         description: Optional[str] = None,
-        required: bool = False,
         default: bool = False,
     ):
         """
@@ -24,14 +23,12 @@ class CheckboxWidget(TaterWidget):
             schema_field: Field name in the Pydantic schema
             label: Human-readable label
             description: Optional help text
-            required: Whether field is required
             default: Default checked state
         """
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.default = default
 

@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class SwitchWidget(TaterWidget):
+class SwitchWidget(ControlWidget):
     """Widget for boolean yes/no annotations displayed as a toggle switch."""
 
     def __init__(
@@ -13,14 +13,12 @@ class SwitchWidget(TaterWidget):
         schema_field: str,
         label: str,
         description: Optional[str] = None,
-        required: bool = False,
         default: bool = False,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.default = default
 

@@ -2,9 +2,9 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
-class NumberInputWidget(TaterWidget):
+class NumberInputWidget(ControlWidget):
     """Widget for entering a numeric value."""
 
     def __init__(
@@ -12,7 +12,6 @@ class NumberInputWidget(TaterWidget):
         schema_field: str,
         label: str,
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[float] = None,
         min_value: Optional[float] = None,
         max_value: Optional[float] = None,
@@ -25,7 +24,6 @@ class NumberInputWidget(TaterWidget):
             schema_field: Field name in the Pydantic schema
             label: Human-readable label
             description: Optional help text
-            required: Whether field is required
             default: Default value
             min_: Minimum value
             max_: Maximum value
@@ -35,7 +33,6 @@ class NumberInputWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.default = default
         self.min_value = min_value

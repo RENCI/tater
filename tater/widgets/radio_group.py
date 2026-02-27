@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class RadioGroupWidget(TaterWidget):
+class RadioGroupWidget(ControlWidget):
     """Widget for selecting from a list of mutually exclusive options."""
 
     def __init__(
@@ -14,7 +14,6 @@ class RadioGroupWidget(TaterWidget):
         label: str,
         options: list[str],
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[str] = None,
         vertical: bool = False,
     ):
@@ -22,7 +21,6 @@ class RadioGroupWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.options = options
         self.default = default

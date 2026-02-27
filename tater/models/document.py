@@ -1,15 +1,16 @@
 """Document and metadata models for Tater."""
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from pydantic import BaseModel, Field
 
 
 class DocumentMetadata(BaseModel):
     """System-managed metadata for tracking annotation progress."""
-    
+
     flagged: bool = Field(False, description="Whether this document is flagged for review")
     notes: str = Field("", description="Annotator notes about this document")
     visited: bool = Field(False, description="Whether this document has been viewed")
     annotation_seconds: float = Field(0.0, description="Total time spent annotating this document (seconds)")
+    status: Literal["not_started", "in_progress", "complete"] = Field("not_started", description="Annotation status")
 
 
 class Document(BaseModel):

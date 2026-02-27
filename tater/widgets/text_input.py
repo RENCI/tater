@@ -3,10 +3,10 @@ from typing import Optional
 
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class TextInputWidget(TaterWidget):
+class TextInputWidget(ControlWidget):
     """Widget for entering a single line of text."""
 
     def __init__(
@@ -14,7 +14,6 @@ class TextInputWidget(TaterWidget):
         schema_field: str,
         label: str,
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[str] = None,
         placeholder: Optional[str] = None,
     ):
@@ -25,7 +24,6 @@ class TextInputWidget(TaterWidget):
             schema_field: Field name in the Pydantic schema
             label: Human-readable label
             description: Optional help text
-            required: Whether field is required
             default: Default text value
             placeholder: Placeholder text shown when empty
         """
@@ -33,7 +31,6 @@ class TextInputWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.default = default
         self.placeholder = placeholder

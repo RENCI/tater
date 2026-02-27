@@ -2,10 +2,10 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ContainerWidget, TaterWidget
 
 
-class GroupWidget(TaterWidget):
+class GroupWidget(ContainerWidget):
     """Container widget for nested Pydantic model fields."""
 
     def __init__(
@@ -14,7 +14,6 @@ class GroupWidget(TaterWidget):
         label: str,
         children: list[TaterWidget],
         description: Optional[str] = None,
-        required: bool = False,
     ):
         """
         Initialize GroupWidget.
@@ -24,13 +23,11 @@ class GroupWidget(TaterWidget):
             label: Human-readable label for the group
             children: List of child widgets
             description: Optional help text
-            required: Whether this group is required
         """
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.children = children
 
@@ -71,11 +68,6 @@ class GroupWidget(TaterWidget):
             dmc.Text(self.description or "", size="xs", c="dimmed", mb="sm") if self.description else None,
             dmc.Stack(child_components, gap="sm"),
         ], withBorder=True, p="md", mt="md")
-
-    @property
-    def renders_own_label(self) -> bool:
-        """GroupWidget renders its own label and description."""
-        return True
 
     def register_callbacks(self, app) -> None:
         """Register callbacks for any child widgets that need them."""

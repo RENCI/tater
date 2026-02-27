@@ -16,7 +16,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     annotation_components = _build_annotation_components(tater_app.widgets)
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
-    nav_controls = _build_navigation_controls()
+    nav_controls = _build_navigation_controls(tater_app)
     footer_bar = _build_footer_bar()
 
     content_grid = dmc.Grid([
@@ -41,6 +41,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         children=[
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
+            dcc.Store(id="status-store", data="not_started"),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             dmc.Container([
                 dmc.Stack([
@@ -48,12 +49,17 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                         dmc.Title(tater_app.title, order=1, mt="xl")
                     ),
                     dmc.Stack([
-                        dmc.Text(
-                            id="document-title",
-                            fw=500,
-                            size="lg",
-                            mb="xs"
-                        ),
+                        dmc.Group([
+                            dmc.Text(
+                                id="document-title",
+                                fw=500,
+                                size="lg",
+                            ),
+                            dmc.Badge(
+                                id="status-badge",
+                                variant="light",
+                            ),
+                        ], gap="sm", align="center", mb="xs"),
                         dmc.Progress(
                             id="document-progress",
                             value=0,
@@ -142,12 +148,33 @@ def _build_document_controls() -> dmc.Stack:
     ], gap="sm")
 
 
-def _build_navigation_controls() -> dmc.Flex:
+def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
     """Build the navigation button row."""
     return dmc.Flex([
-        dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", flex=1),
-        dmc.Button("Next \u2192", id="btn-next", variant="outline", flex=1),
-    ], gap="md")
+        dmc.Box(
+            dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", fullWidth=True),
+            style={"flex": "1 1 0", "minWidth": 0},
+        ),
+        dmc.Box(
+            dmc.Menu([
+                dmc.MenuTarget(
+                    dmc.Button(
+                        "Select document",
+                        id="document-selector-button",
+                        variant="outline",
+                        fullWidth=True,
+                    ),
+                    boxWrapperProps={"className": "menu-target-wrapper"},
+                ),
+                dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
+            ], position="bottom-start", withArrow=True, withinPortal=True, width="target"),
+            style={"flex": "1 1 0", "minWidth": 0},
+        ),
+        dmc.Box(
+            dmc.Button("Next \u2192", id="btn-next", variant="outline", fullWidth=True),
+            style={"flex": "1 1 0", "minWidth": 0},
+        ),
+    ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
 
 
 def _build_footer_bar() -> dmc.Box:

@@ -2,10 +2,10 @@
 from typing import Optional, List
 import dash_mantine_components as dmc
 
-from .base import TaterWidget
+from .base import ControlWidget
 
 
-class ChipGroupWidget(TaterWidget):
+class ChipGroupWidget(ControlWidget):
     """Widget for selecting multiple options displayed as inline chip buttons."""
 
     def __init__(
@@ -14,7 +14,6 @@ class ChipGroupWidget(TaterWidget):
         label: str,
         options: list[str],
         description: Optional[str] = None,
-        required: bool = False,
         default: Optional[List[str]] = None,
         vertical: bool = False,
     ):
@@ -22,7 +21,6 @@ class ChipGroupWidget(TaterWidget):
             schema_field=schema_field,
             label=label,
             description=description,
-            required=required,
         )
         self.options = options
         self.default = default or []
