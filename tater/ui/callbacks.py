@@ -164,11 +164,13 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
     app = tater_app.app
     widget_id = widget.component_id
     field_path = widget.field_path
+    value_prop = widget.value_prop
+    default_value = getattr(widget, "default", None)
 
     # Callback for updating self.annotations when widget value changes
     @app.callback(
         Output(widget_id, "id"),  # Dummy output, just to trigger
-        Input(widget_id, "value"),
+        Input(widget_id, value_prop),
         State("current-doc-id", "data"),
         prevent_initial_call=True
     )
@@ -194,13 +196,22 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
 
     # Callback for updating widget value when document changes
     @app.callback(
-        Output(widget_id, "value"),
+        Output(widget_id, value_prop),
         Input("current-doc-id", "data"),
         prevent_initial_call=True
     )
     def update_widget_value(doc_id):
         if not doc_id or doc_id not in tater_app.annotations:
-            return None
+            if value_prop == "checked":
+                return bool(default_value) if default_value is not None else False
+            return default_value
 
         annotation = tater_app.annotations[doc_id]
-        return value_helpers.get_model_value(annotation, field_path)
+        value = value_helpers.get_model_value(annotation, field_path)
+        if value_prop == "checked":
+            if value is None:
+                return bool(default_value) if default_value is not None else False
+            return bool(value)
+        if value is None:
+            return default_value
+        return value

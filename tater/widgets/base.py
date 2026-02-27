@@ -79,6 +79,11 @@ class TaterWidget(ABC):
         """Whether this widget renders its own label in component()."""
         return False
 
+    @property
+    def value_prop(self) -> str:
+        """Dash prop name used to read/write this widget's value."""
+        return "value"
+
     @abstractmethod
     def component(self) -> Any:
         """

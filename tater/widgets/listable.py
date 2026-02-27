@@ -259,10 +259,11 @@ class ListableWidget(TaterWidget):
         
         pattern_type = f"{self.component_id}-item"
         field_name = item_widget_template._local_path
+        value_prop = item_widget_template.value_prop
         
         @app.callback(
             Output({"type": pattern_type, "field": field_name, "index": ALL}, "id"),
-            Input({"type": pattern_type, "field": field_name, "index": ALL}, "value"),
+            Input({"type": pattern_type, "field": field_name, "index": ALL}, value_prop),
             State({"type": pattern_type, "field": field_name, "index": ALL}, "id"),
             State("current-doc-id", "data"),
             prevent_initial_call=True
