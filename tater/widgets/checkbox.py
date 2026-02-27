@@ -15,6 +15,7 @@ class CheckboxWidget(ControlWidget):
         label: str,
         description: Optional[str] = None,
         default: bool = False,
+        required: bool = False,
     ):
         """
         Initialize Checkbox widget.
@@ -25,6 +26,8 @@ class CheckboxWidget(ControlWidget):
             description: Optional help text
             default: Default checked state
         """
+        if required:
+            raise ValueError("CheckboxWidget cannot be required — boolean fields always have a value.")
         super().__init__(
             schema_field=schema_field,
             label=label,

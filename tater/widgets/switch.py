@@ -14,7 +14,10 @@ class SwitchWidget(ControlWidget):
         label: str,
         description: Optional[str] = None,
         default: bool = False,
+        required: bool = False,
     ):
+        if required:
+            raise ValueError("SwitchWidget cannot be required — boolean fields always have a value.")
         super().__init__(
             schema_field=schema_field,
             label=label,
