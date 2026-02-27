@@ -1,12 +1,12 @@
-"""Radio group widget for single-choice annotations."""
+"""Select widget for single-choice annotations."""
 from typing import Optional
 import dash_mantine_components as dmc
 
 from .base import TaterWidget
 
 
-class RadioGroupWidget(TaterWidget):
-    """Widget for selecting from a list of mutually exclusive options."""
+class SelectWidget(TaterWidget):
+    """Widget for selecting a single option from a dropdown."""
 
     def __init__(
         self,
@@ -16,7 +16,6 @@ class RadioGroupWidget(TaterWidget):
         description: Optional[str] = None,
         required: bool = False,
         default: Optional[str] = None,
-        vertical: bool = False,
     ):
         super().__init__(
             schema_field=schema_field,
@@ -26,18 +25,16 @@ class RadioGroupWidget(TaterWidget):
         )
         self.options = options
         self.default = default
-        self.vertical = vertical
 
-    def component(self) -> dmc.RadioGroup:
-        """Return Dash Mantine RadioGroup component."""
-        radio_items = [dmc.Radio(label=opt, value=opt) for opt in self.options]
-        container = dmc.Stack(radio_items, gap="xs") if self.vertical else dmc.Group(radio_items, wrap="wrap")
-        return dmc.RadioGroup(
+    def component(self) -> dmc.Select:
+        """Return Dash Mantine Select component."""
+        return dmc.Select(
             id=self.component_id,
-            children=container,
+            data=[{"label": opt, "value": opt} for opt in self.options],
             value=self.default,
+            clearable=True,
+            searchable=True,
         )
 
     def to_python_type(self) -> type:
-        """Return str since this widget produces string values."""
         return str

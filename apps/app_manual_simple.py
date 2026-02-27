@@ -1,41 +1,23 @@
-"""Simple flat schema example - no nesting.
-
-Tater app with just flat fields.
-"""
+"""Simple annotation example with a single-choice and a boolean widget."""
 from typing import Optional, Literal
 from pydantic import BaseModel
 
 from tater import TaterApp, parse_args
-from tater.widgets import SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget, MultiSelectWidget, NumberInputWidget, ChipGroupWidget
+from tater.widgets import SegmentedControlWidget, CheckboxWidget
 
 
-# Define types
-PetType = Literal["cat", "dog", "fish"]
 SentimentType = Literal["positive", "negative", "neutral"]
 
 
 class SimpleAnnotation(BaseModel):
-    """Simple flat annotation schema - no nested models."""
-    pet_type: Optional[PetType] = None
     sentiment: Optional[SentimentType] = None
-    is_cute: bool = False
-    reviewer_note: Optional[str] = None
-    favorite_colors: Optional[list[str]] = None
-    pet_age: Optional[float] = None
-    traits: Optional[list[str]] = None
+    is_relevant: bool = False
 
 
 def main() -> None:
     args = parse_args()
-    
+
     widgets = [
-        RadioGroupWidget(
-            schema_field="pet_type",
-            label="Pet Type",
-            description="What type of pet is mentioned?",
-            options=["cat", "dog", "fish"],
-            orientation="vertical",
-        ),
         SegmentedControlWidget(
             schema_field="sentiment",
             label="Sentiment",
@@ -43,36 +25,9 @@ def main() -> None:
             options=["positive", "negative", "neutral"],
         ),
         CheckboxWidget(
-            schema_field="is_cute",
-            label="Is cute?",
-            description="Check if this pet is cute",
-            default=False,
-        ),
-        TextInputWidget(
-            schema_field="reviewer_note",
-            label="Reviewer note",
-            description="Optional short note about this document",
-            placeholder="Enter a short note",
-        ),
-        MultiSelectWidget(
-            schema_field="favorite_colors",
-            label="Favorite Colors",
-            description="Select one or more favorite colors",
-            options=["red", "green", "blue", "yellow", "purple"],
-        ),
-        NumberInputWidget(
-            schema_field="pet_age",
-            label="Pet Age",
-            description="How old is the pet?",
-            min_value=0,
-            max_value=50,
-            step=0.1,
-        ),
-        ChipGroupWidget(
-            schema_field="traits",
-            label="Traits",
-            description="Select all traits that apply",
-            options=["friendly", "playful", "lazy", "energetic", "shy"],
+            schema_field="is_relevant",
+            label="Relevant?",
+            description="Is this document relevant?",
         ),
     ]
 
@@ -80,9 +35,9 @@ def main() -> None:
         title="tater - simple",
         theme="light",
         annotations_path=args.annotations,
-        schema_model=SimpleAnnotation
+        schema_model=SimpleAnnotation,
     )
-    
+
     if not app.load_documents(args.documents):
         return
 

@@ -16,6 +16,7 @@ class ChipGroupWidget(TaterWidget):
         description: Optional[str] = None,
         required: bool = False,
         default: Optional[List[str]] = None,
+        vertical: bool = False,
     ):
         super().__init__(
             schema_field=schema_field,
@@ -25,14 +26,14 @@ class ChipGroupWidget(TaterWidget):
         )
         self.options = options
         self.default = default or []
+        self.vertical = vertical
 
     def component(self) -> dmc.ChipGroup:
         """Return Dash Mantine ChipGroup component."""
+        chips = [dmc.Chip(opt, value=opt) for opt in self.options]
+        container = dmc.Stack(chips, gap="xs") if self.vertical else dmc.Group(chips, wrap="wrap")
         return dmc.ChipGroup(
-            dmc.Group(
-                [dmc.Chip(opt, value=opt) for opt in self.options],
-                wrap="wrap",
-            ),
+            container,
             id=self.component_id,
             value=self.default,
             multiple=True,

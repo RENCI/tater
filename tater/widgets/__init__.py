@@ -10,6 +10,9 @@ from tater.widgets.listable import ListableWidget
 from tater.widgets.multiselect import MultiSelectWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.chip_group import ChipGroupWidget
+from tater.widgets.slider import SliderWidget
+from tater.widgets.switch import SwitchWidget
+from tater.widgets.select import SelectWidget
 
 __all__ = [
     "TaterWidget",
@@ -22,4 +25,7 @@ __all__ = [
     "MultiSelectWidget",
     "NumberInputWidget",
     "ChipGroupWidget",
+    "SliderWidget",
+    "SwitchWidget",
+    "SelectWidget",
 ]
