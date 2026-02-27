@@ -42,7 +42,8 @@ def main() -> None:
     app = TaterApp(
         title="Simple Annotation",
         theme="light",
-        annotations_path=args.annotations
+        annotations_path=args.annotations,
+        schema_model=SimpleAnnotation
     )
     
     if not app.load_documents(args.documents):

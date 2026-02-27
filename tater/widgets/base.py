@@ -64,8 +64,15 @@ class TaterWidget(ABC):
 
     @property
     def component_id(self) -> str:
-        """Return unique component ID for Dash."""
-        return f"annotation-{self.field_path}"
+        """Return unique component ID for Dash (dots replaced with hyphens)."""
+        return f"annotation-{self.field_path.replace('.', '-')}"
+    
+    def component_id_dict(self, pattern_type: str = "widget") -> dict:
+        """Return dictionary-based component ID for pattern-matching callbacks."""
+        return {
+            "type": pattern_type,
+            "field": self.field_path,
+        }
 
     @property
     def renders_own_label(self) -> bool:
