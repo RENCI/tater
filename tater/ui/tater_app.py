@@ -120,72 +120,127 @@ class TaterApp:
                 ], gap="xs", mt="md")
             annotation_fields.append(field_container)
 
+        # Document viewer component
+        document_viewer = html.Pre(
+            id="document-content",
+            style={
+                "whiteSpace": "pre-wrap",
+                "wordWrap": "break-word",
+                "fontFamily": "monospace",
+                "fontSize": "0.9rem",
+                "lineHeight": "1.5",
+                "padding": "12px",
+                "border": "1px solid #dee2e6",
+                "borderRadius": "4px",
+                "height": "500px",
+                "overflowY": "auto",
+                "backgroundColor": "#f8f9fa"
+            }
+        )
+
+        # Document controls (flag and notes)
+        document_controls = dmc.Stack([
+            dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+            dmc.Textarea(
+                id="document-notes",
+                label="Notes",
+                autosize=True,
+                minRows=3,
+                placeholder="Add notes about this document"
+            )
+        ], gap="sm")
+
+        # Navigation controls
+        nav_controls = dmc.Flex([
+            dmc.Button("← Previous", id="btn-prev", variant="outline", flex=1),
+            dmc.Button("Next →", id="btn-next", variant="outline", flex=1),
+        ], gap="md")
+
+        # Two-column layout: left (document) and right (annotations)
+        content_grid = dmc.Grid([
+            dmc.GridCol([
+                dmc.Stack([
+                    document_viewer,
+                    document_controls
+                ], gap="md")
+            ], span={"base": 12, "md": 7}),
+            dmc.GridCol([
+                dmc.Paper(
+                    dmc.Stack(annotation_fields, gap="md"),
+                    p="md",
+                    withBorder=True,
+                    shadow="sm"
+                )
+            ], span={"base": 12, "md": 5}),
+        ], gutter="xl")
+
+        # Main layout
         self.app.layout = dmc.MantineProvider(
             theme={"colorScheme": self.theme},
             children=[
+                # State stores
+                dcc.Store(id="current-doc-id", data=self.documents[0].id if self.documents else ""),
+                
                 dmc.Container([
-                    # Header
-                    dmc.Paper([
-                        dmc.Group([
-                            dmc.Title(self.title, order=2),
-                            dmc.Badge(
-                                f"Document {self.current_doc_index + 1} of {len(self.documents)}",
-                                id="doc-counter",
-                                color="blue"
-                            ),
-                        ], justify="space-between"),
-                    ], p="md", mb="md", withBorder=True),
-                    
-                    # Navigation
-                    dmc.Card([
-                        dmc.Group([
-                            dmc.Button("Previous", id="btn-prev", variant="outline"),
-                            dmc.Button("Next", id="btn-next", variant="outline"),
-                        ], justify="space-between"),
-                    ], withBorder=True, p="md", mb="md"),
-
-                    # Document viewer
-                    dmc.Card([
-                        dmc.Title("Document", order=4, mb="sm"),
-                        dmc.ScrollArea(
-                            html.Div(
-                                id="document-content",
-                                style={"whiteSpace": "pre-wrap"}
-                            ),
-                            h=300
+                    dmc.Stack([
+                        # Title
+                        dmc.Center(
+                            dmc.Title(self.title, order=1, mt="xl")
                         ),
-                    ], withBorder=True, p="md", mb="md"),
 
-                    # Annotation panel
-                    dmc.Card([
-                        dmc.Title("Annotations", order=4, mb="sm"),
-                        dmc.Stack(annotation_fields, gap="md"),
-                    ], withBorder=True, p="md"),
+                        # Document info
+                        dmc.Stack([
+                            dmc.Text(
+                                id="document-title",
+                                fw=500,
+                                size="lg",
+                                mb="xs"
+                            ),
+                            dmc.Progress(
+                                id="document-progress",
+                                value=0,
+                                size="sm",
+                                mb="xs"
+                            ),
+                            dmc.Text(
+                                id="document-metadata",
+                                size="sm",
+                                c="dimmed"
+                            ),
+                        ]),
 
-                    # Hidden store for state
-                    dcc.Store(id="current-doc-index", data=0),
-                    dcc.Store(id="current-doc-id", data=self.documents[0].id if self.documents else ""),
-                ], size="lg", pt="md")
+                        # Main content grid
+                        content_grid,
+
+                        # Save status
+                        html.Div(id="save-status", style={"position": "fixed", "top": "20px", "right": "20px", "zIndex": 1000}),
+
+                        # Navigation
+                        nav_controls,
+                    ], gap="lg")
+                ], size="xl", py="xl", fluid=True)
             ]
         )
 
     def _setup_callbacks(self) -> None:
         """Setup Dash callbacks for interactivity."""
         
-        # Update document display
+        # Update document display and info
         @self.app.callback(
             [Output("document-content", "children"),
-             Output("doc-counter", "children")],
+             Output("document-title", "children"),
+             Output("document-metadata", "children"),
+             Output("document-progress", "value")],
             Input("current-doc-id", "data")
         )
         def update_document(doc_id):
             if not doc_id:
-                return "No document loaded", "No documents"
+                return "No document loaded", "No document", "", 0
             
             # Find document by ID
             doc = next((d for d in self.documents if d.id == doc_id), None)
             if not doc:
-                return "Document not found", "Error"
+                return "Document not found", "Error", "", 0
             
             # Load document content
             try:
@@ -194,24 +249,28 @@ class TaterApp:
                 content = f"Error loading file: {e}"
             
             doc_index = next((i for i, d in enumerate(self.documents) if d.id == doc_id), 0)
-            counter_text = f"Document {doc_index + 1} of {len(self.documents)}"
-            return content, counter_text
+            title = doc.name or f"Document {doc_index + 1}"
+            metadata = f"Document {doc_index + 1} of {len(self.documents)}"
+            progress = ((doc_index + 1) / len(self.documents)) * 100 if self.documents else 0
+            
+            return content, title, metadata, progress
 
         # Navigation buttons
         @self.app.callback(
-            [Output("current-doc-index", "data"),
-             Output("current-doc-id", "data")],
+            Output("current-doc-id", "data"),
             [Input("btn-prev", "n_clicks"),
              Input("btn-next", "n_clicks")],
-            State("current-doc-index", "data"),
+            State("current-doc-id", "data"),
             prevent_initial_call=True
         )
-        def navigate(prev_clicks, next_clicks, current_index):
+        def navigate(prev_clicks, next_clicks, current_doc_id):
             from dash import ctx
             
-            if not ctx.triggered:
-                return current_index, ""
+            if not ctx.triggered or not self.documents:
+                return current_doc_id
             
+            # Find current index from current doc_id
+            current_index = next((i for i, d in enumerate(self.documents) if d.id == current_doc_id), 0)
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
             
             if button_id == "btn-prev" and current_index > 0:
@@ -219,8 +278,34 @@ class TaterApp:
             elif button_id == "btn-next" and current_index < len(self.documents) - 1:
                 current_index += 1
             
-            doc_id = self.documents[current_index].id if self.documents and current_index < len(self.documents) else ""
-            return current_index, doc_id
+            doc_id = self.documents[current_index].id if current_index < len(self.documents) else ""
+            return doc_id
+
+        # Handle flag-document changes
+        @self.app.callback(
+            Output("flag-document", "id"),  # Dummy output
+            Input("flag-document", "checked"),
+            State("current-doc-id", "data"),
+            prevent_initial_call=True
+        )
+        def save_flag(checked, doc_id):
+            if not doc_id:
+                return "flag-document"
+            # Store flag state (optional - can be expanded if needed)
+            return "flag-document"
+
+        # Handle document-notes changes
+        @self.app.callback(
+            Output("document-notes", "id"),  # Dummy output
+            Input("document-notes", "value"),
+            State("current-doc-id", "data"),
+            prevent_initial_call=True
+        )
+        def save_notes(notes, doc_id):
+            if not doc_id:
+                return "document-notes"
+            # Store notes state (optional - can be expanded if needed)
+            return "document-notes"
 
     def _setup_value_capture_callbacks(self) -> None:
         """Setup callbacks to capture widget value changes to annotations store."""
