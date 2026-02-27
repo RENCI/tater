@@ -16,6 +16,7 @@ class TextInputWidget(ControlWidget):
         description: Optional[str] = None,
         default: Optional[str] = None,
         placeholder: Optional[str] = None,
+        **kwargs,
     ):
         """
         Initialize TextInput widget.
@@ -31,6 +32,7 @@ class TextInputWidget(ControlWidget):
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.default = default
         self.placeholder = placeholder

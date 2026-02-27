@@ -83,22 +83,37 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
 def _build_annotation_components(widgets: list[TaterWidget]) -> list:
     """Create annotation fields from widgets with dividers between them."""
+    from tater.ui.callbacks import _collect_value_capture_widgets
     annotation_components = []
-    has_required = any(getattr(widget, "required", False) for widget in widgets)
+    has_required = any(w.required for w in _collect_value_capture_widgets(widgets))
 
     for i, widget in enumerate(widgets):
+        required = getattr(widget, "required", False)
         if widget.renders_own_label:
-            field_container = widget.component()
+            # Widget draws its own label — prepend a red * beside it if required
+            if required:
+                field_container = dmc.Group(
+                    [dmc.Text("*", size="sm", c="red"), widget.component()],
+                    gap=4,
+                    align="self-start",
+                    mt="md",
+                )
+            else:
+                field_container = widget.component()
         else:
-            components_list = [
-                dmc.Text(widget.label, fw=500, size="sm"),
-            ]
+            label_row = dmc.Group(
+                [
+                    *([dmc.Text("*", size="sm", c="red")] if required else []),
+                    dmc.Text(widget.label, fw=500, size="sm"),
+                ],
+                gap=4,
+            )
+            components_list = [label_row]
             if widget.description:
                 components_list.append(
                     dmc.Text(widget.description, size="xs", c="dimmed")
                 )
             components_list.append(widget.component())
-
             field_container = dmc.Stack(components_list, gap="xs", mt="md")
 
         annotation_components.append(field_container)
@@ -107,7 +122,8 @@ def _build_annotation_components(widgets: list[TaterWidget]) -> list:
             annotation_components.append(dmc.Divider())
 
     if has_required:
-        annotation_components.append(dmc.Text("[* Required]", size="xs", c="red"))
+        annotation_components.append(dmc.Divider())
+        annotation_components.append(dmc.Text("* Required", size="xs", c="red"))
 
     return annotation_components
 

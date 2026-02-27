@@ -17,11 +17,13 @@ class SliderWidget(ControlWidget):
         min_value: float = 0,
         max_value: float = 100,
         step: Optional[float] = None,
+        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.default = default
         self.min_value = min_value

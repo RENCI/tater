@@ -16,6 +16,7 @@ class NumberInputWidget(ControlWidget):
         min_value: Optional[float] = None,
         max_value: Optional[float] = None,
         step: Optional[float] = None,
+        **kwargs,
     ):
         """
         Initialize NumberInput widget.
@@ -33,6 +34,7 @@ class NumberInputWidget(ControlWidget):
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.default = default
         self.min_value = min_value

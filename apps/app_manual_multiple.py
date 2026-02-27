@@ -40,18 +40,21 @@ def main() -> None:
             label="Pet Type",
             description="What type of pet is mentioned?",
             options=["cat", "dog", "fish"],
+            required=True,
         ),
         SegmentedControlWidget(
             schema_field="sentiment",
             label="Sentiment",
             description="Overall sentiment of the document",
             options=["positive", "negative", "neutral"],
+            required=True,
         ),
         SelectWidget(
             schema_field="location",
             label="Location",
             description="Where is the pet located?",
             options=["home", "park", "vet", "shelter", "other"],
+            required=True,
         ),
         # Boolean
         CheckboxWidget(
@@ -59,11 +62,13 @@ def main() -> None:
             label="Is cute?",
             description="Check if this pet is cute",
             default=False,
+            required=True,
         ),
         SwitchWidget(
             schema_field="is_indoor",
             label="Indoor?",
             description="Is this an indoor setting?",
+            required=True,
         ),
         # Multi value selects
         MultiSelectWidget(
@@ -71,12 +76,14 @@ def main() -> None:
             label="Favorite Colors",
             description="Select one or more favorite colors",
             options=["red", "green", "blue", "yellow", "purple"],
+            required=True,
         ),
         ChipGroupWidget(
             schema_field="traits",
             label="Traits",
             description="Select all traits that apply",
             options=["friendly", "playful", "lazy", "energetic", "shy"],
+            required=True,
         ),
         # Numeric
         NumberInputWidget(
@@ -86,6 +93,7 @@ def main() -> None:
             min_value=0,
             max_value=50,
             step=0.1,
+            required=True,
         ),
         SliderWidget(
             schema_field="confidence",
@@ -95,6 +103,7 @@ def main() -> None:
             max_value=100,
             step=1,
             default=50,
+            required=True,
         ),
         # Text
         TextInputWidget(
@@ -102,6 +111,7 @@ def main() -> None:
             label="Reviewer note",
             description="Optional short note about this document",
             placeholder="Enter a short note",
+            required=True,
         ),
     ]
 

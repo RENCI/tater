@@ -14,6 +14,7 @@ class MultiSelectWidget(ControlWidget):
         options: list[str],
         description: Optional[str] = None,
         default: Optional[List[str]] = None,
+        **kwargs,
     ):
         """
         Initialize MultiSelect widget.
@@ -29,6 +30,7 @@ class MultiSelectWidget(ControlWidget):
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.options = options
         self.default = default or []

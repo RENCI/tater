@@ -14,11 +14,13 @@ class SwitchWidget(ControlWidget):
         label: str,
         description: Optional[str] = None,
         default: bool = False,
+        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.default = default
 

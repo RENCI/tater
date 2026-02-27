@@ -82,36 +82,10 @@ class ControlWidget(TaterWidget):
         """Fallback value when no annotation value exists."""
         return None
 
-    def __init__(self, schema_field: str, label: str = "", description: Optional[str] = None):
+    def __init__(self, schema_field: str, label: str = "", description: Optional[str] = None,
+                 required: bool = False):
         super().__init__(schema_field=schema_field, label=label, description=description)
-        self.required = False  # resolved from schema by set_annotation_widgets
-
-    def resolve_required(self, schema_model: Any) -> None:
-        """Set required by inspecting the schema model field at this widget's path."""
-        import typing
-
-        if schema_model is None:
-            self.required = False
-            return
-
-        parts = self.field_path.split(".")
-        model = schema_model
-        for i, part in enumerate(parts):
-            if not hasattr(model, "model_fields"):
-                self.required = False
-                return
-            field_info = model.model_fields.get(part)
-            if field_info is None:
-                self.required = False
-                return
-            if i == len(parts) - 1:
-                args = typing.get_args(field_info.annotation)
-                allows_none = type(None) in args
-                self.required = field_info.is_required() and not allows_none
-            else:
-                args = typing.get_args(field_info.annotation)
-                inner = [a for a in args if a is not type(None)]
-                model = inner[0] if inner else field_info.annotation
+        self.required = required
 
 
 class ContainerWidget(TaterWidget):

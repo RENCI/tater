@@ -23,6 +23,7 @@ def main() -> None:
             label="Sentiment",
             description="Overall sentiment of the document",
             options=["positive", "negative", "neutral"],
+            required=True,
         ),
         CheckboxWidget(
             schema_field="is_relevant",

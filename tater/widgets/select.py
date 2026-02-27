@@ -15,11 +15,13 @@ class SelectWidget(ControlWidget):
         options: list[str],
         description: Optional[str] = None,
         default: Optional[str] = None,
+        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.options = options
         self.default = default

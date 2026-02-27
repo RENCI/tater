@@ -15,6 +15,7 @@ class CheckboxWidget(ControlWidget):
         label: str,
         description: Optional[str] = None,
         default: bool = False,
+        **kwargs,
     ):
         """
         Initialize Checkbox widget.
@@ -29,6 +30,7 @@ class CheckboxWidget(ControlWidget):
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.default = default
 

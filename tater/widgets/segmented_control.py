@@ -15,6 +15,7 @@ class SegmentedControlWidget(ControlWidget):
         options: list[str],
         description: Optional[str] = None,
         default: Optional[str] = None,
+        **kwargs,
     ):
         """
         Initialize SegmentedControl widget.
@@ -30,6 +31,7 @@ class SegmentedControlWidget(ControlWidget):
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.options = options
         self.default = default

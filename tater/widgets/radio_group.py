@@ -16,11 +16,13 @@ class RadioGroupWidget(ControlWidget):
         description: Optional[str] = None,
         default: Optional[str] = None,
         vertical: bool = False,
+        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
+            **kwargs,
         )
         self.options = options
         self.default = default
