@@ -22,7 +22,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
     # Update document display and info
     @app.callback(
-        [Output("document-viewer", "children"),
+        [Output("document-content", "children"),
          Output("document-title", "children"),
          Output("document-metadata", "children"),
          Output("document-progress", "value")],
