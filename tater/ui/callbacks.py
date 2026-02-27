@@ -324,19 +324,9 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
         if not doc_id:
             return widget_id, "not_started"
 
-        if tater_app.schema_model:
-            # Using Pydantic models - get or create instance
-            if doc_id not in tater_app.annotations:
-                tater_app.annotations[doc_id] = tater_app.schema_model()
-
-            # Write directly to the Pydantic instance using setattr
-            model = tater_app.annotations[doc_id]
-            value_helpers.set_model_value(model, field_path, value)
-        else:
-            # Using plain dicts (fallback)
-            if doc_id not in tater_app.annotations:
-                tater_app.annotations[doc_id] = {}
-            value_helpers.set_nested_value(tater_app.annotations[doc_id], field_path, value)
+        if doc_id not in tater_app.annotations:
+            tater_app.annotations[doc_id] = tater_app.schema_model()
+        value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
 
         update_status_for_doc(tater_app, doc_id)
         status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
@@ -346,7 +336,6 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
     @app.callback(
         Output(widget_id, value_prop),
         Input("current-doc-id", "data"),
-        prevent_initial_call=True
     )
     def update_widget_value(doc_id):
         if not doc_id or doc_id not in tater_app.annotations:

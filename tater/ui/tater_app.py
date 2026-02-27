@@ -42,8 +42,7 @@ class TaterApp:
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
         self.current_doc_index = 0
-        # Store Pydantic model instances (or dicts if no schema_model)
-        self.annotations: dict[str, BaseModel | dict] = {}
+        self.annotations: dict[str, BaseModel] = {}
         # Store metadata (DocumentMetadata) separately from annotations
         from tater.models.document import DocumentMetadata
         self.metadata: dict[str, DocumentMetadata] = {}
@@ -143,10 +142,10 @@ class TaterApp:
             for doc_id, doc_data in data.items():
                 if isinstance(doc_data, dict) and "annotations" in doc_data:
                     # New format with metadata
-                    self.annotations[doc_id] = doc_data["annotations"]
+                    ann_data = doc_data["annotations"]
                     meta = doc_data.get("metadata", {})
                     self.metadata[doc_id] = DocumentMetadata(
-                        flagged=meta.get("flagged_for_review", False),
+                        flagged=meta.get("flagged", False),
                         notes=meta.get("notes", ""),
                         annotation_seconds=meta.get("annotation_seconds", 0.0),
                         visited=meta.get("visited", False),
@@ -154,8 +153,10 @@ class TaterApp:
                     )
                 else:
                     # Old format (flat) - treat as annotations only
-                    self.annotations[doc_id] = doc_data
+                    ann_data = doc_data
                     self.metadata[doc_id] = DocumentMetadata()
+                if self.schema_model and ann_data:
+                    self.annotations[doc_id] = self.schema_model(**ann_data)
             print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
             print(f"Error loading annotations: {e}")
@@ -169,16 +170,10 @@ class TaterApp:
             # Combine annotations and metadata into save format
             save_dict = {}
             for doc_id, annotation in self.annotations.items():
-                # Convert Pydantic models to dicts for JSON serialization
-                if isinstance(annotation, BaseModel):
-                    annotations_data = annotation.model_dump()
-                else:
-                    annotations_data = annotation
-                # Get DocumentMetadata for this document
                 meta: DocumentMetadata = self.metadata.get(doc_id, DocumentMetadata())
                 save_dict[doc_id] = {
-                    "annotations": annotations_data,
-                    "metadata": meta.model_dump()
+                    "annotations": annotation.model_dump(),
+                    "metadata": meta.model_dump(),
                 }
             
             with open(path, 'w') as f:

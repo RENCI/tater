@@ -20,7 +20,6 @@ class Document(BaseModel):
     file_path: str = Field(description="Path to the document file")
     name: Optional[str] = Field(None, description="Human-readable document name")
     info: Optional[dict[str, Any]] = Field(None, description="User-supplied metadata/information")
-    metadata: DocumentMetadata = Field(default_factory=DocumentMetadata, description="System-managed metadata")
     
     @classmethod
     def from_dict(cls, doc_dict: dict[str, Any], index: int = 0) -> "Document":
