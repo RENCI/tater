@@ -58,7 +58,7 @@ def main() -> None:
     ]
 
     app = TaterApp(
-        title="Nested Annotation",
+        title="tater - nested",
         theme="light",
         annotations_path=args.annotations
     )

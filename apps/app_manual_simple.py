@@ -54,7 +54,7 @@ def main() -> None:
     ]
 
     app = TaterApp(
-        title="Simple Annotation",
+        title="tater - simple",
         theme="light",
         annotations_path=args.annotations,
         schema_model=SimpleAnnotation

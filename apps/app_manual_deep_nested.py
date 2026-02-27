@@ -71,7 +71,7 @@ def main() -> None:
     ]
 
     app = TaterApp(
-        title="Deep Nested Annotation",
+        title="tater - deep nested",
         theme="light",
         annotations_path=args.annotations
     )
