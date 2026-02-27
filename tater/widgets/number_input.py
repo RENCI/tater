@@ -14,8 +14,8 @@ class NumberInputWidget(TaterWidget):
         description: Optional[str] = None,
         required: bool = False,
         default: Optional[float] = None,
-        min_: Optional[float] = None,
-        max_: Optional[float] = None,
+        min_value: Optional[float] = None,
+        max_value: Optional[float] = None,
         step: Optional[float] = None,
     ):
         """
@@ -38,8 +38,8 @@ class NumberInputWidget(TaterWidget):
             required=required,
         )
         self.default = default
-        self.min_ = min_
-        self.max_ = max_
+        self.min_value = min_value
+        self.max_value = max_value
         self.step = step
 
     def component(self) -> dmc.NumberInput:
@@ -47,8 +47,8 @@ class NumberInputWidget(TaterWidget):
         return dmc.NumberInput(
             id=self.component_id,
             value=self.default,
-            min=self.min_,
-            max=self.max_,
+            min=self.min_value,
+            max=self.max_value,
             step=self.step,
             hideControls=False,
             style={"maxWidth": 200},

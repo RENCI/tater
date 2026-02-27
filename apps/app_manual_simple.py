@@ -63,8 +63,8 @@ def main() -> None:
             schema_field="pet_age",
             label="Pet Age",
             description="How old is the pet?",
-            min_=0,
-            max_=50,
+            min_value=0,
+            max_value=50,
             step=0.1,
         ),
     ]
