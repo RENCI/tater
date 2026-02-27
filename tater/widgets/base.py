@@ -1,6 +1,7 @@
 """Base widget classes for Tater."""
 from abc import ABC, abstractmethod
 from typing import Any, Optional
+import dash_mantine_components as dmc
 
 
 class TaterWidget(ABC):
@@ -50,6 +51,32 @@ class TaterWidget(ABC):
     def component_id_dict(self, pattern_type: str = "widget") -> dict:
         """Return dictionary-based component ID for pattern-matching callbacks."""
         return {"type": pattern_type, "field": self.field_path}
+
+    def render_field(self, mt: str = "md") -> Any:
+        """Return the complete field: label, description, required marker, and component."""
+        required = getattr(self, "required", False)
+        if self.renders_own_label:
+            if required:
+                return dmc.Group(
+                    [dmc.Text("*", size="sm", c="red"), self.component()],
+                    gap=4,
+                    align="self-start",
+                    mt=mt,
+                )
+            return self.component()
+        else:
+            label_row = dmc.Group(
+                [
+                    *([dmc.Text("*", size="sm", c="red")] if required else []),
+                    dmc.Text(self.label, fw=500, size="sm"),
+                ],
+                gap=4,
+            )
+            items = [label_row]
+            if self.description:
+                items.append(dmc.Text(self.description, size="xs", c="dimmed"))
+            items.append(self.component())
+            return dmc.Stack(items, gap="xs", mt=mt)
 
     @property
     @abstractmethod

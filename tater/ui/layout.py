@@ -88,36 +88,7 @@ def _build_annotation_components(widgets: list[TaterWidget]) -> list:
     has_required = any(w.required for w in _collect_value_capture_widgets(widgets))
 
     for i, widget in enumerate(widgets):
-        required = getattr(widget, "required", False)
-        if widget.renders_own_label:
-            # Widget draws its own label — prepend a red * beside it if required
-            if required:
-                field_container = dmc.Group(
-                    [dmc.Text("*", size="sm", c="red"), widget.component()],
-                    gap=4,
-                    align="self-start",
-                    mt="md",
-                )
-            else:
-                field_container = widget.component()
-        else:
-            label_row = dmc.Group(
-                [
-                    *([dmc.Text("*", size="sm", c="red")] if required else []),
-                    dmc.Text(widget.label, fw=500, size="sm"),
-                ],
-                gap=4,
-            )
-            components_list = [label_row]
-            if widget.description:
-                components_list.append(
-                    dmc.Text(widget.description, size="xs", c="dimmed")
-                )
-            components_list.append(widget.component())
-            field_container = dmc.Stack(components_list, gap="xs", mt="md")
-
-        annotation_components.append(field_container)
-
+        annotation_components.append(widget.render_field())
         if i < len(widgets) - 1:
             annotation_components.append(dmc.Divider())
 

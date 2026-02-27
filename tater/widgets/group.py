@@ -54,14 +54,7 @@ class GroupWidget(ContainerWidget):
         Returns:
             A Dash Mantine Card containing all child widgets
         """
-        child_components = []
-        for child in self.children:
-            child_stack = dmc.Stack([
-                dmc.Text(child.label, fw=500, size="sm"),
-                child.component(),
-                dmc.Text(child.description or "", size="xs", c="dimmed") if child.description else None,
-            ], gap="xs", mt="sm")
-            child_components.append(child_stack)
+        child_components = [child.render_field(mt="sm") for child in self.children]
         
         return dmc.Card([
             dmc.Title(self.label, order=5, mb="sm"),
