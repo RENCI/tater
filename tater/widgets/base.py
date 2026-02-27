@@ -84,6 +84,11 @@ class TaterWidget(ABC):
         """Dash prop name used to read/write this widget's value."""
         return "value"
 
+    @property
+    def empty_value(self) -> Any:
+        """Fallback value to use when no annotation value exists."""
+        return None
+
     @abstractmethod
     def component(self) -> Any:
         """

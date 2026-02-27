@@ -9,6 +9,7 @@ class DocumentMetadata(BaseModel):
     flagged: bool = Field(False, description="Whether this document is flagged for review")
     notes: str = Field("", description="Annotator notes about this document")
     visited: bool = Field(False, description="Whether this document has been viewed")
+    annotation_seconds: float = Field(0.0, description="Total time spent annotating this document (seconds)")
 
 
 class Document(BaseModel):

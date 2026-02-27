@@ -38,11 +38,16 @@ class TextInputWidget(TaterWidget):
         self.default = default
         self.placeholder = placeholder
 
+    @property
+    def empty_value(self) -> str:
+        """Use empty string to keep TextInput controlled when unset."""
+        return ""
+
     def component(self) -> dmc.TextInput:
         """Return Dash Mantine TextInput component."""
         return dmc.TextInput(
             id=self.component_id,
-            value=self.default,
+            value=self.default if self.default is not None else self.empty_value,
             placeholder=self.placeholder,
         )
 

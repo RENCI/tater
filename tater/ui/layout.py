@@ -17,6 +17,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls()
+    footer_bar = _build_footer_bar()
 
     content_grid = dmc.Grid([
         dmc.GridCol([
@@ -39,6 +40,8 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         theme={"colorScheme": tater_app.theme},
         children=[
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
+            dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
+            dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             dmc.Container([
                 dmc.Stack([
                     dmc.Center(
@@ -64,10 +67,10 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                         ),
                     ]),
                     content_grid,
-                    html.Div(id="save-status", style={"position": "fixed", "top": "20px", "right": "20px", "zIndex": 1000}),
                     nav_controls,
                 ], gap="lg")
-            ], size="xl", py="xl", fluid=True)
+            ], size="xl", py="xl", fluid=True, pb="100px"),
+            footer_bar,
         ]
     )
 
@@ -145,3 +148,44 @@ def _build_navigation_controls() -> dmc.Flex:
         dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", flex=1),
         dmc.Button("Next \u2192", id="btn-next", variant="outline", flex=1),
     ], gap="md")
+
+
+def _build_footer_bar() -> dmc.Box:
+    """Build the persistent footer bar with save status and timing info."""
+    return dmc.Box(
+        dmc.Group(
+            [
+                dmc.Box(
+                    dmc.Text(
+                        id="timing-text",
+                        size="sm",
+                        c="dimmed",
+                    ),
+                    style={"flex": "1"},
+                ),
+                dmc.Divider(orientation="vertical"),
+                dmc.Box(
+                    dmc.Text(
+                        id="save-status-text",
+                        size="sm",
+                        c="dimmed",
+                        ta="right",
+                    ),
+                    style={"flex": "1"},
+                ),
+            ],
+            align="center",
+            gap="md",
+        ),
+        py="sm",
+        px="md",
+        style={
+            "borderTop": "1px solid #e9ecef",
+            "backgroundColor": "#f8f9fa",
+            "position": "fixed",
+            "bottom": 0,
+            "left": 0,
+            "right": 0,
+            "zIndex": 500,
+        },
+    )

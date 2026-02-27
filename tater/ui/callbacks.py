@@ -16,6 +16,9 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     """Register document and navigation callbacks on the Dash app."""
     app = tater_app.app
 
+    # Setup timing callbacks
+    _setup_timing_callbacks(tater_app)
+
     # Update document display and info
     @app.callback(
         [Output("document-content", "children"),
@@ -56,14 +59,16 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Autosave and navigation buttons
     @app.callback(
         Output("current-doc-id", "data"),
-        Output("save-status", "children"),
+        Output("timing-store", "data"),
         [Input("btn-prev", "n_clicks"),
          Input("btn-next", "n_clicks")],
         State("current-doc-id", "data"),
+        State("timing-store", "data"),
         prevent_initial_call=True
     )
-    def navigate(prev_clicks, next_clicks, current_doc_id):
+    def navigate(prev_clicks, next_clicks, current_doc_id, timing_data):
         from dash import ctx, no_update
+        import time
 
         if not ctx.triggered or not tater_app.documents:
             return current_doc_id, no_update
@@ -77,33 +82,64 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         elif button_id == "btn-next" and current_index < len(tater_app.documents) - 1:
             current_index += 1
 
+
+        # Accumulate annotation_seconds for the document being left
+        from tater.models.document import DocumentMetadata
+        now = time.time()
+        if current_doc_id:
+            if current_doc_id not in tater_app.metadata:
+                tater_app.metadata[current_doc_id] = DocumentMetadata()
+            # Use timing_data["doc_start_time"] to know when user started viewing this doc
+            start = None
+            if timing_data and timing_data.get("doc_start_time"):
+                start = timing_data["doc_start_time"]
+            if start:
+                elapsed = now - start
+                tater_app.metadata[current_doc_id].annotation_seconds += elapsed
+
+        # Determine new doc_id after navigation
+        doc_id = tater_app.documents[current_index].id if current_index < len(tater_app.documents) else ""
+
+        # No need to update annotation_seconds for the document being entered (will be tracked on next navigation)
+
         # Save annotations before navigating
         tater_app._save_annotations_to_file()
 
-        # Show save status
-        alert = dmc.Alert(
-            "Annotations saved",
-            title="Saved",
-            color="teal",
-            withCloseButton=False,
-            icon=dmc.Text("\u2713", size="lg"),
-            duration=2000
-        )
+        # Update timing store with save time and reset doc timer
+        if timing_data is None:
+            timing_data = {}
+        timing_data["last_save_time"] = time.time()
+        timing_data["doc_start_time"] = time.time()  # Reset for new doc
+        if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
+            timing_data["session_start_time"] = time.time()
 
         doc_id = tater_app.documents[current_index].id if current_index < len(tater_app.documents) else ""
-        return doc_id, alert
+        return doc_id, timing_data
 
     # Handle flag-document changes
     @app.callback(
         Output("flag-document", "id"),  # Dummy output
         Input("flag-document", "checked"),
         State("current-doc-id", "data"),
+        State("timing-store", "data"),
         prevent_initial_call=True
     )
-    def save_flag(checked, doc_id):
+    def save_flag(checked, doc_id, timing_data):
+        import time
         if not doc_id:
             return "flag-document"
-        # Store flag state (optional - can be expanded if needed)
+        
+        # Ensure DocumentMetadata exists for this document
+        from tater.models.document import DocumentMetadata
+        if doc_id not in tater_app.metadata:
+            tater_app.metadata[doc_id] = DocumentMetadata()
+        # Save the flag value
+        tater_app.metadata[doc_id].flagged = checked
+        
+        # Update save time
+        if timing_data is None:
+            timing_data = {}
+        timing_data["last_save_time"] = time.time()
         return "flag-document"
 
     # Handle document-notes changes
@@ -111,13 +147,95 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("document-notes", "id"),  # Dummy output
         Input("document-notes", "value"),
         State("current-doc-id", "data"),
+        State("timing-store", "data"),
         prevent_initial_call=True
     )
-    def save_notes(notes, doc_id):
+    def save_notes(notes, doc_id, timing_data):
+        import time
         if not doc_id:
             return "document-notes"
-        # Store notes state (optional - can be expanded if needed)
+        
+        # Ensure DocumentMetadata exists for this document
+        from tater.models.document import DocumentMetadata
+        if doc_id not in tater_app.metadata:
+            tater_app.metadata[doc_id] = DocumentMetadata()
+        # Save the notes value
+        tater_app.metadata[doc_id].notes = notes if notes else ""
+        
+        # Update save time
+        if timing_data is None:
+            timing_data = {}
+        timing_data["last_save_time"] = time.time()
         return "document-notes"
+
+
+def _setup_timing_callbacks(tater_app: TaterApp) -> None:
+    """Setup callbacks for save time and document timing display."""
+    app = tater_app.app
+
+    # Handle document changes to initialize timing
+    @app.callback(
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("current-doc-id", "data"),
+        State("timing-store", "data"),
+        prevent_initial_call='initial_duplicate',
+    )
+    def on_doc_change(doc_id, timing_data):
+        import time
+        if timing_data is None:
+            timing_data = {}
+        timing_data["doc_start_time"] = time.time()
+        if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
+            timing_data["session_start_time"] = time.time()
+        return timing_data
+
+    # Update footer text every second
+
+    @app.callback(
+        Output("save-status-text", "children"),
+        Output("timing-text", "children"),
+        Input("clock-interval", "n_intervals"),
+        State("timing-store", "data"),
+        State("current-doc-id", "data"),
+        prevent_initial_call=False,
+    )
+    def update_footer(n_intervals, timing_data, doc_id):
+        import time
+        from datetime import datetime
+        now = time.time()
+
+        # Save status text - display timestamp of last save
+        save_text = "Never saved"
+        if timing_data and timing_data.get("last_save_time"):
+            save_time = timing_data["last_save_time"]
+            dt = datetime.fromtimestamp(save_time)
+            save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
+
+        # Doc time: show total annotation_seconds for current doc, plus current session time if viewing
+        from tater.models.document import DocumentMetadata
+        total_seconds = 0.0
+        meta = tater_app.metadata.get(doc_id)
+        if meta:
+            total_seconds = meta.annotation_seconds
+        # If currently viewing, add time since doc_start_time
+        if timing_data and timing_data.get("doc_start_time"):
+            # Only add if this doc is the one being viewed
+            total_seconds += now - timing_data["doc_start_time"]
+
+        # Format as h/m/s
+        total_seconds = int(total_seconds)
+        if total_seconds < 60:
+            timing_text = f"Doc time: {total_seconds}s"
+        elif total_seconds < 3600:
+            minutes = total_seconds // 60
+            seconds = total_seconds % 60
+            timing_text = f"Doc time: {minutes}m {seconds}s"
+        else:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            timing_text = f"Doc time: {hours}h {minutes}m"
+
+        return save_text, timing_text
 
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
@@ -166,6 +284,7 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
     field_path = widget.field_path
     value_prop = widget.value_prop
     default_value = getattr(widget, "default", None)
+    empty_value = widget.empty_value
 
     # Callback for updating self.annotations when widget value changes
     @app.callback(
@@ -204,7 +323,9 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
         if not doc_id or doc_id not in tater_app.annotations:
             if value_prop == "checked":
                 return bool(default_value) if default_value is not None else False
-            return default_value
+            if default_value is not None:
+                return default_value
+            return empty_value
 
         annotation = tater_app.annotations[doc_id]
         value = value_helpers.get_model_value(annotation, field_path)
@@ -213,5 +334,7 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
                 return bool(default_value) if default_value is not None else False
             return bool(value)
         if value is None:
-            return default_value
+            if default_value is not None:
+                return default_value
+            return empty_value
         return value

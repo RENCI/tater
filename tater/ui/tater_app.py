@@ -3,6 +3,8 @@ from typing import Optional, Type, Any
 from pathlib import Path
 import json
 
+from tater.models.document import DocumentMetadata
+
 from dash import Dash
 from tater.ui import layout
 from pydantic import BaseModel, ValidationError
@@ -42,6 +44,9 @@ class TaterApp:
         self.current_doc_index = 0
         # Store Pydantic model instances (or dicts if no schema_model)
         self.annotations: dict[str, BaseModel | dict] = {}
+        # Store metadata (DocumentMetadata) separately from annotations
+        from tater.models.document import DocumentMetadata
+        self.metadata: dict[str, DocumentMetadata] = {}
 
     def load_documents(self, source: str) -> bool:
         """
@@ -83,6 +88,9 @@ class TaterApp:
                 doc_path = Path(source)
                 self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
+            # Load existing annotations if file exists
+            self._load_annotations_from_file()
+            
             print(f"Loaded {len(self.documents)} documents from {source}")
             return True
         except Exception as e:
@@ -117,22 +125,63 @@ class TaterApp:
         """Create the Dash layout with navigation and annotation panel."""
         self.app.layout = layout.build_layout(self)
 
+    def _load_annotations_from_file(self) -> None:
+        """Load existing annotations from the annotations file."""
+        if not self.annotations_path:
+            return
+            
+        path = Path(self.annotations_path)
+        if not path.exists():
+            return
+            
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+            
+            # Handle both old format (flat) and new format (with metadata)
+            from tater.models.document import DocumentMetadata
+            for doc_id, doc_data in data.items():
+                if isinstance(doc_data, dict) and "annotations" in doc_data:
+                    # New format with metadata
+                    self.annotations[doc_id] = doc_data["annotations"]
+                    meta = doc_data.get("metadata", {})
+                    self.metadata[doc_id] = DocumentMetadata(
+                        flagged=meta.get("flagged_for_review", False),
+                        notes=meta.get("notes", ""),
+                        annotation_seconds=meta.get("annotation_seconds", 0.0),
+                        visited=meta.get("visited", False)
+                    )
+                else:
+                    # Old format (flat) - treat as annotations only
+                    self.annotations[doc_id] = doc_data
+                    self.metadata[doc_id] = DocumentMetadata()
+            print(f"Loaded existing annotations from {self.annotations_path}")
+        except Exception as e:
+            print(f"Error loading annotations: {e}")
+
     def _save_annotations_to_file(self) -> None:
         """Save all annotations to the annotations file."""
         try:
             path = Path(self.annotations_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Convert Pydantic models to dicts for JSON serialization
-            annotations_dict = {}
+            # Combine annotations and metadata into save format
+            save_dict = {}
             for doc_id, annotation in self.annotations.items():
+                # Convert Pydantic models to dicts for JSON serialization
                 if isinstance(annotation, BaseModel):
-                    annotations_dict[doc_id] = annotation.model_dump()
+                    annotations_data = annotation.model_dump()
                 else:
-                    annotations_dict[doc_id] = annotation
+                    annotations_data = annotation
+                # Get DocumentMetadata for this document
+                meta: DocumentMetadata = self.metadata.get(doc_id, DocumentMetadata())
+                save_dict[doc_id] = {
+                    "annotations": annotations_data,
+                    "metadata": meta.model_dump()
+                }
             
             with open(path, 'w') as f:
-                json.dump(annotations_dict, f, indent=2)
+                json.dump(save_dict, f, indent=2)
         except Exception as e:
             print(f"Error saving annotations: {e}")
 
