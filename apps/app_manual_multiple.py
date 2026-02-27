@@ -62,13 +62,11 @@ def main() -> None:
             label="Is cute?",
             description="Check if this pet is cute",
             default=False,
-            required=True,
         ),
         SwitchWidget(
             schema_field="is_indoor",
             label="Indoor?",
             description="Is this an indoor setting?",
-            required=True,
         ),
         # Multi value selects
         MultiSelectWidget(
