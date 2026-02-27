@@ -89,7 +89,14 @@ class TaterApp:
             
             # Load existing annotations if file exists
             self._load_annotations_from_file()
-            
+
+            # Ensure every document has annotation and metadata objects
+            for doc in self.documents:
+                if self.schema_model and doc.id not in self.annotations:
+                    self.annotations[doc.id] = self.schema_model()
+                if doc.id not in self.metadata:
+                    self.metadata[doc.id] = DocumentMetadata()
+
             print(f"Loaded {len(self.documents)} documents from {source}")
             return True
         except Exception as e:

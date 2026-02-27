@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 
 def setup_callbacks(tater_app: TaterApp) -> None:
+    # Removed clientside keyboard navigation callback
     """Register document and navigation callbacks on the Dash app."""
     app = tater_app.app
 
@@ -21,7 +22,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
     # Update document display and info
     @app.callback(
-        [Output("document-content", "children"),
+        [Output("document-viewer", "children"),
          Output("document-title", "children"),
          Output("document-metadata", "children"),
          Output("document-progress", "value")],
@@ -133,11 +134,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         if not doc_id:
             return "flag-document"
         
-        # Ensure DocumentMetadata exists for this document
-        from tater.models.document import DocumentMetadata
-        if doc_id not in tater_app.metadata:
-            tater_app.metadata[doc_id] = DocumentMetadata()
-        # Save the flag value
         tater_app.metadata[doc_id].flagged = checked
         
         # Update save time
@@ -159,11 +155,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         if not doc_id:
             return "document-notes"
         
-        # Ensure DocumentMetadata exists for this document
-        from tater.models.document import DocumentMetadata
-        if doc_id not in tater_app.metadata:
-            tater_app.metadata[doc_id] = DocumentMetadata()
-        # Save the notes value
         tater_app.metadata[doc_id].notes = notes if notes else ""
         
         # Update save time
@@ -187,11 +178,8 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     )
     def on_doc_change(doc_id, timing_data):
         import time
-        from tater.models.document import DocumentMetadata
 
         if doc_id:
-            if doc_id not in tater_app.metadata:
-                tater_app.metadata[doc_id] = DocumentMetadata()
             tater_app.metadata[doc_id].visited = True
             update_status_for_doc(tater_app, doc_id)
 
@@ -324,8 +312,6 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
         if not doc_id:
             return widget_id, "not_started"
 
-        if doc_id not in tater_app.annotations:
-            tater_app.annotations[doc_id] = tater_app.schema_model()
         value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
 
         update_status_for_doc(tater_app, doc_id)
@@ -360,12 +346,8 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
 
 def update_status_for_doc(tater_app: TaterApp, doc_id: str) -> None:
     """Compute and store the annotation status for a document."""
-    from tater.models.document import DocumentMetadata
-
     if not doc_id:
         return
-    if doc_id not in tater_app.metadata:
-        tater_app.metadata[doc_id] = DocumentMetadata()
     meta = tater_app.metadata[doc_id]
 
     if not meta.visited:
@@ -439,12 +421,9 @@ def _build_menu_items(tater_app: TaterApp) -> list:
 def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int, timing_data: dict) -> tuple:
     """Shared navigation logic: accumulate timing, save, and return new doc_id and timing."""
     import time
-    from tater.models.document import DocumentMetadata
 
     now = time.time()
     if current_doc_id:
-        if current_doc_id not in tater_app.metadata:
-            tater_app.metadata[current_doc_id] = DocumentMetadata()
         start = timing_data.get("doc_start_time") if timing_data else None
         if start:
             tater_app.metadata[current_doc_id].annotation_seconds += now - start
