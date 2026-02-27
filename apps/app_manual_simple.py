@@ -6,7 +6,7 @@ from typing import Optional, Literal
 from pydantic import BaseModel
 
 from tater import TaterApp, parse_args
-from tater.widgets import SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget, MultiSelectWidget
+from tater.widgets import SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget, MultiSelectWidget, NumberInputWidget
 
 
 # Define types
@@ -21,6 +21,7 @@ class SimpleAnnotation(BaseModel):
     is_cute: bool = False
     reviewer_note: Optional[str] = None
     favorite_colors: Optional[list[str]] = None
+    pet_age: Optional[float] = None
 
 
 def main() -> None:
@@ -42,7 +43,7 @@ def main() -> None:
         ),
         CheckboxWidget(
             schema_field="is_cute",
-            label="Is Cute?",
+            label="Is cute?",
             description="Check if this pet is cute",
             default=False,
         ),
@@ -57,6 +58,14 @@ def main() -> None:
             label="Favorite Colors",
             description="Select one or more favorite colors",
             options=["red", "green", "blue", "yellow", "purple"],
+        ),
+        NumberInputWidget(
+            schema_field="pet_age",
+            label="Pet Age",
+            description="How old is the pet?",
+            min_=0,
+            max_=50,
+            step=0.1,
         ),
     ]
 
