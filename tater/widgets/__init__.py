@@ -4,8 +4,10 @@ from tater.widgets.segmented_control import SegmentedControlWidget
 from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.text_input import TextInputWidget
+
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
+from tater.widgets.multiselect import MultiSelectWidget
 
 __all__ = [
     "TaterWidget",
@@ -15,4 +17,5 @@ __all__ = [
     "TextInputWidget",
     "GroupWidget",
     "ListableWidget",
+    "MultiSelectWidget",
 ]
