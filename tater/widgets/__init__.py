@@ -9,6 +9,7 @@ from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
 from tater.widgets.multiselect import MultiSelectWidget
 from tater.widgets.number_input import NumberInputWidget
+from tater.widgets.chip_group import ChipGroupWidget
 
 __all__ = [
     "TaterWidget",
@@ -20,4 +21,5 @@ __all__ = [
     "ListableWidget",
     "MultiSelectWidget",
     "NumberInputWidget",
+    "ChipGroupWidget",
 ]
