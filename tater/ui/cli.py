@@ -14,6 +14,12 @@ def parse_args() -> Namespace:
         help="Path to documents JSON file or directory"
     )
     parser.add_argument(
+        "--schema",
+        type=str,
+        required=False,
+        help="Path to a tater JSON schema file"
+    )
+    parser.add_argument(
         "--annotations",
         type=str,
         required=False,

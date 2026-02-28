@@ -1,0 +1,123 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "pet_type",
+      "type": "single_choice",
+      "options": ["cat", "dog", "fish"],
+      "required": true
+    },
+    {
+      "id": "sentiment",
+      "type": "single_choice",
+      "options": ["positive", "negative", "neutral"],
+      "required": true
+    },
+    {
+      "id": "location",
+      "type": "single_choice",
+      "options": ["home", "park", "vet", "shelter", "other"],
+      "required": true
+    },
+    {
+      "id": "is_cute",
+      "type": "boolean"
+    },
+    {
+      "id": "is_indoor",
+      "type": "boolean"
+    },
+    {
+      "id": "favorite_colors",
+      "type": "multi_choice",
+      "options": ["red", "green", "blue", "yellow", "purple"],
+      "required": true
+    },
+    {
+      "id": "traits",
+      "type": "multi_choice",
+      "options": ["friendly", "playful", "lazy", "energetic", "shy"],
+      "required": true
+    },
+    {
+      "id": "pet_age",
+      "type": "numeric",
+      "required": true
+    },
+    {
+      "id": "confidence",
+      "type": "numeric",
+      "required": true,
+      "default": 50
+    },
+    {
+      "id": "reviewer_note",
+      "type": "free_text",
+      "required": true
+    }
+  ],
+  "ui": [
+    {
+      "schema_id": "pet_type",
+      "widget": "radio_group",
+      "label": "Pet Type",
+      "description": "What type of pet is mentioned?"
+    },
+    {
+      "schema_id": "sentiment",
+      "label": "Sentiment",
+      "description": "Overall sentiment of the document"
+    },
+    {
+      "schema_id": "location",
+      "widget": "select",
+      "label": "Location",
+      "description": "Where is the pet located?"
+    },
+    {
+      "schema_id": "is_cute",
+      "label": "Is cute?",
+      "description": "Check if this pet is cute"
+    },
+    {
+      "schema_id": "is_indoor",
+      "widget": "switch",
+      "label": "Indoor?",
+      "description": "Is this an indoor setting?"
+    },
+    {
+      "schema_id": "favorite_colors",
+      "label": "Favorite Colors",
+      "description": "Select one or more favorite colors"
+    },
+    {
+      "schema_id": "traits",
+      "widget": "chip_group",
+      "label": "Traits",
+      "description": "Select all traits that apply"
+    },
+    {
+      "schema_id": "pet_age",
+      "label": "Pet Age",
+      "description": "How old is the pet?",
+      "min_value": 0,
+      "max_value": 50,
+      "step": 0.1
+    },
+    {
+      "schema_id": "confidence",
+      "widget": "slider",
+      "label": "Confidence",
+      "description": "How confident are you in this annotation?",
+      "min_value": 0,
+      "max_value": 100,
+      "step": 1
+    },
+    {
+      "schema_id": "reviewer_note",
+      "label": "Reviewer note",
+      "description": "Optional short note about this document",
+      "placeholder": "Enter a short note"
+    }
+  ]
+}

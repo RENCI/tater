@@ -3,6 +3,7 @@ from tater.ui.tater_app import TaterApp
 from tater.ui.cli import parse_args
 from tater.models.span import SpanAnnotation
 from tater.widgets.span import SpanAnnotationWidget, EntityType
+from tater.loaders import load_schema, parse_schema
 
 __all__ = [
     "TaterApp",
@@ -10,4 +11,6 @@ __all__ = [
     "SpanAnnotation",
     "SpanAnnotationWidget",
     "EntityType",
+    "load_schema",
+    "parse_schema",
 ]

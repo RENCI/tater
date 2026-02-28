@@ -1,0 +1,16 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "entities",
+      "type": "span_annotation",
+      "entity_types": ["Medication", "Diagnosis", "Symptom", "Procedure"]
+    },
+    {
+      "id": "quality",
+      "type": "single_choice",
+      "options": ["high", "medium", "low"],
+      "required": true
+    }
+  ]
+}
