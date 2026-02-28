@@ -67,6 +67,25 @@ def _build_tree(name: str, data: Any) -> Node:
     return Node(str(data))
 
 
+def _find_path(root: Node, name: str) -> list[str]:
+    """Return the path (list of node names) from root's children to the named node.
+
+    Returns an empty list if not found.
+    """
+    def _dfs(node: Node, target: str, current: list[str]) -> Optional[list[str]]:
+        for child in node.children:
+            path = current + [child.name]
+            if child.name == target:
+                return path
+            result = _dfs(child, target, path)
+            if result is not None:
+                return result
+        return None
+
+    result = _dfs(root, name, [])
+    return result if result is not None else []
+
+
 def build_tree(hierarchy: Union[dict, list]) -> Node:
     """Build a Node tree from a Python dict or list.
 
@@ -172,6 +191,10 @@ class HierarchicalLabelWidget(TaterWidget):
     # Subclass interface
     # ------------------------------------------------------------------
 
+    @property
+    def _show_breadcrumb(self) -> bool:
+        return False
+
     def _render_sections(
         self, path: list[str], cid: str, selected_value: Optional[str]
     ) -> list:
@@ -192,6 +215,22 @@ class HierarchicalLabelWidget(TaterWidget):
                     placeholder="Search…",
                     size="xs",
                     style={} if self.searchable else {"display": "none"},
+                    rightSection=dmc.ActionIcon(
+                        "×",
+                        id=f"hier-search-clear-{cid}",
+                        size="xs",
+                        variant="transparent",
+                        c="dimmed",
+                        style={"display": "none"},
+                    ),
+                    rightSectionPointerEvents="all",
+                ),
+                dmc.Text(
+                    "",
+                    id=f"hier-breadcrumb-{cid}",
+                    size="xs",
+                    fw=600,
+                    style={} if self._show_breadcrumb else {"display": "none"},
                 ),
                 dmc.Stack(initial_sections, id=f"hier-sections-{cid}", gap="sm"),
                 dcc.Store(id=f"hier-nav-{cid}", data=[]),
@@ -209,6 +248,8 @@ class HierarchicalLabelWidget(TaterWidget):
         nav_id = f"hier-nav-{cid}"
         sections_id = f"hier-sections-{cid}"
         search_id = f"hier-search-{cid}"
+        search_clear_id = f"hier-search-clear-{cid}"
+        breadcrumb_id = f"hier-breadcrumb-{cid}"
 
         def node_at(path: list[str]) -> Node:
             node = root
@@ -219,7 +260,25 @@ class HierarchicalLabelWidget(TaterWidget):
                 node = child
             return node
 
-        # ---- 1. Reset navigation when document changes ----
+        # ---- 1a. Show/hide clear button based on search value ----
+        @app.callback(
+            Output(search_clear_id, "style"),
+            Input(search_id, "value"),
+            prevent_initial_call=False,
+        )
+        def toggle_clear(value):
+            return {} if value else {"display": "none"}
+
+        # ---- 1b. Clear search on button click ----
+        @app.callback(
+            Output(search_id, "value", allow_duplicate=True),
+            Input(search_clear_id, "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def clear_search(_):
+            return ""
+
+        # ---- 2. Reset navigation when document changes ----
         @app.callback(
             Output(nav_id, "data"),
             Input("current-doc-id", "data"),
@@ -228,9 +287,10 @@ class HierarchicalLabelWidget(TaterWidget):
         def reset_nav(_doc_id):
             return []
 
-        # ---- 2. Handle node button click → update path, write if leaf ----
+        # ---- 3. Handle node button click → update path, write if leaf ----
         @app.callback(
             Output(nav_id, "data", allow_duplicate=True),
+            Output(search_id, "value", allow_duplicate=True),
             Input({"type": "hier-node-btn", "field": cid, "idx": ALL, "name": ALL}, "n_clicks"),
             State(nav_id, "data"),
             State("current-doc-id", "data"),
@@ -238,10 +298,13 @@ class HierarchicalLabelWidget(TaterWidget):
         )
         def handle_click(node_clicks, current_path, doc_id):
             if not ctx.triggered_id:
-                return no_update
+                return no_update, no_update
             triggered = ctx.triggered_id
             if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn":
-                return no_update
+                return no_update, no_update
+            # Guard against phantom fires when buttons are re-rendered (n_clicks resets to 0)
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                return no_update, no_update
 
             idx = triggered["idx"]
             node_name = triggered["name"]
@@ -249,8 +312,13 @@ class HierarchicalLabelWidget(TaterWidget):
 
             parent = node_at(path[:idx])
             clicked = parent.find(node_name)
+            is_search_result = False
             if clicked is None:
-                return no_update
+                # Fallback: search result buttons have idx=0 but may be deep leaves
+                clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
+                if clicked is None:
+                    return no_update, no_update
+                is_search_result = True
 
             tater_app = app._tater_app
 
@@ -262,28 +330,37 @@ class HierarchicalLabelWidget(TaterWidget):
                     if annotation is not None:
                         current_value = value_helpers.get_model_value(annotation, field_path)
 
+                if is_search_result:
+                    # Navigate to parent level so siblings are shown
+                    full_path = _find_path(root, node_name)
+                    new_path = full_path[:-1]
+                else:
+                    new_path = path[:idx]
+
                 if current_value == node_name:
                     # Toggle off: clear annotation
                     if annotation is not None:
                         value_helpers.set_model_value(annotation, field_path, None)
                         tater_app._save_annotations_to_file()
-                    return path[:idx]
                 else:
                     if annotation is not None:
                         value_helpers.set_model_value(annotation, field_path, node_name)
                         tater_app._save_annotations_to_file()
-                    return path[:idx] + [node_name]
+
+                clear_search = "" if is_search_result else no_update
+                return new_path, clear_search
             else:
                 # Intermediate node: toggle collapses from this level
                 if idx < len(path) and path[idx] == node_name:
-                    return path[:idx]
-                return path[:idx] + [node_name]
+                    return path[:idx], no_update
+                return path[:idx] + [node_name], no_update
 
-        # ---- 3. Rebuild sections from nav state / search / doc change ----
+        # ---- 4. Rebuild sections from nav state / search / doc change ----
         render_sections = self._render_sections  # capture for closure
 
         @app.callback(
             Output(sections_id, "children"),
+            Output(breadcrumb_id, "children"),
             Input(nav_id, "data"),
             Input(search_id, "value"),
             Input("current-doc-id", "data"),
@@ -299,14 +376,16 @@ class HierarchicalLabelWidget(TaterWidget):
                 if annotation is not None:
                     selected_value = value_helpers.get_model_value(annotation, field_path)
 
+            breadcrumb = " → ".join(path) if path else "None selected"
+
             # Search mode: flat list of matching leaves
             if search_query and search_query.strip():
                 q = search_query.strip().lower()
                 matches = [n for n in root.all_leaves() if q in n.name.lower()]
                 search_buttons = _make_buttons(matches, cid, idx=0, selected_name=selected_value)
-                return [_section("Search results", search_buttons)]
+                return [_section("Search results", search_buttons)], breadcrumb
 
-            return render_sections(path, cid, selected_value)
+            return render_sections(path, cid, selected_value), breadcrumb
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +399,10 @@ class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
     Clicking a node at an earlier level resets the selection from that level
     downward.
     """
+
+    @property
+    def _show_breadcrumb(self) -> bool:
+        return True
 
     def _render_sections(
         self, path: list[str], cid: str, selected_value: Optional[str]
@@ -378,6 +461,7 @@ def _make_buttons(
                     gap=0,
                 ),
                 size="sm", color="gray", variant="light",
+                style={"pointerEvents": "none"},
             )
         buttons.append(
             dmc.Button(
