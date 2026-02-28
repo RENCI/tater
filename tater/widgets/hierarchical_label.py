@@ -192,6 +192,7 @@ class HierarchicalLabelWidget(TaterWidget):
                     size="xs",
                     style={} if self.searchable else {"display": "none"},
                 ),
+                dmc.Text("", id=f"hier-breadcrumb-{cid}", size="xs", fw=600),
                 dmc.Stack(initial_sections, id=f"hier-sections-{cid}", gap="sm"),
                 dcc.Store(id=f"hier-nav-{cid}", data=[]),
             ],
@@ -212,6 +213,7 @@ class HierarchicalLabelWidget(TaterWidget):
         nav_id = f"hier-nav-{cid}"
         sections_id = f"hier-sections-{cid}"
         search_id = f"hier-search-{cid}"
+        breadcrumb_id = f"hier-breadcrumb-{cid}"
 
         def node_at(path: list[str]) -> Node:
             node = root
@@ -287,6 +289,7 @@ class HierarchicalLabelWidget(TaterWidget):
         # ---- 3. Rebuild sections from nav state / search / doc change ----
         @app.callback(
             Output(sections_id, "children"),
+            Output(breadcrumb_id, "children"),
             Input(nav_id, "data"),
             Input(search_id, "value"),
             Input("current-doc-id", "data"),
@@ -303,15 +306,17 @@ class HierarchicalLabelWidget(TaterWidget):
                 if annotation is not None:
                     selected_value = value_helpers.get_model_value(annotation, field_path)
 
+            breadcrumb = " → ".join(path) if path else "None selected"
+
             # Search mode
             if search_query and search_query.strip():
                 q = search_query.strip().lower()
                 matches = [n for n in root.all_leaves() if q in n.name.lower()]
                 search_buttons = _make_buttons(matches, cid, idx=0, selected_name=selected_value)
-                return [_section("Search results", search_buttons)]
+                return [_section("Search results", search_buttons)], breadcrumb
 
             # Normal mode: stack a section per level
-            return _build_sections(root, path, cid, selected_value=selected_value)
+            return _build_sections(root, path, cid, selected_value=selected_value), breadcrumb
 
 
 # ---------------------------------------------------------------------------
@@ -334,18 +339,35 @@ def _make_buttons(
     idx: int,
     selected_name: Optional[str] = None,
 ) -> list:
-    return [
-        dmc.Button(
-            node.name,
-            id={"type": "hier-node-btn", "field": field, "idx": idx, "name": node.name},
-            size="xs",
-            variant="filled" if node.name == selected_name else (
-                "default" if not node.is_leaf else "light"
-            ),
-            n_clicks=0,
+    buttons = []
+    for node in nodes:
+        if node.is_leaf:
+            left_section = None
+            right_section = None
+        else:
+            left_section = None
+            right_section = dmc.Badge(
+                dmc.Group(
+                    [
+                        dmc.Text(str(len(node.children)), size="xs", lh=1),
+                        dmc.Text("▾", size="lg", lh=1),
+                    ],
+                    gap=0,
+                ),
+                size="sm", color="gray", variant="light",
+            )
+        buttons.append(
+            dmc.Button(
+                node.name,
+                id={"type": "hier-node-btn", "field": field, "idx": idx, "name": node.name},
+                size="xs",
+                variant="light" if node.name == selected_name else "default",
+                n_clicks=0,
+                leftSection=left_section,
+                rightSection=right_section,
+            )
         )
-        for node in nodes
-    ]
+    return buttons
 
 
 def _build_sections(
