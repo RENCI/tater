@@ -131,15 +131,15 @@ SpanAnnotationWidget(
 Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`.
 
 ```python
-from tater.widgets import HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, build_tree_from_yaml
+from tater.widgets import HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, load_hierarchy_from_yaml
 
-ontology = build_tree_from_yaml("data/ontology.yaml")
+ontology = load_hierarchy_from_yaml("data/ontology.yaml")
 
 HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
 HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
 ```
 
-Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `build_tree_from_yaml(path)`.
+Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
 
 ## TaterApp
 

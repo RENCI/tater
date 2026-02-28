@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from tater import TaterApp, parse_args
-from tater.widgets import HierarchicalLabelFullWidget, HierarchicalLabelCompactWidget, build_tree_from_yaml
+from tater.widgets import HierarchicalLabelFullWidget, HierarchicalLabelCompactWidget, load_hierarchy_from_yaml
 
 
 class PathologyAnnotation(BaseModel):
@@ -17,7 +17,7 @@ class PathologyAnnotation(BaseModel):
 def main() -> None:
     args = parse_args()
 
-    ontology = build_tree_from_yaml("data/breast_fdx_ontology.yaml")
+    ontology = load_hierarchy_from_yaml("data/breast_fdx_ontology.yaml")
 
     widgets = [
         HierarchicalLabelCompactWidget(

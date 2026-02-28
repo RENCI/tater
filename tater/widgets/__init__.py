@@ -29,7 +29,7 @@ from tater.widgets.hierarchical_label import (
     HierarchicalLabelCompactWidget,
     Node,
     build_tree,
-    build_tree_from_yaml,
+    load_hierarchy_from_yaml,
 )
 
 __all__ = [
@@ -60,5 +60,5 @@ __all__ = [
     "HierarchicalLabelCompactWidget",
     "Node",
     "build_tree",
-    "build_tree_from_yaml",
+    "load_hierarchy_from_yaml",
 ]

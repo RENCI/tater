@@ -114,7 +114,7 @@ def build_tree(hierarchy: Union[dict, list]) -> Node:
     raise TypeError(f"hierarchy must be dict or list, got {type(hierarchy)}")
 
 
-def build_tree_from_yaml(path: Union[str, Path]) -> Node:
+def load_hierarchy_from_yaml(path: Union[str, Path]) -> Node:
     """Build a Node tree from a YAML file.
 
     Supported YAML formats::
