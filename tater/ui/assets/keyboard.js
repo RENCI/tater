@@ -16,7 +16,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (e.key === 'ArrowLeft') {
+        if (e.key === 'f') {
+            e.preventDefault();
+            const cb = document.getElementById('flag-document');
+            if (cb) cb.click();
+        } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
             const btn = document.getElementById('btn-prev');
             if (btn) btn.click();
