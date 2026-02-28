@@ -1,35 +1,32 @@
 """ChipGroup widget for multi-choice annotations."""
-from typing import Optional, List
+from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import ControlWidget
+from .base import MultiChoiceWidget
 
 
-class ChipGroupWidget(ControlWidget):
+class ChipGroupWidget(MultiChoiceWidget):
     """Widget for selecting multiple options displayed as inline chip buttons."""
 
     def __init__(
         self,
         schema_field: str,
-        label: str,
-        options: list[str],
+        label: str = "",
         description: Optional[str] = None,
-        default: Optional[List[str]] = None,
+        required: bool = False,
+        default: Optional[list[str]] = None,
         vertical: bool = False,
-        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            **kwargs,
+            required=required,
+            default=default,
         )
-        self.options = options
-        self.default = default or []
         self.vertical = vertical
 
     def component(self) -> dmc.ChipGroup:
-        """Return Dash Mantine ChipGroup component."""
         chips = [dmc.Chip(opt, value=opt) for opt in self.options]
         container = dmc.Stack(chips, gap="xs") if self.vertical else dmc.Group(chips, wrap="wrap")
         return dmc.ChipGroup(
@@ -40,5 +37,4 @@ class ChipGroupWidget(ControlWidget):
         )
 
     def to_python_type(self) -> type:
-        """Return list since this widget produces a list of strings."""
         return list

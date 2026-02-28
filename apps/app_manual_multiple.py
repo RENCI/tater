@@ -1,28 +1,27 @@
 """Widget showcase example demonstrating all available widget types."""
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel
 
 from tater import TaterApp, parse_args
-from tater.widgets import SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget, MultiSelectWidget, NumberInputWidget, ChipGroupWidget, SliderWidget, SwitchWidget, SelectWidget
-
-
-# Define types
-PetType = Literal["cat", "dog", "fish"]
-SentimentType = Literal["positive", "negative", "neutral"]
+from tater.widgets import (
+    SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget,
+    MultiSelectWidget, NumberInputWidget, ChipGroupWidget, SliderWidget,
+    SwitchWidget, SelectWidget,
+)
 
 
 class MultipleAnnotation(BaseModel):
     """Annotation schema showcasing all widget types."""
     # Single value selects
-    pet_type: Optional[PetType] = None
-    sentiment: Optional[SentimentType] = None
-    location: Optional[str] = None
+    pet_type: Optional[Literal["cat", "dog", "fish"]] = None
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    location: Optional[Literal["home", "park", "vet", "shelter", "other"]] = None
     # Boolean
     is_cute: bool = False
     is_indoor: bool = False
     # Multi value selects
-    favorite_colors: Optional[list[str]] = None
-    traits: Optional[list[str]] = None
+    favorite_colors: Optional[List[Literal["red", "green", "blue", "yellow", "purple"]]] = None
+    traits: Optional[List[Literal["friendly", "playful", "lazy", "energetic", "shy"]]] = None
     # Numeric
     pet_age: Optional[float] = None
     confidence: Optional[float] = None
@@ -32,28 +31,25 @@ class MultipleAnnotation(BaseModel):
 
 def main() -> None:
     args = parse_args()
-    
+
     widgets = [
         # Single value selects
         RadioGroupWidget(
             schema_field="pet_type",
             label="Pet Type",
             description="What type of pet is mentioned?",
-            options=["cat", "dog", "fish"],
             required=True,
         ),
         SegmentedControlWidget(
             schema_field="sentiment",
             label="Sentiment",
             description="Overall sentiment of the document",
-            options=["positive", "negative", "neutral"],
             required=True,
         ),
         SelectWidget(
             schema_field="location",
             label="Location",
             description="Where is the pet located?",
-            options=["home", "park", "vet", "shelter", "other"],
             required=True,
         ),
         # Boolean
@@ -61,7 +57,6 @@ def main() -> None:
             schema_field="is_cute",
             label="Is cute?",
             description="Check if this pet is cute",
-            default=False,
         ),
         SwitchWidget(
             schema_field="is_indoor",
@@ -73,14 +68,12 @@ def main() -> None:
             schema_field="favorite_colors",
             label="Favorite Colors",
             description="Select one or more favorite colors",
-            options=["red", "green", "blue", "yellow", "purple"],
             required=True,
         ),
         ChipGroupWidget(
             schema_field="traits",
             label="Traits",
             description="Select all traits that apply",
-            options=["friendly", "playful", "lazy", "energetic", "shy"],
             required=True,
         ),
         # Numeric
@@ -117,9 +110,9 @@ def main() -> None:
         title="tater - multiple",
         theme="light",
         annotations_path=args.annotations,
-        schema_model=MultipleAnnotation
+        schema_model=MultipleAnnotation,
     )
-    
+
     if not app.load_documents(args.documents):
         return
 

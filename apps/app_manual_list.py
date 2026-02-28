@@ -6,32 +6,24 @@ from tater import TaterApp, parse_args
 from tater.widgets import SegmentedControlWidget, ListableWidget
 
 
-# Define types
-PetType = Literal["cat", "dog", "fish"]
-
-
 class Pet(BaseModel):
-    """Model for a single pet."""
-    kind: Optional[PetType] = None
+    kind: Optional[Literal["cat", "dog", "fish"]] = None
 
 
 class ListAnnotation(BaseModel):
-    """Annotation schema with a list of nested models."""
     pets: List[Pet] = Field(default_factory=list)
 
 
 def main() -> None:
     args = parse_args()
-    
-    # Define the widget template for a single pet
+
     pet_item_widgets = [
         SegmentedControlWidget(
-            schema_field="kind",  # Becomes "pets.0.kind", "pets.1.kind", etc.
+            schema_field="kind",
             label="Pet Type",
-            options=["cat", "dog", "fish"],
         ),
     ]
-    
+
     widgets = [
         ListableWidget(
             schema_field="pets",
@@ -42,14 +34,14 @@ def main() -> None:
             initial_count=1,
         ),
     ]
-    
+
     app = TaterApp(
         title="tater - list",
         theme="light",
         annotations_path=args.annotations,
-        schema_model=ListAnnotation
+        schema_model=ListAnnotation,
     )
-    
+
     if not app.load_documents(args.documents):
         return
 

@@ -1,5 +1,14 @@
 """Tater widgets for building annotation interfaces."""
-from tater.widgets.base import TaterWidget, ControlWidget, ContainerWidget
+from tater.widgets.base import (
+    TaterWidget,
+    ControlWidget,
+    ContainerWidget,
+    ChoiceWidget,
+    MultiChoiceWidget,
+    BooleanWidget,
+    NumericWidget,
+    TextWidget,
+)
 from tater.widgets.segmented_control import SegmentedControlWidget
 from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.checkbox import CheckboxWidget
@@ -19,6 +28,11 @@ __all__ = [
     "TaterWidget",
     "ControlWidget",
     "ContainerWidget",
+    "ChoiceWidget",
+    "MultiChoiceWidget",
+    "BooleanWidget",
+    "NumericWidget",
+    "TextWidget",
     "SegmentedControlWidget",
     "RadioGroupWidget",
     "CheckboxWidget",

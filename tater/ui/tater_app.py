@@ -111,13 +111,26 @@ class TaterApp:
             widgets: List of TaterWidget instances
         """
         self.widgets = widgets
-        
+
         # Store reference to TaterApp in Dash app so widgets can access it
         self.app._tater_app = self
-        
+
         # Finalize all field paths for nested widgets
         for widget in self.widgets:
             widget._finalize_paths()
+
+        # Duplicate field check
+        seen: set[str] = set()
+        for widget in self.widgets:
+            path = widget.field_path
+            if path in seen:
+                raise ValueError(f"Duplicate widget for schema field '{path}'")
+            seen.add(path)
+
+        # Bind widgets against the schema model (validates types, derives options)
+        if self.schema_model is not None:
+            for widget in self.widgets:
+                widget.bind_schema(self.schema_model)
 
         # Register any widget-specific callbacks
         for widget in self.widgets:

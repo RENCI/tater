@@ -2,34 +2,31 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import ControlWidget
+from .base import ChoiceWidget
 
 
-class RadioGroupWidget(ControlWidget):
+class RadioGroupWidget(ChoiceWidget):
     """Widget for selecting from a list of mutually exclusive options."""
 
     def __init__(
         self,
         schema_field: str,
-        label: str,
-        options: list[str],
+        label: str = "",
         description: Optional[str] = None,
+        required: bool = False,
         default: Optional[str] = None,
         vertical: bool = False,
-        **kwargs,
     ):
         super().__init__(
             schema_field=schema_field,
             label=label,
             description=description,
-            **kwargs,
+            required=required,
+            default=default,
         )
-        self.options = options
-        self.default = default
         self.vertical = vertical
 
     def component(self) -> dmc.RadioGroup:
-        """Return Dash Mantine RadioGroup component."""
         radio_items = [dmc.Radio(label=opt, value=opt) for opt in self.options]
         container = dmc.Stack(radio_items, gap="xs") if self.vertical else dmc.Group(radio_items, wrap="wrap")
         return dmc.RadioGroup(
@@ -39,5 +36,4 @@ class RadioGroupWidget(ControlWidget):
         )
 
     def to_python_type(self) -> type:
-        """Return str since this widget produces string values."""
         return str

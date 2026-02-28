@@ -8,7 +8,8 @@ from dash import dcc, html, Input, Output, State, ctx, ALL
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 
-from .base import ContainerWidget, TaterWidget
+import typing
+from .base import ContainerWidget, TaterWidget, _resolve_field_info, _unwrap_optional
 
 
 class ListableWidget(ContainerWidget):
@@ -307,6 +308,18 @@ class ListableWidget(ContainerWidget):
             
             # Return IDs unchanged (dummy output)
             return all_ids if all_ids else []
+
+    def bind_schema(self, model: type) -> None:
+        """Resolve the list item model type and bind each item widget template against it."""
+        field_info = _resolve_field_info(model, self.field_path)
+        if field_info is None:
+            return
+        inner = _unwrap_optional(field_info.annotation)
+        if typing.get_origin(inner) is not list:
+            return
+        item_type = typing.get_args(inner)[0]
+        for item_widget in self.item_widgets:
+            item_widget.bind_schema(item_type)
 
     def to_python_type(self) -> type:
         """Return list since this represents a list of models."""

@@ -6,11 +6,8 @@ from tater import TaterApp, parse_args
 from tater.widgets import SegmentedControlWidget, CheckboxWidget
 
 
-SentimentType = Literal["positive", "negative", "neutral"]
-
-
 class SimpleAnnotation(BaseModel):
-    sentiment: Optional[SentimentType] = None
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
     is_relevant: bool = False
 
 
@@ -22,7 +19,6 @@ def main() -> None:
             schema_field="sentiment",
             label="Sentiment",
             description="Overall sentiment of the document",
-            options=["positive", "negative", "neutral"],
             required=True,
         ),
         CheckboxWidget(

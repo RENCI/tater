@@ -2,42 +2,26 @@
 from typing import Optional
 import dash_mantine_components as dmc
 
-from .base import ControlWidget
+from .base import BooleanWidget
 
 
-class SwitchWidget(ControlWidget):
+class SwitchWidget(BooleanWidget):
     """Widget for boolean yes/no annotations displayed as a toggle switch."""
 
     def __init__(
         self,
         schema_field: str,
-        label: str,
+        label: str = "",
         description: Optional[str] = None,
         default: bool = False,
-        required: bool = False,
     ):
-        if required:
-            raise ValueError("SwitchWidget cannot be required — boolean fields always have a value.")
-        super().__init__(
-            schema_field=schema_field,
-            label=label,
-            description=description,
-        )
+        super().__init__(schema_field=schema_field, label=label, description=description)
         self.default = default
 
     def component(self) -> dmc.Stack:
-        """Return Dash Mantine Switch component."""
-        parts = [
-            dmc.Switch(
-                id=self.component_id,
-                label=self.label,
-                checked=self.default,
-            )
-        ]
-
+        parts = [dmc.Switch(id=self.component_id, label=self.label, checked=self.default)]
         if self.description:
             parts.append(dmc.Text(self.description, size="xs", c="dimmed"))
-
         return dmc.Stack(parts, gap="xs", mt="md")
 
     @property

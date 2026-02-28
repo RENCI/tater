@@ -62,6 +62,11 @@ class GroupWidget(ContainerWidget):
             dmc.Stack(child_components, gap="sm"),
         ], withBorder=True, p="md", mt="md")
 
+    def bind_schema(self, model: type) -> None:
+        """Pass the root model down; children navigate using their full field paths."""
+        for child in self.children:
+            child.bind_schema(model)
+
     def register_callbacks(self, app) -> None:
         """Register callbacks for any child widgets that need them."""
         for child in self.children:
