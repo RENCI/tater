@@ -21,12 +21,20 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     nav_controls = _build_navigation_controls(tater_app)
     footer_bar = _build_footer_bar()
 
-    # One selection store + one trigger store per SpanAnnotationWidget
+    # Stores + hidden proxy button per SpanAnnotationWidget
     span_stores = []
     for w in tater_app.widgets:
         if isinstance(w, SpanAnnotationWidget):
             span_stores.append(dcc.Store(id=f"span-selection-{w.component_id}", data=None))
             span_stores.append(dcc.Store(id=f"span-trigger-{w.component_id}", data=0))
+            span_stores.append(dcc.Store(id=f"span-delete-{w.component_id}", data=None))
+            # Hidden button: clicked programmatically by the JS tooltip's delete button,
+            # triggering the clientside captureDelete callback.
+            span_stores.append(html.Button(
+                id=f"span-delete-proxy-{w.component_id}",
+                n_clicks=0,
+                style={"display": "none"},
+            ))
 
     content_grid = dmc.Grid([
         dmc.GridCol([

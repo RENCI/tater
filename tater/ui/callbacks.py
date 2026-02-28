@@ -491,8 +491,13 @@ def _render_document_content(text: str, doc_id: str, span_widgets: list, tater_a
         components.append(
             html.Mark(
                 span.text,
-                title=span.tag,
                 style={"backgroundColor": color, "padding": "1px 0"},
+                **{
+                    "data-tag": span.tag,
+                    "data-start": str(span.start),
+                    "data-end": str(span.end),
+                    "data-field": widget_cid,
+                },
             )
         )
         pos = span.end
