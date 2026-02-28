@@ -1,162 +1,213 @@
-# Tater - Clinical Note Annotation Application
+# Tater
 
-A web-based tool for manual annotation of clinical notes using Dash.
+A Python library for building document annotation interfaces with [Dash](https://dash.plotly.com/) and [Pydantic](https://docs.pydantic.dev/).
 
-## Features
-
-- Load and annotate clinical documents
-- Flexible annotation schema support (single choice, multi choice, span annotations, free text)
-- Progress tracking across document collections
-- Auto-save functionality
-- Flag documents for review
-- Export annotations to JSON
+Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
 ## Installation
 
-This project uses `uv` for dependency management.
-
 ```bash
-# Install dependencies
 uv sync
 ```
 
 ## Quick Start
 
-1. **Prepare your data:**
-   - Create a JSON or CSV file listing your documents (see `data/documents.json` for example)
-   - Create an annotation schema JSON file (see `data/sample_schema.json` for example)
-   - Place your clinical note text files in a directory
+```python
+from typing import Literal, Optional
+from pydantic import BaseModel
+from tater import TaterApp, parse_args
+from tater.widgets import SegmentedControlWidget, TextInputWidget
 
-2. **Run the application:**
-   ```bash
-   uv run python src/app.py
-   ```
+class NoteAnnotation(BaseModel):
+    sentiment: Literal["positive", "negative", "neutral"]
+    summary: Optional[str] = None
 
-3. **Open your browser:**
-   - Navigate to http://localhost:8050
-   - Click "Choose Document List File" and upload your document list (CSV or JSON)
-   - Click "Choose Schema File" and upload your annotation schema (JSON)
-   - Click "Load and Start Annotating"
+widgets = [
+    SegmentedControlWidget("sentiment", label="Sentiment"),
+    TextInputWidget("summary", label="Summary", description="Brief summary of the note"),
+]
 
-## Sample Data
+args = parse_args()
+app = TaterApp(title="My Annotator", schema_model=NoteAnnotation, annotations_path=args.annotations)
+app.load_documents(args.documents)
+app.set_annotation_widgets(widgets)
+app.run(debug=args.debug, port=args.port, host=args.host)
+```
 
-Sample data is provided in the `data/` directory:
-- `data/documents.json` - Sample document list
-- `data/sample_schema.json` - Sample annotation schema
-- `data/note_001.txt`, `note_002.txt`, `note_003.txt` - Sample clinical notes
-
-To try it out:
-1. Start the app: `uv run python src/app.py`
-2. Upload `data/documents.json` as the document list
-3. Upload `data/sample_schema.json` as the schema
-4. Click "Load and Start Annotating"
-
-## Configuration
-
-Configure the application using environment variables:
-
-- `TATER_ANNOTATIONS_DIR` - Directory for saving annotations (default: `./annotations`)
-- `TATER_ANNOTATIONS_FILE` - Annotation file name (default: `annotations.json`)
-- `TATER_PORT` - Server port (default: `8050`)
-- `TATER_DEBUG` - Debug mode (default: `False`)
-- `TATER_ANNOTATOR` - Annotator name (default: system username)
-
-Example:
+Run with:
 ```bash
-TATER_ANNOTATOR="jane@example.com" uv run python src/app.py
+python my_app.py --documents data/documents.json
 ```
 
-## Document List Format
+Example apps for all widget types are in [apps/](apps/).
 
-**JSON Format:**
+## Widgets
+
+Widgets are linked to Pydantic model fields by `schema_field`. Options for choice widgets are
+inferred from the field's `Literal` type — no manual list needed.
+
+All widgets accept `label`, `description`, and most accept `required`.
+
+### Single choice
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `SegmentedControlWidget` | `Literal[...]` | Horizontal button group |
+| `RadioGroupWidget` | `Literal[...]` | Radio buttons; `vertical=True` supported |
+| `SelectWidget` | `Literal[...]` | Searchable dropdown |
+
+### Multiple choice
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `MultiSelectWidget` | `list[Literal[...]]` | Searchable multi-select dropdown |
+| `ChipGroupWidget` | `list[Literal[...]]` | Clickable chip group; `vertical=True` supported |
+
+### Boolean
+
+| Widget | Schema type |
+|--------|-------------|
+| `CheckboxWidget` | `bool` |
+| `SwitchWidget` | `bool` |
+
+### Numeric
+
+| Widget | Schema type | Extra params |
+|--------|-------------|--------------|
+| `NumberInputWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+| `SliderWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+
+### Text
+
+| Widget | Schema type | Extra params |
+|--------|-------------|--------------|
+| `TextInputWidget` | `str` | `placeholder` |
+
+### Containers
+
+**`GroupWidget`** — groups child widgets under a nested Pydantic model field:
+```python
+class Address(BaseModel):
+    city: str
+    country: str
+
+class Doc(BaseModel):
+    address: Address
+
+GroupWidget("address", label="Location", children=[
+    TextInputWidget("address.city", label="City"),
+    TextInputWidget("address.country", label="Country"),
+])
+```
+
+**`ListableWidget`** — repeatable list of sub-widgets for `list[SomeModel]` fields:
+```python
+ListableWidget("tags", label="Tags", item_widgets=[
+    TextInputWidget("tags.$.value", label="Tag"),
+])
+```
+
+### Span annotation
+
+**`SpanAnnotationWidget`** — highlight text spans and assign entity types. Schema field must be `list[SpanAnnotation]`:
+
+```python
+from tater import SpanAnnotation
+from tater.widgets import SpanAnnotationWidget, EntityType
+
+SpanAnnotationWidget(
+    "entities",
+    label="Entities",
+    entity_types=[
+        EntityType("Medication"),
+        EntityType("Diagnosis"),
+        EntityType("Symptom"),
+    ],
+)
+```
+
+### Hierarchical label
+
+Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`.
+
+```python
+from tater.widgets import HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, build_tree_from_yaml
+
+ontology = build_tree_from_yaml("data/ontology.yaml")
+
+HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
+HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
+```
+
+Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `build_tree_from_yaml(path)`.
+
+## TaterApp
+
+```python
+TaterApp(
+    title="My App",                # Browser tab title
+    theme="light",                 # "light" or "dark"
+    schema_model=MyModel,          # Pydantic BaseModel subclass
+    annotations_path="out.json",   # Where to save annotations (optional)
+)
+```
+
+| Method | Description |
+|--------|-------------|
+| `load_documents(path)` | Load documents from a JSON file. Returns `False` on error. |
+| `set_annotation_widgets(widgets)` | Set the widget list (must be called after `load_documents`). |
+| `run(debug, port, host)` | Start the Dash server. |
+
+## Document format
+
+JSON file listing documents to annotate:
+
+```json
+[
+  {"file_path": "data/note_001.txt"},
+  {"file_path": "data/note_002.txt", "name": "Patient 2", "info": {"date": "2024-01-15"}}
+]
+```
+
+Or with a top-level `"documents"` key:
+```json
+{"documents": [{"file_path": "data/note_001.txt"}]}
+```
+
+Each document may have:
+- `file_path` (required) — path to a `.txt` file
+- `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
+- `name` — display name
+- `info` — arbitrary metadata dict shown in the UI
+
+## Annotations file format
+
+Auto-saved JSON keyed by document ID:
+
 ```json
 {
-  "documents": [
-    {
-      "file_path": "/path/to/document.txt",
-      "metadata": {
-        "date": "2024-01-15",
-        "patient_id": "P001"
-      }
-    }
-  ]
+  "doc_000": {
+    "annotations": {"sentiment": "positive", "summary": "Normal findings."},
+    "metadata": {"flagged": false, "notes": "", "visited": true, "annotation_seconds": 42.0, "status": "complete"}
+  }
 }
 ```
 
-**CSV Format:**
-```csv
-file_path,metadata
-/path/to/document.txt,"{\"date\": \"2024-01-15\"}"
-```
+Status values: `"not_started"`, `"in_progress"`, `"complete"`.
 
-## Annotation Schema Format
+## CLI
 
-```json
-{
-  "schema_version": "1.0",
-  "annotation_types": [
-    {
-      "id": "sentiment",
-      "label": "Document Sentiment",
-      "type": "single_choice",
-      "options": ["Positive", "Negative", "Neutral"],
-      "required": true,
-      "description": "Overall tone of the document"
-    }
-  ]
-}
-```
-
-Supported annotation types:
-- `single_choice` - Radio button selection
-- `multi_choice` - Checkbox selection (multiple allowed)
-- `span_annotation` - Text highlighting with entity type labeling
-  - Copy/paste or type text from the document
-  - Select entity type
-  - Click "Add Annotation" to highlight the text
-  - Click × to remove annotations
-- `free_text` - Open text field
-
-## Output
-
-Annotations are saved in a single JSON file (default: `annotations/annotations.json`):
-
-```json
-{
-  "schema_version": "1.0",
-  "collection_metadata": {
-    "created": "2024-01-20T09:00:00Z",
-    "last_modified": "2024-01-20T10:30:00Z"
-  },
-  "annotations": [
-    {
-      "file_path": "/path/to/document.txt",
-      "annotator": "user@example.com",
-      "timestamp": "2024-01-20T10:30:00Z",
-      "flagged_for_review": false,
-      "annotations": {
-        "sentiment": "Positive"
-      },
-      "status": "completed"
-    }
-  ]
-}
-```
-
-## Project Structure
+`parse_args()` provides standard CLI flags for any tater app:
 
 ```
-tater/
-├── src/
-│   ├── app.py                 # Main application
-│   ├── components/            # UI components
-│   ├── data/                  # Data loading and storage
-│   └── utils/                 # Utilities and config
-├── data/                      # Sample data
-├── annotations/               # Output directory
-├── spec/                      # Specification
-└── pyproject.toml            # Project configuration
+--documents PATH     Documents JSON file (required)
+--annotations PATH   Annotations output file (default: <documents>_annotations.json)
+--port INT           Server port (default: 8050)
+--host STR           Bind address (default: 127.0.0.1)
+--debug              Enable debug/hot-reload mode
 ```
+
+Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
 
 ## License
 
