@@ -23,6 +23,12 @@ from tater.widgets.slider import SliderWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.select import SelectWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
+from tater.widgets.hierarchical_label import (
+    HierarchicalLabelWidget,
+    Node,
+    build_tree,
+    build_tree_from_yaml,
+)
 
 __all__ = [
     "TaterWidget",
@@ -47,4 +53,8 @@ __all__ = [
     "SelectWidget",
     "SpanAnnotationWidget",
     "EntityType",
+    "HierarchicalLabelWidget",
+    "Node",
+    "build_tree",
+    "build_tree_from_yaml",
 ]
