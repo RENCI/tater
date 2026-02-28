@@ -27,7 +27,6 @@ class Node:
         return len(self.children) == 0
 
     def find(self, name: str) -> Optional[Node]:
-        """Return a direct child by name, or None."""
         for child in self.children:
             if child.name == name:
                 return child
@@ -52,7 +51,6 @@ class Node:
 
 
 def _build_tree(name: str, data: Any) -> Node:
-    """Recursively build a Node from a name + nested dict/list value."""
     if data is None or data == [] or data == {}:
         return Node(name)
     if isinstance(data, list):
@@ -125,9 +123,12 @@ def build_tree_from_yaml(path: Union[str, Path]) -> Node:
 class HierarchicalLabelWidget(TaterWidget):
     """Progressive disclosure widget for tree-based label selection.
 
-    Users navigate level-by-level through a hierarchy of labels. Clicking an
-    intermediate node drills down; clicking a leaf selects it.  An optional
-    search bar filters across all leaf labels.
+    Shows top-level categories as buttons. Clicking an intermediate node
+    highlights it and reveals its children in a new row below. Clicking a
+    leaf selects it as the annotation value. Clicking any button in an
+    earlier row resets the selection from that level downward.
+
+    An optional search bar filters across all leaf labels.
 
     Example usage::
 
@@ -137,7 +138,7 @@ class HierarchicalLabelWidget(TaterWidget):
             hierarchy=build_tree_from_yaml("data/ontology.yaml"),
         )
 
-    The corresponding schema field must be ``str`` or ``Optional[str]``.
+    The schema field must be ``str`` or ``Optional[str]``.
     """
 
     def __init__(
@@ -181,36 +182,17 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def component(self) -> Any:
         cid = self.component_id
-        initial_buttons = _make_buttons(self.root.children, cid)
+        initial_sections = _build_sections(self.root, [], cid)
 
         return dmc.Stack(
             [
-                # Navigation row: back button + breadcrumb path
-                dmc.Group(
-                    [
-                        dmc.ActionIcon(
-                            "←",
-                            id=f"hier-back-{cid}",
-                            variant="subtle",
-                            size="sm",
-                            n_clicks=0,
-                        ),
-                        dmc.Text("", id=f"hier-crumb-{cid}", size="sm", c="dimmed"),
-                    ],
-                    gap="xs",
-                ),
-                # Currently selected value
-                dmc.Text("", id=f"hier-selected-{cid}", size="sm", fw=500),
-                # Search input (always in DOM; hidden when searchable=False)
                 dmc.TextInput(
                     id=f"hier-search-{cid}",
                     placeholder="Search…",
                     size="xs",
                     style={} if self.searchable else {"display": "none"},
                 ),
-                # Node buttons (dynamically updated)
-                dmc.Group(initial_buttons, id=f"hier-buttons-{cid}", gap="xs", wrap="wrap"),
-                # Navigation state store
+                dmc.Stack(initial_sections, id=f"hier-sections-{cid}", gap="sm"),
                 dcc.Store(id=f"hier-nav-{cid}", data=[]),
             ],
             gap="xs",
@@ -228,10 +210,7 @@ class HierarchicalLabelWidget(TaterWidget):
         root = self.root
 
         nav_id = f"hier-nav-{cid}"
-        back_id = f"hier-back-{cid}"
-        buttons_id = f"hier-buttons-{cid}"
-        crumb_id = f"hier-crumb-{cid}"
-        selected_id = f"hier-selected-{cid}"
+        sections_id = f"hier-sections-{cid}"
         search_id = f"hier-search-{cid}"
 
         def node_at(path: list[str]) -> Node:
@@ -243,10 +222,6 @@ class HierarchicalLabelWidget(TaterWidget):
                 node = child
             return node
 
-        def crumb_label(path: list[str]) -> str:
-            parts = ([] if root.name == "__root__" else [root.name]) + list(path)
-            return " › ".join(parts) if parts else ""
-
         # ---- 1. Reset navigation when document changes ----
         @app.callback(
             Output(nav_id, "data"),
@@ -256,58 +231,62 @@ class HierarchicalLabelWidget(TaterWidget):
         def reset_nav(_doc_id):
             return []
 
-        # ---- 2. Handle node click or back button → navigate / select ----
+        # ---- 2. Handle node button click → update path, write if leaf ----
         @app.callback(
             Output(nav_id, "data", allow_duplicate=True),
-            Input({"type": "hier-node-btn", "field": cid, "name": ALL}, "n_clicks"),
-            Input(back_id, "n_clicks"),
+            Input({"type": "hier-node-btn", "field": cid, "idx": ALL, "name": ALL}, "n_clicks"),
             State(nav_id, "data"),
             State("current-doc-id", "data"),
             prevent_initial_call=True,
         )
-        def handle_click(node_clicks, _back, current_path, doc_id):
+        def handle_click(node_clicks, current_path, doc_id):
             if not ctx.triggered_id:
                 return no_update
-
-            path = list(current_path or [])
-
-            # Back button
-            if ctx.triggered_id == back_id:
-                return path[:-1]
-
             triggered = ctx.triggered_id
             if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn":
                 return no_update
 
+            idx = triggered["idx"]
             node_name = triggered["name"]
-            current_node = node_at(path)
-            clicked = current_node.find(node_name)
+            path = list(current_path or [])
 
-            # Fall back to full-tree search (handles search result clicks)
-            if clicked is None:
-                clicked = next(
-                    (n for n in root.all_nodes() if n.name == node_name), None
-                )
+            # Resolve the clicked node
+            parent = node_at(path[:idx])
+            clicked = parent.find(node_name)
             if clicked is None:
                 return no_update
 
+            tater_app = app._tater_app
+
             if clicked.is_leaf:
-                # Save the selection
-                tater_app = app._tater_app
+                # Leaf selection is tracked via annotation value
+                current_value = None
+                annotation = None
                 if doc_id and tater_app:
                     annotation = tater_app.annotations.get(doc_id)
                     if annotation is not None:
-                        value_helpers.set_model_value(annotation, field_path, clicked.name)
-                        tater_app._save_annotations_to_file()
-                return path  # stay at current level after selecting
-            else:
-                return path + [node_name]
+                        current_value = value_helpers.get_model_value(annotation, field_path)
 
-        # ---- 3. Update buttons, breadcrumb, and selected label ----
+                if current_value == node_name:
+                    # Toggle off: clear annotation
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, field_path, None)
+                        tater_app._save_annotations_to_file()
+                    return path[:idx]
+                else:
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, field_path, node_name)
+                        tater_app._save_annotations_to_file()
+                    return path[:idx] + [node_name]
+            else:
+                # Intermediate node: toggle collapses from this level
+                if idx < len(path) and path[idx] == node_name:
+                    return path[:idx]
+                return path[:idx] + [node_name]
+
+        # ---- 3. Rebuild sections from nav state / search / doc change ----
         @app.callback(
-            Output(buttons_id, "children"),
-            Output(crumb_id, "children"),
-            Output(selected_id, "children"),
+            Output(sections_id, "children"),
             Input(nav_id, "data"),
             Input(search_id, "value"),
             Input("current-doc-id", "data"),
@@ -317,40 +296,87 @@ class HierarchicalLabelWidget(TaterWidget):
             path = list(current_path or [])
             tater_app = app._tater_app
 
-            # Read current annotation value for this doc
-            selected_text = ""
+            # Read current annotation value
+            selected_value = None
             if doc_id and tater_app:
                 annotation = tater_app.annotations.get(doc_id)
                 if annotation is not None:
-                    val = value_helpers.get_model_value(annotation, field_path)
-                    if val:
-                        selected_text = f"✓ {val}"
+                    selected_value = value_helpers.get_model_value(annotation, field_path)
 
-            # Search mode: show matching leaves as flat buttons
+            # Search mode
             if search_query and search_query.strip():
                 q = search_query.strip().lower()
                 matches = [n for n in root.all_leaves() if q in n.name.lower()]
-                return _make_buttons(matches, cid), crumb_label(path), selected_text
+                search_buttons = _make_buttons(matches, cid, idx=0, selected_name=selected_value)
+                return [_section("Search results", search_buttons)]
 
-            # Normal navigation: show current level's children
-            current_node = node_at(path)
-            return _make_buttons(current_node.children, cid), crumb_label(path), selected_text
+            # Normal mode: stack a section per level
+            return _build_sections(root, path, cid, selected_value=selected_value)
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Rendering helpers
 # ---------------------------------------------------------------------------
 
-def _make_buttons(nodes: list[Node], field: str) -> list:
-    """Build Dash Button components for a list of nodes."""
+def _section(label: str, buttons: list) -> Any:
+    return dmc.Stack(
+        [
+            dmc.Text(label, size="xs", c="dimmed", fw=500),
+            dmc.Group(buttons, gap="xs", wrap="wrap"),
+        ],
+        gap="xs",
+    )
+
+
+def _make_buttons(
+    nodes: list[Node],
+    field: str,
+    idx: int,
+    selected_name: Optional[str] = None,
+) -> list:
     return [
         dmc.Button(
             node.name,
-            id={"type": "hier-node-btn", "field": field, "name": node.name},
+            id={"type": "hier-node-btn", "field": field, "idx": idx, "name": node.name},
             size="xs",
-            variant="light" if node.is_leaf else "outline",
-            rightSection="›" if not node.is_leaf else None,
+            variant="filled" if node.name == selected_name else (
+                "default" if not node.is_leaf else "light"
+            ),
             n_clicks=0,
         )
         for node in nodes
     ]
+
+
+def _build_sections(
+    root: Node,
+    path: list[str],
+    cid: str,
+    selected_value: Optional[str] = None,
+) -> list:
+    """Build the stacked level sections for the current navigation path."""
+    sections = []
+
+    # Level 0: root's children, label "Top level categories"
+    selected_at = path[0] if path else None
+    level_label = "Top level categories"
+    buttons = _make_buttons(root.children, cid, idx=0, selected_name=selected_at or selected_value)
+    sections.append(_section(level_label, buttons))
+
+    # Each subsequent level revealed by selection
+    current_node = root
+    for depth, name in enumerate(path):
+        child = current_node.find(name)
+        if child is None or child.is_leaf:
+            break
+        current_node = child
+        selected_at = path[depth + 1] if depth + 1 < len(path) else None
+        buttons = _make_buttons(
+            current_node.children,
+            cid,
+            idx=depth + 1,
+            selected_name=selected_at or selected_value,
+        )
+        sections.append(_section(current_node.name, buttons))
+
+    return sections
