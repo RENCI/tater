@@ -15,20 +15,27 @@ if TYPE_CHECKING:
 def setup_callbacks(tater_app: TaterApp) -> None:
     # Removed clientside keyboard navigation callback
     """Register document and navigation callbacks on the Dash app."""
+    from tater.widgets.span import SpanAnnotationWidget
+
     app = tater_app.app
+    span_widgets = [w for w in tater_app.widgets if isinstance(w, SpanAnnotationWidget)]
 
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app)
 
-    # Update document display and info
+    # Update document display and info.
+    # Span trigger stores are included as additional inputs so that adding or
+    # deleting a span causes the document to re-render with updated highlights.
+    span_trigger_inputs = [Input(f"span-trigger-{w.component_id}", "data") for w in span_widgets]
+
     @app.callback(
         [Output("document-content", "children"),
          Output("document-title", "children"),
          Output("document-metadata", "children"),
          Output("document-progress", "value")],
-        Input("current-doc-id", "data")
+        [Input("current-doc-id", "data")] + span_trigger_inputs,
     )
-    def update_document(doc_id):
+    def update_document(doc_id, *_span_triggers):
         if not doc_id:
             return "No document loaded", "No document", "", 0
 
@@ -39,9 +46,11 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
         # Load document content
         try:
-            content = doc.load_content()
+            raw_text = doc.load_content()
         except Exception as e:
-            content = f"Error loading file: {e}"
+            raw_text = f"Error loading file: {e}"
+
+        content = _render_document_content(raw_text, doc_id, span_widgets, tater_app)
 
         doc_index = next((i for i, d in enumerate(tater_app.documents) if d.id == doc_id), 0)
         title = f"Document {doc_index + 1} of {len(tater_app.documents)}"
@@ -440,3 +449,55 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
         timing_data["session_start_time"] = time.time()
 
     return doc_id, timing_data
+
+
+def _render_document_content(text: str, doc_id: str, span_widgets: list, tater_app) -> list | str:
+    """
+    Return Dash component children for the document viewer.
+
+    When no SpanAnnotationWidgets are present, returns the raw text string.
+    Otherwise builds a list of strings and highlighted html.Span components.
+    """
+    from dash import html
+    from tater.ui import value_helpers
+
+    if not span_widgets or not doc_id:
+        return text
+
+    # Collect all spans across all span widgets for this document
+    all_spans = []
+    for widget in span_widgets:
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation:
+            spans = value_helpers.get_model_value(annotation, widget.field_path) or []
+            for span in spans:
+                color = widget.get_color_for_tag(span.tag)
+                all_spans.append((span, widget.component_id, color))
+
+    if not all_spans:
+        return text
+
+    # Sort by start position; skip overlapping spans
+    all_spans.sort(key=lambda x: x[0].start)
+
+    components = []
+    pos = 0
+    for span, widget_cid, color in all_spans:
+        if span.start < pos:
+            continue  # overlapping — skip
+        if span.start > pos:
+            components.append(text[pos:span.start])
+
+        components.append(
+            html.Mark(
+                span.text,
+                title=span.tag,
+                style={"backgroundColor": color, "padding": "1px 0"},
+            )
+        )
+        pos = span.end
+
+    if pos < len(text):
+        components.append(text[pos:])
+
+    return components

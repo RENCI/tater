@@ -13,11 +13,20 @@ if TYPE_CHECKING:
 
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
+    from tater.widgets.span import SpanAnnotationWidget
+
     annotation_components = _build_annotation_components(tater_app.widgets)
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls(tater_app)
     footer_bar = _build_footer_bar()
+
+    # One selection store + one trigger store per SpanAnnotationWidget
+    span_stores = []
+    for w in tater_app.widgets:
+        if isinstance(w, SpanAnnotationWidget):
+            span_stores.append(dcc.Store(id=f"span-selection-{w.component_id}", data=None))
+            span_stores.append(dcc.Store(id=f"span-trigger-{w.component_id}", data=0))
 
     content_grid = dmc.Grid([
         dmc.GridCol([
@@ -43,6 +52,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
             dcc.Store(id="status-store", data="not_started"),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
+            *span_stores,
             dmc.Container([
                 dmc.Stack([
                     dmc.Center(

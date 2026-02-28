@@ -13,6 +13,7 @@ from tater.widgets.chip_group import ChipGroupWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.select import SelectWidget
+from tater.widgets.span import SpanAnnotationWidget, EntityType
 
 __all__ = [
     "TaterWidget",
@@ -30,4 +31,6 @@ __all__ = [
     "SliderWidget",
     "SwitchWidget",
     "SelectWidget",
+    "SpanAnnotationWidget",
+    "EntityType",
 ]
