@@ -25,6 +25,8 @@ from tater.widgets.select import SelectWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
+    HierarchicalLabelFullWidget,
+    HierarchicalLabelCompactWidget,
     Node,
     build_tree,
     build_tree_from_yaml,
@@ -54,6 +56,8 @@ __all__ = [
     "SpanAnnotationWidget",
     "EntityType",
     "HierarchicalLabelWidget",
+    "HierarchicalLabelFullWidget",
+    "HierarchicalLabelCompactWidget",
     "Node",
     "build_tree",
     "build_tree_from_yaml",

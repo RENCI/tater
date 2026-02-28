@@ -117,26 +117,14 @@ def build_tree_from_yaml(path: Union[str, Path]) -> Node:
 
 
 # ---------------------------------------------------------------------------
-# Widget
+# Base widget
 # ---------------------------------------------------------------------------
 
 class HierarchicalLabelWidget(TaterWidget):
-    """Progressive disclosure widget for tree-based label selection.
+    """Base class for hierarchical label widgets.
 
-    Shows top-level categories as buttons. Clicking an intermediate node
-    highlights it and reveals its children in a new row below. Clicking a
-    leaf selects it as the annotation value. Clicking any button in an
-    earlier row resets the selection from that level downward.
-
-    An optional search bar filters across all leaf labels.
-
-    Example usage::
-
-        HierarchicalLabelWidget(
-            schema_field="diagnosis",
-            label="Diagnosis",
-            hierarchy=build_tree_from_yaml("data/ontology.yaml"),
-        )
+    Subclasses implement ``_render_sections`` to control how the tree is
+    displayed at each navigation depth.
 
     The schema field must be ``str`` or ``Optional[str]``.
     """
@@ -171,18 +159,31 @@ class HierarchicalLabelWidget(TaterWidget):
         field_info = _resolve_field_info(model, self.field_path)
         if field_info is None:
             raise ValueError(
-                f"HierarchicalLabelWidget: field '{self.field_path}' not found in {model.__name__}"
+                f"{self.__class__.__name__}: field '{self.field_path}' not found in {model.__name__}"
             )
         inner = _unwrap_optional(field_info.annotation)
         if inner is not str:
             raise TypeError(
-                f"HierarchicalLabelWidget: field '{self.field_path}' must be str or "
+                f"{self.__class__.__name__}: field '{self.field_path}' must be str or "
                 f"Optional[str], got {field_info.annotation!r}"
             )
 
+    # ------------------------------------------------------------------
+    # Subclass interface
+    # ------------------------------------------------------------------
+
+    def _render_sections(
+        self, path: list[str], cid: str, selected_value: Optional[str]
+    ) -> list:
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Component + callbacks
+    # ------------------------------------------------------------------
+
     def component(self) -> Any:
         cid = self.component_id
-        initial_sections = _build_sections(self.root, [], cid)
+        initial_sections = self._render_sections([], cid, None)
 
         return dmc.Stack(
             [
@@ -192,16 +193,11 @@ class HierarchicalLabelWidget(TaterWidget):
                     size="xs",
                     style={} if self.searchable else {"display": "none"},
                 ),
-                dmc.Text("", id=f"hier-breadcrumb-{cid}", size="xs", fw=600),
                 dmc.Stack(initial_sections, id=f"hier-sections-{cid}", gap="sm"),
                 dcc.Store(id=f"hier-nav-{cid}", data=[]),
             ],
             gap="xs",
         )
-
-    # ------------------------------------------------------------------
-    # Callbacks
-    # ------------------------------------------------------------------
 
     def register_callbacks(self, app: Any) -> None:
         from tater.ui import value_helpers
@@ -213,7 +209,6 @@ class HierarchicalLabelWidget(TaterWidget):
         nav_id = f"hier-nav-{cid}"
         sections_id = f"hier-sections-{cid}"
         search_id = f"hier-search-{cid}"
-        breadcrumb_id = f"hier-breadcrumb-{cid}"
 
         def node_at(path: list[str]) -> Node:
             node = root
@@ -252,7 +247,6 @@ class HierarchicalLabelWidget(TaterWidget):
             node_name = triggered["name"]
             path = list(current_path or [])
 
-            # Resolve the clicked node
             parent = node_at(path[:idx])
             clicked = parent.find(node_name)
             if clicked is None:
@@ -261,7 +255,6 @@ class HierarchicalLabelWidget(TaterWidget):
             tater_app = app._tater_app
 
             if clicked.is_leaf:
-                # Leaf selection is tracked via annotation value
                 current_value = None
                 annotation = None
                 if doc_id and tater_app:
@@ -287,9 +280,10 @@ class HierarchicalLabelWidget(TaterWidget):
                 return path[:idx] + [node_name]
 
         # ---- 3. Rebuild sections from nav state / search / doc change ----
+        render_sections = self._render_sections  # capture for closure
+
         @app.callback(
             Output(sections_id, "children"),
-            Output(breadcrumb_id, "children"),
             Input(nav_id, "data"),
             Input(search_id, "value"),
             Input("current-doc-id", "data"),
@@ -299,24 +293,53 @@ class HierarchicalLabelWidget(TaterWidget):
             path = list(current_path or [])
             tater_app = app._tater_app
 
-            # Read current annotation value
             selected_value = None
             if doc_id and tater_app:
                 annotation = tater_app.annotations.get(doc_id)
                 if annotation is not None:
                     selected_value = value_helpers.get_model_value(annotation, field_path)
 
-            breadcrumb = " → ".join(path) if path else "None selected"
-
-            # Search mode
+            # Search mode: flat list of matching leaves
             if search_query and search_query.strip():
                 q = search_query.strip().lower()
                 matches = [n for n in root.all_leaves() if q in n.name.lower()]
                 search_buttons = _make_buttons(matches, cid, idx=0, selected_name=selected_value)
-                return [_section("Search results", search_buttons)], breadcrumb
+                return [_section("Search results", search_buttons)]
 
-            # Normal mode: stack a section per level
-            return _build_sections(root, path, cid, selected_value=selected_value), breadcrumb
+            return render_sections(path, cid, selected_value)
+
+
+# ---------------------------------------------------------------------------
+# Concrete widgets
+# ---------------------------------------------------------------------------
+
+class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
+    """Progressive disclosure widget showing all sibling nodes at each level.
+
+    Clicking an intermediate node reveals its children in a new section below.
+    Clicking a node at an earlier level resets the selection from that level
+    downward.
+    """
+
+    def _render_sections(
+        self, path: list[str], cid: str, selected_value: Optional[str]
+    ) -> list:
+        return _build_sections_full(self.root, path, cid, selected_value=selected_value)
+
+
+class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
+    """Compact hierarchical widget showing only the selected node per level.
+
+    Already-navigated levels collapse to a single highlighted button. Only
+    the active (deepest) level shows all available options. Clicking a
+    collapsed button at any earlier level expands it again.
+    """
+
+    def _render_sections(
+        self, path: list[str], cid: str, selected_value: Optional[str]
+    ) -> list:
+        items = _build_sections_compact(self.root, path, cid, selected_value=selected_value)
+        return [dmc.Stack(items, gap=2)]
 
 
 # ---------------------------------------------------------------------------
@@ -370,22 +393,21 @@ def _make_buttons(
     return buttons
 
 
-def _build_sections(
+def _build_sections_full(
     root: Node,
     path: list[str],
     cid: str,
     selected_value: Optional[str] = None,
 ) -> list:
-    """Build the stacked level sections for the current navigation path."""
+    """Full mode: show all sibling nodes at every revealed level."""
     sections = []
 
-    # Level 0: root's children, label "Top level categories"
     selected_at = path[0] if path else None
-    level_label = "Top level categories"
-    buttons = _make_buttons(root.children, cid, idx=0, selected_name=selected_at or selected_value)
-    sections.append(_section(level_label, buttons))
+    buttons = _make_buttons(
+        root.children, cid, idx=0, selected_name=selected_at or selected_value
+    )
+    sections.append(_section("Top level categories", buttons))
 
-    # Each subsequent level revealed by selection
     current_node = root
     for depth, name in enumerate(path):
         child = current_node.find(name)
@@ -400,5 +422,42 @@ def _build_sections(
             selected_name=selected_at or selected_value,
         )
         sections.append(_section(current_node.name, buttons))
+
+    return sections
+
+
+def _build_sections_compact(
+    root: Node,
+    path: list[str],
+    cid: str,
+    selected_value: Optional[str] = None,
+) -> list:
+    """Compact mode: collapse navigated levels to a single button each."""
+    sections = []
+    current_node = root
+
+    def _add(buttons: list) -> None:
+        if sections:
+            sections.append(dmc.Text("▾", size="xl", c="dimmed", lh=0.5, pl="sm"))
+        sections.append(dmc.Group(buttons, gap="xs", wrap="wrap"))
+
+    for depth, name in enumerate(path):
+        child = current_node.find(name)
+
+        if child is not None and child.is_leaf:
+            # Show all siblings at this leaf level with the leaf highlighted
+            _add(_make_buttons(current_node.children, cid, idx=depth, selected_name=name))
+            return sections
+
+        # Intermediate: collapse to just the selected button
+        _add(_make_buttons([child] if child else [], cid, idx=depth, selected_name=name))
+
+        if child is None:
+            return sections
+        current_node = child
+
+    # Active level: show all children of the current node
+    depth = len(path)
+    _add(_make_buttons(current_node.children, cid, idx=depth, selected_name=selected_value))
 
     return sections
