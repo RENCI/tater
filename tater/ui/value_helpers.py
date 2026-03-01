@@ -1,6 +1,7 @@
 """Helpers for reading/writing nested annotation values."""
 from __future__ import annotations
 
+import typing
 from typing import Any
 
 from pydantic import BaseModel
@@ -44,13 +45,21 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
                 if hasattr(current, "model_fields"):
                     field_info = current.model_fields.get(key)
                     if field_info:
-                        # Determine what type to create
-                        if hasattr(field_info.annotation, "__args__"):
-                            # It's a generic type like List, create empty list
+                        # Unwrap Optional[X] → X
+                        inner = field_info.annotation
+                        origin = typing.get_origin(inner)
+                        if origin is typing.Union:
+                            args = [a for a in typing.get_args(inner) if a is not type(None)]
+                            if len(args) == 1:
+                                inner = args[0]
+                        # Instantiate sub-model or create empty list
+                        if isinstance(inner, type) and issubclass(inner, BaseModel):
+                            setattr(current, key, inner())
+                        elif typing.get_origin(inner) is list:
                             setattr(current, key, [])
-                            next_value = getattr(current, key)
                         else:
                             raise ValueError(f"Cannot create field {key}")
+                        next_value = getattr(current, key)
                     else:
                         raise ValueError(f"Field {key} not in model")
                 else:
