@@ -1,0 +1,20 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "sentiment",
+      "type": "single_choice",
+      "options": ["positive", "negative", "neutral"],
+      "required": true,
+      "label": "Sentiment",
+      "description": "Overall sentiment of the document",
+      "widget": {"type": "radio_group", "orientation": "vertical"}
+    },
+    {
+      "id": "is_relevant",
+      "type": "boolean",
+      "label": "Relevant?",
+      "description": "Is this document relevant?"
+    }
+  ]
+}

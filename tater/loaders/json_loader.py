@@ -70,8 +70,10 @@ relative to the schema file's directory when using ``load_schema``.
 from __future__ import annotations
 
 import json
+import types as _builtin_types
+import typing
 from pathlib import Path
-from typing import Any, Optional, Literal
+from typing import Any, Optional, Literal, Union
 
 from pydantic import BaseModel, Field, create_model
 
@@ -112,6 +114,112 @@ def _make_literal(options: list[str]) -> Any:
 def _to_classname(field_id: str) -> str:
     """Convert snake_case or kebab-case id to PascalCase for model class naming."""
     return "".join(part.title() for part in field_id.replace("-", "_").split("_"))
+
+
+def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | None:
+    """Directly build a default widget from a Pydantic field annotation.
+
+    Returns ``None`` for unrecognized types.
+    """
+    label = _humanize(field_name)
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+
+    # Unwrap Optional[X] / Union[X, None] / X | None (Python 3.10+)
+    is_union = origin is Union or (
+        hasattr(_builtin_types, "UnionType")
+        and isinstance(annotation, _builtin_types.UnionType)
+    )
+    if is_union:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) == 1:
+            return _widget_from_annotation(field_name, non_none[0])
+        return None
+
+    # Literal["a", "b"] → SegmentedControlWidget
+    if origin is Literal:
+        return _build_widget(field_name, "single_choice", False, label, None, None, {}, {}, {})
+
+    # list[X]
+    if origin is list:
+        item_type = args[0] if args else None
+        if item_type is None:
+            return None
+        item_origin = typing.get_origin(item_type)
+
+        # list[Literal[...]] → MultiSelectWidget
+        if item_origin is Literal:
+            return _build_widget(field_name, "multi_choice", False, label, None, None, {}, {}, {})
+
+        # list[SpanAnnotation] → SpanAnnotationWidget
+        if item_type is SpanAnnotation:
+            return _build_widget(field_name, "span_annotation", False, label, None, None, {}, {}, {})
+
+        # list[SubModel] → ListableWidget
+        if isinstance(item_type, type) and issubclass(item_type, BaseModel):
+            item_widgets = [
+                w for w in (
+                    _widget_from_annotation(n, fi.annotation)
+                    for n, fi in item_type.model_fields.items()
+                ) if w is not None
+            ]
+            return ListableWidget(field_name, label=label, item_widgets=item_widgets)
+
+        return None
+
+    # bool must come before int (bool is a subclass of int)
+    if annotation is bool:
+        return _build_widget(field_name, "boolean", False, label, None, None, {}, {}, {})
+
+    if annotation is str:
+        return _build_widget(field_name, "free_text", False, label, None, None, {}, {}, {})
+
+    if annotation in (float, int):
+        return _build_widget(field_name, "numeric", False, label, None, None, {}, {}, {})
+
+    # SubModel → GroupWidget
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        child_widgets = [
+            w for w in (
+                _widget_from_annotation(n, fi.annotation)
+                for n, fi in annotation.model_fields.items()
+            ) if w is not None
+        ]
+        return GroupWidget(field_name, label=label, children=child_widgets)
+
+    return None
+
+
+def widgets_from_model(
+    model: type[BaseModel],
+    overrides: list[TaterWidget] | None = None,
+) -> list[TaterWidget]:
+    """Generate default widgets from a Pydantic model's field annotations.
+
+    Uses the same widget defaults as the JSON schema loader. Unrecognized
+    field types are silently skipped.
+
+    Args:
+        model: A Pydantic ``BaseModel`` subclass.
+        overrides: Widgets to use in place of the generated defaults. Matched
+                   by field name. Useful for fields whose type is ambiguous
+                   (e.g. ``hierarchical`` fields appear as ``Optional[str]``)
+                   or where a non-default widget is desired.
+
+    Returns:
+        A list of ``TaterWidget`` instances ready to pass to
+        ``set_annotation_widgets``, in model field order.
+    """
+    override_map = {w._local_path: w for w in (overrides or [])}
+    result = []
+    for name, fi in model.model_fields.items():
+        if name in override_map:
+            result.append(override_map[name])
+        else:
+            w = _widget_from_annotation(name, fi.annotation)
+            if w is not None:
+                result.append(w)
+    return result
 
 
 def _load_hierarchies(data: dict, base_dir: Path) -> dict[str, Node]:
