@@ -4,23 +4,15 @@
     {
       "id": "entities",
       "type": "span_annotation",
-      "entity_types": ["Medication", "Diagnosis", "Symptom", "Procedure"]
+      "entity_types": ["Medication", "Diagnosis", "Symptom", "Procedure"],
+      "label": "Clinical Entities",
+      "description": "Highlight text then click an entity type to label it."
     },
     {
       "id": "quality",
       "type": "single_choice",
       "options": ["high", "medium", "low"],
-      "required": true
-    }
-  ],
-  "ui": [
-    {
-      "schema_id": "entities",
-      "label": "Clinical Entities",
-      "description": "Highlight text then click an entity type to label it."
-    },
-    {
-      "schema_id": "quality",
+      "required": true,
       "label": "Note Quality"
     }
   ]

@@ -1,0 +1,26 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "document_sentiment",
+      "type": "single_choice",
+      "options": ["positive", "negative", "neutral"]
+    },
+    {
+      "id": "owner",
+      "type": "group",
+      "fields": [
+        {
+          "id": "sentiment",
+          "type": "single_choice",
+          "options": ["positive", "negative", "neutral"]
+        },
+        {
+          "id": "pet_type",
+          "type": "single_choice",
+          "options": ["cat", "dog", "fish"]
+        }
+      ]
+    }
+  ]
+}

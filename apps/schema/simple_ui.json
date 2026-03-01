@@ -6,20 +6,12 @@
       "type": "single_choice",
       "options": ["positive", "negative", "neutral"],
       "required": true,
+      "label": "Sentiment",
       "description": "Overall sentiment of the document"
     },
     {
       "id": "is_relevant",
-      "type": "boolean"
-    }
-  ],
-  "ui": [
-    {
-      "schema_id": "sentiment",
-      "label": "Sentiment"
-    },
-    {
-      "schema_id": "is_relevant",
+      "type": "boolean",
       "label": "Relevant?",
       "description": "Is this document relevant?"
     }
