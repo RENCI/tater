@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Optional, Any
 
 from dash import dcc, html, Input, Output, State, ctx, ALL
@@ -275,7 +276,7 @@ class ListableWidget(ContainerWidget):
             try:
                 # Extract the triggered ID dict
                 triggered_id_str = triggered_prop.split(".")[0]
-                triggered_id = eval(triggered_id_str)
+                triggered_id = json.loads(triggered_id_str)
                 
                 if not isinstance(triggered_id, dict):
                     return all_ids if all_ids else []
