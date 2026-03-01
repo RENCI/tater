@@ -280,7 +280,12 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             title="Schema mismatch detected",
             message=html.Ul(
                 [html.Li(w) for w in warnings],
-                style={"margin": "4px 0 0 0", "paddingLeft": "16px"},
+                style={
+                    "margin": "4px 0 0 0",
+                    "paddingLeft": "16px",
+                    "maxHeight": "160px",
+                    "overflowY": "auto",
+                },
             ),
             color="yellow",
             action="show",
