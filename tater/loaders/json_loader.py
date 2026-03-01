@@ -17,6 +17,10 @@ Schema format::
 
     {
       "spec_version": "1.0",
+      "hierarchies": {
+        "ontology": "data/my_ontology.yaml",
+        "regions": {"Head": ["Brain", "Eye"], "Thorax": ["Lung", "Heart"]}
+      },
       "data_schema": [
         {
           "id": "sentiment",
@@ -26,6 +30,13 @@ Schema format::
           "label": "Sentiment",
           "description": "Overall tone of the document",
           "widget": {"type": "radio_group", "orientation": "vertical"}
+        },
+        {
+          "id": "diagnosis",
+          "type": "hierarchical",
+          "hierarchy_ref": "ontology",
+          "label": "Diagnosis",
+          "widget": {"type": "compact", "searchable": true}
         },
         {
           "id": "address",
@@ -51,6 +62,10 @@ Schema format::
 
 The ``widget`` object is optional on leaf fields. Without it, a sensible
 default widget is chosen for each field type.
+
+For ``hierarchical`` fields, ``hierarchy_ref`` must match a key in the
+top-level ``hierarchies`` dict. File paths in ``hierarchies`` are resolved
+relative to the schema file's directory when using ``load_schema``.
 """
 from __future__ import annotations
 
@@ -74,6 +89,13 @@ from tater.widgets.slider import SliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
+from tater.widgets.hierarchical_label import (
+    HierarchicalLabelCompactWidget,
+    HierarchicalLabelFullWidget,
+    build_tree,
+    load_hierarchy_from_yaml,
+    Node,
+)
 from tater.models.span import SpanAnnotation
 
 
@@ -92,30 +114,53 @@ def _to_classname(field_id: str) -> str:
     return "".join(part.title() for part in field_id.replace("-", "_").split("_"))
 
 
-def parse_schema(data: dict) -> tuple[type[BaseModel], list[TaterWidget]]:
+def _load_hierarchies(data: dict, base_dir: Path) -> dict[str, Node]:
+    """Build the named hierarchy map from the top-level ``hierarchies`` section."""
+    hierarchy_map: dict[str, Node] = {}
+    for name, source in data.get("hierarchies", {}).items():
+        if isinstance(source, str):
+            path = Path(source)
+            if not path.is_absolute():
+                path = base_dir / path
+            hierarchy_map[name] = load_hierarchy_from_yaml(path)
+        else:
+            hierarchy_map[name] = build_tree(source)
+    return hierarchy_map
+
+
+def parse_schema(
+    data: dict, base_dir: Path | None = None
+) -> tuple[type[BaseModel], list[TaterWidget]]:
     """Parse a schema dict into a Pydantic model and widget list.
 
     Args:
         data: Parsed JSON dict with a ``data_schema`` list. Each field entry
               may include an optional ``widget`` object for UI configuration.
+        base_dir: Directory used to resolve relative ``hierarchy_file`` paths.
+                  Defaults to the current working directory.
 
     Returns:
         A ``(model_class, widgets)`` tuple ready to pass to
         ``TaterApp(schema_model=model)`` and ``set_annotation_widgets(widgets)``.
     """
+    base_dir = base_dir or Path.cwd()
+    hierarchy_map = _load_hierarchies(data, base_dir)
+
     model_fields: dict[str, Any] = {}
     widgets: list[TaterWidget] = []
 
     for spec in data.get("data_schema", []):
         fid = spec["id"]
-        field_def, widget = _process_field(spec, fid)
+        field_def, widget = _process_field(spec, fid, hierarchy_map)
         model_fields[fid] = field_def
         widgets.append(widget)
 
     return create_model("AnnotationModel", **model_fields), widgets
 
 
-def _process_field(spec: dict, local_id: str) -> tuple[Any, TaterWidget]:
+def _process_field(
+    spec: dict, local_id: str, hierarchy_map: dict[str, Node]
+) -> tuple[Any, TaterWidget]:
     """Recursively process one field spec into a (pydantic_field_def, widget) pair.
 
     Child widgets for ``group`` and ``list`` types use their local id only —
@@ -131,7 +176,7 @@ def _process_field(spec: dict, local_id: str) -> tuple[Any, TaterWidget]:
         child_widgets: list[TaterWidget] = []
         for child_spec in spec.get("fields", []):
             child_id = child_spec["id"]
-            child_def, child_widget = _process_field(child_spec, child_id)
+            child_def, child_widget = _process_field(child_spec, child_id, hierarchy_map)
             child_model_fields[child_id] = child_def
             child_widgets.append(child_widget)
         sub_model = create_model(_to_classname(local_id), **child_model_fields)
@@ -144,7 +189,7 @@ def _process_field(spec: dict, local_id: str) -> tuple[Any, TaterWidget]:
         item_widgets: list[TaterWidget] = []
         for child_spec in spec.get("item_fields", []):
             child_id = child_spec["id"]
-            child_def, child_widget = _process_field(child_spec, child_id)
+            child_def, child_widget = _process_field(child_spec, child_id, hierarchy_map)
             item_model_fields[child_id] = child_def
             item_widgets.append(child_widget)
         item_model = create_model(_to_classname(local_id) + "Item", **item_model_fields)
@@ -180,11 +225,14 @@ def _process_field(spec: dict, local_id: str) -> tuple[Any, TaterWidget]:
         field_def = (Optional[float], default)
     elif ftype == "span_annotation":
         field_def = (list[SpanAnnotation], Field(default_factory=list))
+    elif ftype == "hierarchical":
+        field_def = (Optional[str], None)
     else:
         raise ValueError(f"Unknown field type {ftype!r} for field {local_id!r}")
 
     return field_def, _build_widget(
-        local_id, ftype, required, label, description, widget_type, widget_spec, spec
+        local_id, ftype, required, label, description, widget_type, widget_spec, spec,
+        hierarchy_map,
     )
 
 
@@ -197,6 +245,7 @@ def _build_widget(
     widget_type: str | None,
     widget_spec: dict,
     spec: dict,
+    hierarchy_map: dict[str, Node],
 ) -> TaterWidget:
     if ftype == "single_choice":
         if widget_type == "radio_group":
@@ -246,6 +295,20 @@ def _build_widget(
         entity_types = [EntityType(name=et) for et in spec.get("entity_types", [])]
         return SpanAnnotationWidget(fid, label=label, entity_types=entity_types, description=description)
 
+    if ftype == "hierarchical":
+        ref = spec.get("hierarchy_ref")
+        hierarchy = hierarchy_map.get(ref) if ref else None
+        searchable = widget_spec.get("searchable", True)
+        if widget_type == "full":
+            return HierarchicalLabelFullWidget(
+                fid, label=label, description=description,
+                hierarchy=hierarchy, searchable=searchable,
+            )
+        return HierarchicalLabelCompactWidget(
+            fid, label=label, description=description,
+            hierarchy=hierarchy, searchable=searchable,
+        )
+
     raise ValueError(f"Unknown field type {ftype!r}")
 
 
@@ -253,11 +316,13 @@ def load_schema(path: str | Path) -> tuple[type[BaseModel], list[TaterWidget]]:
     """Load a schema JSON file and return ``(model_class, widgets)``.
 
     Args:
-        path: Path to a tater JSON schema file.
+        path: Path to a tater JSON schema file. Relative paths in the
+              ``hierarchies`` section are resolved from this file's directory.
 
     Returns:
         A ``(model_class, widgets)`` tuple.
     """
+    path = Path(path)
     with open(path) as f:
         data = json.load(f)
-    return parse_schema(data)
+    return parse_schema(data, base_dir=path.parent)
