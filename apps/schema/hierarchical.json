@@ -1,0 +1,18 @@
+{
+  "spec_version": "1.0",
+  "hierarchies": {
+    "ontology": "../../data/breast_fdx_ontology.yaml"
+  },
+  "data_schema": [
+    {
+      "id": "diagnosis",
+      "type": "hierarchical",
+      "hierarchy_ref": "ontology"
+    },
+    {
+      "id": "secondary_diagnosis",
+      "type": "hierarchical",
+      "hierarchy_ref": "ontology"
+    }
+  ]
+}

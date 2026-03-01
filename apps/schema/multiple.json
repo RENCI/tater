@@ -1,0 +1,59 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "pet_type",
+      "type": "single_choice",
+      "options": ["cat", "dog", "fish"],
+      "required": true
+    },
+    {
+      "id": "sentiment",
+      "type": "single_choice",
+      "options": ["positive", "negative", "neutral"],
+      "required": true
+    },
+    {
+      "id": "location",
+      "type": "single_choice",
+      "options": ["home", "park", "vet", "shelter", "other"],
+      "required": true
+    },
+    {
+      "id": "is_cute",
+      "type": "boolean"
+    },
+    {
+      "id": "is_indoor",
+      "type": "boolean"
+    },
+    {
+      "id": "favorite_colors",
+      "type": "multi_choice",
+      "options": ["red", "green", "blue", "yellow", "purple"],
+      "required": true
+    },
+    {
+      "id": "traits",
+      "type": "multi_choice",
+      "options": ["friendly", "playful", "lazy", "energetic", "shy"],
+      "required": true
+    },
+    {
+      "id": "pet_age",
+      "type": "numeric",
+      "required": true
+    },
+    {
+      "id": "confidence",
+      "type": "numeric",
+      "required": true,
+      "default": 50
+    },
+    {
+      "id": "reviewer_note",
+      "type": "free_text",
+      "required": true
+    }
+  ]
+}

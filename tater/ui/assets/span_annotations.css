@@ -1,0 +1,33 @@
+mark {
+  border-radius: 2px;
+}
+
+#tater-span-tooltip {
+  position: fixed;
+  display: none;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: auto;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mantine-font-family);
+  color: var(--mantine-color-gray-9);
+}
+
+.tater-tooltip-delete {
+  border: none;
+  border-left: 1px solid rgba(0, 0, 0, 0.2);
+  background: transparent;
+  color: #fa5252;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 6px;
+}
