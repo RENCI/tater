@@ -275,21 +275,33 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         from dash import no_update, html
         if not warnings:
             return no_update
+
+        _LABELS = {
+            "extra": "In saved file, not in current schema (will be ignored):",
+            "missing": "In current schema, not in saved file (will use default):",
+        }
+
+        sections = []
+        for key in ("extra", "missing"):
+            fields = warnings.get(key)
+            if not fields:
+                continue
+            if sections:
+                sections.append(html.Div(style={"height": "6px"}))
+            sections.append(html.Div(_LABELS[key], style={"fontWeight": 600, "fontSize": "0.8rem"}))
+            sections.append(html.Ul(
+                [html.Li(f) for f in fields],
+                style={"margin": "2px 0 0 0", "paddingLeft": "16px", "listStylePosition": "inside"},
+            ))
+
         return dmc.Notification(
             id="schema-mismatch-notification",
-            title="Schema mismatch detected",
-            message=html.Ul(
-                [html.Li(w) for w in warnings],
-                style={
-                    "margin": "4px 0 0 0",
-                    "paddingLeft": "16px",
-                    "maxHeight": "160px",
-                    "overflowY": "auto",
-                },
-            ),
+            title="Schema mismatch",
+            message=html.Div(sections),
             color="yellow",
             action="show",
             autoClose=False,
+            styles={"description": {"maxHeight": "200px", "overflowY": "auto"}},
         )
 
 

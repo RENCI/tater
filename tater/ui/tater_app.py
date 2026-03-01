@@ -47,7 +47,7 @@ class TaterApp:
         from tater.models.document import DocumentMetadata
         self.metadata: dict[str, DocumentMetadata] = {}
         self._save_error: str | None = None
-        self._schema_warnings: list[str] = []
+        self._schema_warnings: dict[str, list[str]] = {}
 
     def load_documents(self, source: str) -> bool:
         """
@@ -192,16 +192,11 @@ class TaterApp:
                     missing_fields |= schema_fields - ann_fields
                     self.annotations[doc_id] = self.schema_model(**ann_data)
 
-            self._schema_warnings = [
-                *(
-                    f'"{f}" is in the saved file but not in the current schema (will be ignored)'
-                    for f in sorted(extra_fields)
-                ),
-                *(
-                    f'"{f}" is in the current schema but missing from saved annotations (will use default)'
-                    for f in sorted(missing_fields)
-                ),
-            ]
+            self._schema_warnings = {}
+            if extra_fields:
+                self._schema_warnings["extra"] = sorted(extra_fields)
+            if missing_fields:
+                self._schema_warnings["missing"] = sorted(missing_fields)
 
             print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
