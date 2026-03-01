@@ -152,12 +152,14 @@ class HierarchicalLabelWidget(TaterWidget):
         self,
         schema_field: str,
         label: str = "",
-        hierarchy: Union[Node, dict, list, None] = None,
+        hierarchy: Union[Node, dict, list, str, Path, None] = None,
         description: Optional[str] = None,
         searchable: bool = True,
     ):
         super().__init__(schema_field=schema_field, label=label, description=description)
-        if isinstance(hierarchy, Node):
+        if isinstance(hierarchy, (str, Path)):
+            self.root = load_hierarchy_from_yaml(hierarchy)
+        elif isinstance(hierarchy, Node):
             self.root = hierarchy
         else:
             self.root = build_tree(hierarchy or {})
