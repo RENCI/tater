@@ -46,6 +46,7 @@ class TaterApp:
         # Store metadata (DocumentMetadata) separately from annotations
         from tater.models.document import DocumentMetadata
         self.metadata: dict[str, DocumentMetadata] = {}
+        self._save_error: str | None = None
 
     def load_documents(self, source: str) -> bool:
         """
@@ -198,7 +199,9 @@ class TaterApp:
             
             with open(path, 'w') as f:
                 json.dump(save_dict, f, indent=2)
+            self._save_error = None
         except Exception as e:
+            self._save_error = str(e)
             print(f"Error saving annotations: {e}")
 
     def _setup_callbacks(self) -> None:

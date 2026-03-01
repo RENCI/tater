@@ -208,6 +208,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
 
     @app.callback(
         Output("save-status-text", "children"),
+        Output("save-status-text", "c"),
         Output("timing-text", "children"),
         Input("clock-interval", "n_intervals"),
         State("timing-store", "data"),
@@ -219,12 +220,18 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         from datetime import datetime
         now = time.time()
 
-        # Save status text - display timestamp of last save
-        save_text = "Never saved"
-        if timing_data and timing_data.get("last_save_time"):
+        # Save status text - show error in red, or timestamp of last save
+        if tater_app._save_error:
+            save_text = f"Save failed: {tater_app._save_error}"
+            save_color = "red"
+        elif timing_data and timing_data.get("last_save_time"):
             save_time = timing_data["last_save_time"]
             dt = datetime.fromtimestamp(save_time)
             save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
+            save_color = "dimmed"
+        else:
+            save_text = "Never saved"
+            save_color = "dimmed"
 
         # Doc time: show total annotation_seconds for current doc, plus current session time if viewing
         total_seconds = 0.0
@@ -248,7 +255,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             minutes = (total_seconds % 3600) // 60
             timing_text = f"Doc time: {hours}h {minutes}m"
 
-        return save_text, timing_text
+        return save_text, save_color, timing_text
 
     @app.callback(
         Output("status-badge", "children"),
