@@ -67,6 +67,10 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         return content, title, metadata, progress
 
     # Button navigation
+    # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".
+    # Every callback that writes to these outputs MUST use allow_duplicate=True,
+    # except this one (the first registered). Omitting it on any subsequent
+    # callback will cause a Dash duplicate-output error at startup.
     @app.callback(
         Output("current-doc-id", "data"),
         Output("timing-store", "data"),
@@ -95,7 +99,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, current_index, timing_data)
         return doc_id, new_timing
 
-    # Menu item navigation
+    # Menu item navigation (allow_duplicate=True required — see note above)
     @app.callback(
         Output("current-doc-id", "data", allow_duplicate=True),
         Output("timing-store", "data", allow_duplicate=True),
