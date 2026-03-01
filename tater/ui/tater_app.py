@@ -158,24 +158,17 @@ class TaterApp:
             with open(path, 'r') as f:
                 data = json.load(f)
             
-            # Handle both old format (flat) and new format (with metadata)
             from tater.models.document import DocumentMetadata
             for doc_id, doc_data in data.items():
-                if isinstance(doc_data, dict) and "annotations" in doc_data:
-                    # New format with metadata
-                    ann_data = doc_data["annotations"]
-                    meta = doc_data.get("metadata", {})
-                    self.metadata[doc_id] = DocumentMetadata(
-                        flagged=meta.get("flagged", False),
-                        notes=meta.get("notes", ""),
-                        annotation_seconds=meta.get("annotation_seconds", 0.0),
-                        visited=meta.get("visited", False),
-                        status=meta.get("status", "not_started"),
-                    )
-                else:
-                    # Old format (flat) - treat as annotations only
-                    ann_data = doc_data
-                    self.metadata[doc_id] = DocumentMetadata()
+                ann_data = doc_data.get("annotations", {})
+                meta = doc_data.get("metadata", {})
+                self.metadata[doc_id] = DocumentMetadata(
+                    flagged=meta.get("flagged", False),
+                    notes=meta.get("notes", ""),
+                    annotation_seconds=meta.get("annotation_seconds", 0.0),
+                    visited=meta.get("visited", False),
+                    status=meta.get("status", "not_started"),
+                )
                 if self.schema_model and ann_data:
                     self.annotations[doc_id] = self.schema_model(**ann_data)
             print(f"Loaded existing annotations from {self.annotations_path}")
