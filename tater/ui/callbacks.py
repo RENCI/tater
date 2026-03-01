@@ -267,6 +267,26 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         color = _STATUS_COLORS.get(status, "gray")
         return label, color
 
+    @app.callback(
+        Output("notification-container", "children"),
+        Input("schema-warnings-store", "data"),
+    )
+    def show_schema_warnings(warnings):
+        from dash import no_update, html
+        if not warnings:
+            return no_update
+        return dmc.Notification(
+            id="schema-mismatch-notification",
+            title="Schema mismatch detected",
+            message=html.Ul(
+                [html.Li(w) for w in warnings],
+                style={"margin": "4px 0 0 0", "paddingLeft": "16px"},
+            ),
+            color="yellow",
+            action="show",
+            autoClose=False,
+        )
+
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     """Setup callbacks to capture widget value changes to annotations store."""

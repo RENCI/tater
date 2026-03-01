@@ -47,6 +47,7 @@ class TaterApp:
         from tater.models.document import DocumentMetadata
         self.metadata: dict[str, DocumentMetadata] = {}
         self._save_error: str | None = None
+        self._schema_warnings: list[str] = []
 
     def load_documents(self, source: str) -> bool:
         """
@@ -128,6 +129,18 @@ class TaterApp:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
             seen.add(path)
 
+        # Enforce that all schema fields have defaults (required for safe annotation loading)
+        if self.schema_model is not None:
+            required_fields = [
+                name for name, fi in self.schema_model.model_fields.items()
+                if fi.is_required()
+            ]
+            if required_fields:
+                raise ValueError(
+                    f"All schema model fields must have default values. "
+                    f"Fields without defaults: {', '.join(required_fields)}"
+                )
+
         # Bind widgets against the schema model (validates types, derives options)
         if self.schema_model is not None:
             for widget in self.widgets:
@@ -159,6 +172,9 @@ class TaterApp:
                 data = json.load(f)
             
             from tater.models.document import DocumentMetadata
+            extra_fields: set[str] = set()
+            missing_fields: set[str] = set()
+
             for doc_id, doc_data in data.items():
                 ann_data = doc_data.get("annotations", {})
                 meta = doc_data.get("metadata", {})
@@ -170,7 +186,23 @@ class TaterApp:
                     status=meta.get("status", "not_started"),
                 )
                 if self.schema_model and ann_data:
+                    schema_fields = set(self.schema_model.model_fields.keys())
+                    ann_fields = set(ann_data.keys())
+                    extra_fields |= ann_fields - schema_fields
+                    missing_fields |= schema_fields - ann_fields
                     self.annotations[doc_id] = self.schema_model(**ann_data)
+
+            self._schema_warnings = [
+                *(
+                    f'"{f}" is in the saved file but not in the current schema (will be ignored)'
+                    for f in sorted(extra_fields)
+                ),
+                *(
+                    f'"{f}" is in the current schema but missing from saved annotations (will use default)'
+                    for f in sorted(missing_fields)
+                ),
+            ]
+
             print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
             print(f"Error loading annotations: {e}")

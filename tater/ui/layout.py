@@ -56,9 +56,12 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     return dmc.MantineProvider(
         theme={"colorScheme": tater_app.theme},
         children=[
+            dmc.NotificationProvider(position="top-right"),
+            html.Div(id="notification-container"),
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
             dcc.Store(id="status-store", data="not_started"),
+            dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             *span_stores,
             dmc.Container([
