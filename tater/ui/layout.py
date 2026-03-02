@@ -198,11 +198,19 @@ def _build_footer_bar() -> dmc.Box:
         dmc.Group(
             [
                 dmc.Box(
-                    dmc.Text(
-                        id="timing-text",
-                        size="sm",
-                        c="dimmed",
-                    ),
+                    dmc.Group([
+                        dmc.Text(
+                            id="timing-text",
+                            size="sm",
+                            c="dimmed",
+                        ),
+                        dmc.ActionIcon(
+                            "⏸",
+                            id="btn-pause-timer",
+                            size="sm",
+                            variant="subtle",
+                        ),
+                    ], gap="xs"),
                     style={"flex": "1"},
                 ),
                 dmc.Divider(orientation="vertical"),

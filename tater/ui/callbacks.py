@@ -216,6 +216,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         if timing_data is None:
             timing_data = {}
         timing_data["doc_start_time"] = time.time()
+        timing_data["paused"] = False
         if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
             timing_data["session_start_time"] = time.time()
 
@@ -231,6 +232,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         Output("save-status-text", "children"),
         Output("save-status-text", "c"),
         Output("timing-text", "children"),
+        Output("btn-pause-timer", "children"),
         Input("clock-interval", "n_intervals"),
         State("timing-store", "data"),
         State("current-doc-id", "data"),
@@ -254,13 +256,14 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             save_text = "Never saved"
             save_color = "dimmed"
 
-        # Doc time: show total annotation_seconds for current doc, plus current session time if viewing
+        paused = timing_data.get("paused", False) if timing_data else False
+
+        # Doc time: show total annotation_seconds for current doc, plus live elapsed if not paused
         total_seconds = 0.0
         meta = tater_app.metadata.get(doc_id)
         if meta:
             total_seconds = meta.annotation_seconds
-        # If currently viewing, add time since doc_start_time
-        if timing_data and timing_data.get("doc_start_time"):
+        if not paused and timing_data and timing_data.get("doc_start_time"):
             total_seconds += now - timing_data["doc_start_time"]
 
         # Format as h/m/s
@@ -276,7 +279,38 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
             minutes = (total_seconds % 3600) // 60
             timing_text = f"Doc time: {hours}h {minutes}m"
 
-        return save_text, save_color, timing_text
+        if paused:
+            timing_text += " (paused)"
+
+        pause_icon = "▶" if paused else "⏸"
+        return save_text, save_color, timing_text, pause_icon
+
+    @app.callback(
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("btn-pause-timer", "n_clicks"),
+        State("timing-store", "data"),
+        State("current-doc-id", "data"),
+        prevent_initial_call=True,
+    )
+    def toggle_pause(n_clicks, timing_data, doc_id):
+        import time
+        if not n_clicks:
+            return no_update
+        if timing_data is None:
+            timing_data = {}
+        now = time.time()
+        currently_paused = timing_data.get("paused", False)
+        if not currently_paused:
+            # Flush elapsed into metadata so time isn't lost
+            start = timing_data.get("doc_start_time")
+            if start and doc_id and doc_id in tater_app.metadata:
+                tater_app.metadata[doc_id].annotation_seconds += now - start
+            timing_data["doc_start_time"] = None
+            timing_data["paused"] = True
+        else:
+            timing_data["doc_start_time"] = now
+            timing_data["paused"] = False
+        return timing_data
 
     @app.callback(
         Output("status-badge", "children"),
@@ -519,6 +553,7 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
         timing_data = {}
     timing_data["last_save_time"] = time.time()
     timing_data["doc_start_time"] = time.time()
+    timing_data["paused"] = False
     if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
         timing_data["session_start_time"] = time.time()
 
