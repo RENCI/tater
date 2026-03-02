@@ -51,9 +51,17 @@
       "default": 50
     },
     {
+      "id": "age_range",
+      "type": "range"
+    },
+    {
       "id": "reviewer_note",
       "type": "free_text",
       "required": true
+    },
+    {
+      "id": "detailed_notes",
+      "type": "free_text"
     }
   ]
 }

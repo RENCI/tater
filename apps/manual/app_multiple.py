@@ -6,7 +6,7 @@ from tater import TaterApp, parse_args
 from tater.widgets import (
     SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget,
     MultiSelectWidget, NumberInputWidget, ChipGroupWidget, SliderWidget,
-    SwitchWidget, SelectWidget,
+    SwitchWidget, SelectWidget, TextAreaWidget, RangeSliderWidget,
 )
 
 
@@ -25,8 +25,10 @@ class MultipleAnnotation(BaseModel):
     # Numeric
     pet_age: Optional[float] = None
     confidence: Optional[float] = None
+    age_range: list[float] = [0.0, 30.0]
     # Text
     reviewer_note: Optional[str] = None
+    detailed_notes: Optional[str] = None
 
 
 def main() -> None:
@@ -96,6 +98,15 @@ def main() -> None:
             default=50,
             required=True,
         ),
+        # Range
+        RangeSliderWidget(
+            schema_field="age_range",
+            label="Age Range",
+            description="Estimated age range of the pet",
+            min_value=0,
+            max_value=30,
+            step=1,
+        ),
         # Text
         TextInputWidget(
             schema_field="reviewer_note",
@@ -103,6 +114,12 @@ def main() -> None:
             description="Optional short note about this document",
             placeholder="Enter a short note",
             required=True,
+        ),
+        TextAreaWidget(
+            schema_field="detailed_notes",
+            label="Detailed Notes",
+            description="Extended notes about this document",
+            placeholder="Enter detailed notes...",
         ),
     ]
 

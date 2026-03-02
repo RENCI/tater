@@ -88,6 +88,8 @@ from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
+from tater.widgets.textarea import TextAreaWidget
+from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
@@ -331,6 +333,10 @@ def _process_field(
         field_def = (bool, default if default is not None else False)
     elif ftype == "numeric":
         field_def = (Optional[float], default)
+    elif ftype == "range":
+        _min = float(widget_spec.get("min_value", 0))
+        _max = float(widget_spec.get("max_value", 100))
+        field_def = (list[float], Field(default_factory=lambda a=_min, b=_max: [a, b]))
     elif ftype == "span_annotation":
         field_def = (list[SpanAnnotation], Field(default_factory=list))
     elif ftype == "hierarchical":
@@ -373,6 +379,11 @@ def _build_widget(
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
     if ftype == "free_text":
+        if widget_type == "textarea":
+            return TextAreaWidget(
+                fid, label=label, description=description, required=required,
+                placeholder=widget_spec.get("placeholder"),
+            )
         return TextInputWidget(
             fid, label=label, description=description, required=required,
             placeholder=widget_spec.get("placeholder"),
@@ -397,6 +408,15 @@ def _build_widget(
             min_value=widget_spec.get("min_value"),
             max_value=widget_spec.get("max_value"),
             step=widget_spec.get("step"),
+        )
+
+    if ftype == "range":
+        return RangeSliderWidget(
+            fid, label=label, description=description, required=required,
+            min_value=widget_spec.get("min_value", 0),
+            max_value=widget_spec.get("max_value", 100),
+            step=widget_spec.get("step"),
+            default=spec.get("default"),
         )
 
     if ftype == "span_annotation":

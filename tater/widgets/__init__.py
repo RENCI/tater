@@ -20,6 +20,8 @@ from tater.widgets.multiselect import MultiSelectWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.chip_group import ChipGroupWidget
 from tater.widgets.slider import SliderWidget
+from tater.widgets.textarea import TextAreaWidget
+from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.select import SelectWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
@@ -51,6 +53,8 @@ __all__ = [
     "NumberInputWidget",
     "ChipGroupWidget",
     "SliderWidget",
+    "TextAreaWidget",
+    "RangeSliderWidget",
     "SwitchWidget",
     "SelectWidget",
     "SpanAnnotationWidget",
