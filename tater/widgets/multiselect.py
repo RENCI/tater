@@ -1,9 +1,11 @@
 """MultiSelect widget for multi-choice annotations."""
+from dataclasses import dataclass
 import dash_mantine_components as dmc
 
 from .base import MultiChoiceWidget
 
 
+@dataclass(eq=False)
 class MultiSelectWidget(MultiChoiceWidget):
     """Widget for selecting multiple options from a list."""
 

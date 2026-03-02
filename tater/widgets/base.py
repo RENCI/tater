@@ -1,6 +1,6 @@
 """Base widget classes for Tater."""
 import typing
-from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Any, Optional
 import dash_mantine_components as dmc
 
@@ -45,43 +45,37 @@ def _resolve_field_info(model: type, field_path: str) -> Any:
 # Abstract base
 # ---------------------------------------------------------------------------
 
-class TaterWidget(ABC):
+@dataclass(eq=False)
+class TaterWidget:
     """Abstract base class for all Tater widgets."""
 
-    def __init__(
-        self,
-        schema_field: str,
-        label: str = "",
-        description: Optional[str] = None,
-    ):
-        self._local_path = schema_field
-        self._full_path: Optional[str] = None
-        self.label = label
-        self.description = description
-        self._condition: Optional[tuple[str, bool]] = None
+    schema_field: str
+    label: str = ""
+    description: Optional[str] = None
 
-    def conditional_on(self, field: str, value: bool) -> "TaterWidget":
+    _full_path: Optional[str] = field(init=False, default=None, repr=False)
+    _condition: Optional[tuple] = field(init=False, default=None, repr=False)
+
+    def conditional_on(self, controlling_field: str, value: bool) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
 
         Args:
-            field: The schema_field of the controlling boolean widget.
+            controlling_field: The schema_field of the controlling boolean widget.
             value: Show this widget when the controlling field equals this value.
 
         Example::
 
             TextInputWidget("indoor_location", label="Location").conditional_on("is_indoor", True)
         """
-        self._condition = (field, value)
+        self._condition = (controlling_field, value)
         return self
 
     @property
     def field_path(self) -> str:
-        if self._full_path is not None:
-            return self._full_path
-        return self._local_path
+        return self._full_path if self._full_path is not None else self.schema_field
 
     def _finalize_paths(self, parent_path: str = "") -> None:
-        self._full_path = f"{parent_path}.{self._local_path}" if parent_path else self._local_path
+        self._full_path = f"{parent_path}.{self.schema_field}" if parent_path else self.schema_field
 
     def bind_schema(self, model: type) -> None:
         """Validate against the schema model and derive any missing config. No-op by default."""
@@ -171,16 +165,17 @@ class TaterWidget(ABC):
                 return _empty
             return no_update
 
+    # Subclasses must override these three methods.
+    # Without ABC enforcement, forgetting to do so will cause a runtime error
+    # when the method is called rather than at instantiation time.
+
     @property
-    @abstractmethod
     def renders_own_label(self) -> bool:
         pass
 
-    @abstractmethod
     def component(self) -> Any:
         pass
 
-    @abstractmethod
     def to_python_type(self) -> type:
         pass
 
@@ -189,8 +184,12 @@ class TaterWidget(ABC):
 # Leaf (value-capturing) base
 # ---------------------------------------------------------------------------
 
+@dataclass(eq=False)
 class ControlWidget(TaterWidget):
     """Base class for leaf (value-capturing) widgets."""
+
+    required: bool = False
+    auto_advance: bool = False
 
     @property
     def renders_own_label(self) -> bool:
@@ -204,16 +203,12 @@ class ControlWidget(TaterWidget):
     def empty_value(self) -> Any:
         return None
 
-    def __init__(self, schema_field: str, label: str = "", description: Optional[str] = None,
-                 required: bool = False):
-        super().__init__(schema_field=schema_field, label=label, description=description)
-        self.required = required
-
 
 # ---------------------------------------------------------------------------
 # Typed intermediate classes
 # ---------------------------------------------------------------------------
 
+@dataclass(eq=False)
 class ChoiceWidget(ControlWidget):
     """Base for single-value choice widgets.
 
@@ -221,11 +216,8 @@ class ChoiceWidget(ControlWidget):
     Options are derived automatically from the schema via ``bind_schema``.
     """
 
-    def __init__(self, schema_field: str, label: str = "", description: Optional[str] = None,
-                 required: bool = False, default: Optional[str] = None, **kwargs):
-        super().__init__(schema_field=schema_field, label=label, description=description, required=required)
-        self.options: list[str] = []
-        self.default = default
+    default: Optional[str] = None
+    options: list[str] = field(init=False, default_factory=list, repr=False)
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
@@ -242,6 +234,7 @@ class ChoiceWidget(ControlWidget):
         self.options = [str(a) for a in typing.get_args(inner)]
 
 
+@dataclass(eq=False)
 class MultiChoiceWidget(ControlWidget):
     """Base for multi-value choice widgets.
 
@@ -249,11 +242,12 @@ class MultiChoiceWidget(ControlWidget):
     Options are derived automatically from the schema via ``bind_schema``.
     """
 
-    def __init__(self, schema_field: str, label: str = "", description: Optional[str] = None,
-                 required: bool = False, default: Optional[list[str]] = None, **kwargs):
-        super().__init__(schema_field=schema_field, label=label, description=description, required=required)
-        self.options: list[str] = []
-        self.default: list[str] = default or []
+    default: Optional[list[str]] = None
+    options: list[str] = field(init=False, default_factory=list, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.default is None:
+            self.default = []
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
@@ -276,6 +270,7 @@ class MultiChoiceWidget(ControlWidget):
         self.options = [str(a) for a in typing.get_args(item_type)]
 
 
+@dataclass(eq=False)
 class BooleanWidget(ControlWidget):
     """Base for boolean widgets. Schema field must be ``bool`` or ``Optional[bool]``."""
 
@@ -293,6 +288,7 @@ class BooleanWidget(ControlWidget):
             )
 
 
+@dataclass(eq=False)
 class NumericWidget(ControlWidget):
     """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional`` thereof."""
 
@@ -310,6 +306,7 @@ class NumericWidget(ControlWidget):
             )
 
 
+@dataclass(eq=False)
 class TextWidget(ControlWidget):
     """Base for free-text widgets. Schema field must be ``str`` or ``Optional[str]``."""
 
@@ -331,6 +328,7 @@ class TextWidget(ControlWidget):
 # Container (structural) base
 # ---------------------------------------------------------------------------
 
+@dataclass(eq=False)
 class ContainerWidget(TaterWidget):
     """Base class for container (structural) widgets that hold child widgets."""
 

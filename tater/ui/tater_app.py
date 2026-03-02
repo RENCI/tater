@@ -1,5 +1,5 @@
 """Main TaterApp application class."""
-from typing import Optional, Type, Any
+from typing import Optional, Type, Any, Callable
 from pathlib import Path
 import json
 
@@ -23,7 +23,8 @@ class TaterApp:
         title: str = "Tater",
         theme: str = "light",
         annotations_path: Optional[str] = None,
-        schema_model: Optional[Type[BaseModel]] = None
+        schema_model: Optional[Type[BaseModel]] = None,
+        on_save: Optional[Callable[[str, BaseModel], None]] = None,
     ):
         """
         Initialize the Tater app.
@@ -38,6 +39,7 @@ class TaterApp:
         self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model
+        self.on_save = on_save
         self.app = Dash(__name__, suppress_callback_exceptions=True)
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
@@ -203,24 +205,36 @@ class TaterApp:
         except Exception as e:
             print(f"Error loading annotations: {e}")
 
-    def _save_annotations_to_file(self) -> None:
-        """Save all annotations to the annotations file."""
+    def _save_annotations_to_file(self, doc_id: Optional[str] = None) -> None:
+        """Save all annotations to the annotations file.
+
+        Args:
+            doc_id: The document whose annotation triggered this save.  When
+                provided and an ``on_save`` hook is configured, the hook is
+                called with this document's annotation after writing.
+        """
         try:
             path = Path(self.annotations_path)
             path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Combine annotations and metadata into save format
             save_dict = {}
-            for doc_id, annotation in self.annotations.items():
-                meta: DocumentMetadata = self.metadata.get(doc_id, DocumentMetadata())
-                save_dict[doc_id] = {
+            for d_id, annotation in self.annotations.items():
+                meta: DocumentMetadata = self.metadata.get(d_id, DocumentMetadata())
+                save_dict[d_id] = {
                     "annotations": annotation.model_dump(),
                     "metadata": meta.model_dump(),
                 }
-            
+
             with open(path, 'w') as f:
                 json.dump(save_dict, f, indent=2)
             self._save_error = None
+
+            if self.on_save and doc_id and doc_id in self.annotations:
+                try:
+                    self.on_save(doc_id, self.annotations[doc_id])
+                except Exception as hook_err:
+                    print(f"on_save hook error: {hook_err}")
         except Exception as e:
             self._save_error = str(e)
             print(f"Error saving annotations: {e}")

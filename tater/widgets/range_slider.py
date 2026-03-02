@@ -1,11 +1,13 @@
 """RangeSlider widget for selecting a numeric range."""
 import typing
+from dataclasses import dataclass
 from typing import Optional
 import dash_mantine_components as dmc
 
 from .base import ControlWidget, _unwrap_optional, _resolve_field_info
 
 
+@dataclass(eq=False)
 class RangeSliderWidget(ControlWidget):
     """Widget for selecting a min/max numeric range via a slider.
 
@@ -13,22 +15,14 @@ class RangeSliderWidget(ControlWidget):
     thereof. The value is stored as a two-element list ``[min, max]``.
     """
 
-    def __init__(
-        self,
-        schema_field: str,
-        label: str = "",
-        description: Optional[str] = None,
-        required: bool = False,
-        min_value: float = 0,
-        max_value: float = 100,
-        step: Optional[float] = None,
-        default: Optional[list[float]] = None,
-    ):
-        super().__init__(schema_field=schema_field, label=label, description=description, required=required)
-        self.min_value = min_value
-        self.max_value = max_value
-        self.step = step
-        self.default = default if default is not None else [min_value, max_value]
+    min_value: float = 0
+    max_value: float = 100
+    step: Optional[float] = None
+    default: Optional[list[float]] = None
+
+    def __post_init__(self) -> None:
+        if self.default is None:
+            self.default = [self.min_value, self.max_value]
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)

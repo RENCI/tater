@@ -231,7 +231,7 @@ class SpanAnnotationWidget(TaterWidget):
             new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
             new_spans = list(current_spans) + [new_span]
             value_helpers.set_model_value(annotation, field_path, new_spans)
-            tater_app._save_annotations_to_file()
+            tater_app._save_annotations_to_file(doc_id=doc_id)
 
             return (trigger_count or 0) + 1
 
@@ -257,7 +257,7 @@ class SpanAnnotationWidget(TaterWidget):
             current_spans = value_helpers.get_model_value(annotation, field_path) or []
             new_spans = [s for s in current_spans if not (s.start == del_start and s.end == del_end)]
             value_helpers.set_model_value(annotation, field_path, new_spans)
-            tater_app._save_annotations_to_file()
+            tater_app._save_annotations_to_file(doc_id=doc_id)
 
             return (trigger_count or 0) + 1
 

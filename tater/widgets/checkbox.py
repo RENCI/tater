@@ -1,22 +1,15 @@
 """Checkbox widget for boolean annotations."""
-from typing import Optional
+from dataclasses import dataclass
 import dash_mantine_components as dmc
 
 from .base import BooleanWidget
 
 
+@dataclass(eq=False)
 class CheckboxWidget(BooleanWidget):
     """Widget for boolean yes/no annotations."""
 
-    def __init__(
-        self,
-        schema_field: str,
-        label: str = "",
-        description: Optional[str] = None,
-        default: bool = False,
-    ):
-        super().__init__(schema_field=schema_field, label=label, description=description)
-        self.default = default
+    default: bool = False
 
     def component(self) -> dmc.Stack:
         parts = [dmc.Checkbox(id=self.component_id, label=self.label, checked=self.default)]

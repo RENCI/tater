@@ -1,9 +1,11 @@
 """Select widget for single-choice annotations."""
+from dataclasses import dataclass
 import dash_mantine_components as dmc
 
 from .base import ChoiceWidget
 
 
+@dataclass(eq=False)
 class SelectWidget(ChoiceWidget):
     """Widget for selecting a single option from a dropdown."""
 

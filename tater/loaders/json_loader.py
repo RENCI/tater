@@ -212,7 +212,7 @@ def widgets_from_model(
         A list of ``TaterWidget`` instances ready to pass to
         ``set_annotation_widgets``, in model field order.
     """
-    override_map = {w._local_path: w for w in (overrides or [])}
+    override_map = {w.schema_field: w for w in (overrides or [])}
     result = []
     for name, fi in model.model_fields.items():
         if name in override_map:

@@ -1,25 +1,17 @@
 """Textarea widget for multi-line text annotations."""
+from dataclasses import dataclass
 from typing import Optional
 import dash_mantine_components as dmc
 
 from .base import TextWidget
 
 
+@dataclass(eq=False)
 class TextAreaWidget(TextWidget):
     """Widget for entering multi-line text."""
 
-    def __init__(
-        self,
-        schema_field: str,
-        label: str = "",
-        description: Optional[str] = None,
-        required: bool = False,
-        default: Optional[str] = None,
-        placeholder: Optional[str] = None,
-    ):
-        super().__init__(schema_field=schema_field, label=label, description=description, required=required)
-        self.default = default
-        self.placeholder = placeholder
+    default: Optional[str] = None
+    placeholder: Optional[str] = None
 
     @property
     def empty_value(self) -> str:

@@ -126,6 +126,28 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, new_index, timing_data)
         return doc_id, new_timing
 
+    # Auto-advance: navigate to next doc when an auto_advance widget gets a value.
+    # (allow_duplicate=True required — see note above)
+    @app.callback(
+        Output("current-doc-id", "data", allow_duplicate=True),
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("auto-advance-store", "data"),
+        State("current-doc-id", "data"),
+        State("timing-store", "data"),
+        prevent_initial_call=True,
+    )
+    def navigate_auto_advance(trigger, current_doc_id, timing_data):
+        from dash import no_update
+        if not trigger:
+            return no_update, no_update
+        current_index = next(
+            (i for i, d in enumerate(tater_app.documents) if d.id == current_doc_id), 0
+        )
+        if current_index >= len(tater_app.documents) - 1:
+            return no_update, no_update
+        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, current_index + 1, timing_data)
+        return doc_id, new_timing
+
     # Refresh menu dropdown with status badges after any navigation or status change
     @app.callback(
         Output("document-menu-dropdown", "children"),
@@ -187,14 +209,16 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
         Input("btn-save", "n_clicks"),
+        State("current-doc-id", "data"),
         State("timing-store", "data"),
         prevent_initial_call=True,
     )
-    def on_save_click(n_clicks, timing_data):
+    def on_save_click(n_clicks, current_doc_id, timing_data):
         import time
+        from dash import no_update
         if not n_clicks:
             return no_update
-        tater_app._save_annotations_to_file()
+        tater_app._save_annotations_to_file(doc_id=current_doc_id)
         if timing_data is None:
             timing_data = {}
         timing_data["last_save_time"] = time.time()
@@ -428,19 +452,30 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
         status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
         return widget_id, status
 
-    # Callback for updating widget value when document changes.
-    # allow_duplicate=True is required when the widget also has a _clear_when_hidden
-    # callback writing to the same output (added by _register_conditional_callbacks).
-    doc_value_output = (
-        Output(widget_id, value_prop, allow_duplicate=True)
-        if widget._condition is not None
-        else Output(widget_id, value_prop)
-    )
+    # Auto-advance: when this widget gets a non-empty value, increment the
+    # auto-advance-store to trigger navigation to the next document.
+    if getattr(widget, "auto_advance", False):
+        _empty = widget.empty_value
 
+        @app.callback(
+            Output("auto-advance-store", "data", allow_duplicate=True),
+            Input(widget_id, value_prop),
+            State("auto-advance-store", "data"),
+            prevent_initial_call=True,
+        )
+        def _trigger_auto_advance(value, current_count, _empty=_empty):
+            from dash import no_update
+            if value is None or value == _empty:
+                return no_update
+            return (current_count or 0) + 1
+
+    # Callback for updating widget value when document changes.
+    # Always allow_duplicate=True so that escape-hatch callbacks registered by
+    # app code can also write to widget outputs without a Dash conflict error.
     @app.callback(
-        doc_value_output,
+        Output(widget_id, value_prop, allow_duplicate=True),
         Input("current-doc-id", "data"),
-        prevent_initial_call="initial_duplicate" if widget._condition is not None else False,
+        prevent_initial_call="initial_duplicate",
     )
     def update_widget_value(doc_id):
         if not doc_id or doc_id not in tater_app.annotations:
@@ -560,7 +595,7 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
         update_status_for_doc(tater_app, current_doc_id)
 
     doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""
-    tater_app._save_annotations_to_file()
+    tater_app._save_annotations_to_file(doc_id=current_doc_id)
 
     if timing_data is None:
         timing_data = {}
