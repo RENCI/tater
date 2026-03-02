@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from dash import Input, Output, State, ALL
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 from tater.ui import value_helpers
 
 if TYPE_CHECKING:
@@ -283,7 +284,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         if paused:
             timing_text += " (paused)"
 
-        pause_icon = "▶" if paused else "⏸"
+        pause_icon = DashIconify(icon="tabler:player-play", width=16) if paused else DashIconify(icon="tabler:player-pause", width=16)
         return save_text, save_color, timing_text, pause_icon
 
     @app.callback(
@@ -519,7 +520,7 @@ def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
         status = meta.status if meta else "not_started"
         right_children = []
         if flagged:
-            right_children.append(dmc.Text("⚑", c="red", size="sm"))
+            right_children.append(DashIconify(icon="tabler:flag-filled", color="red", width=14))
         right_children.append(
             dmc.Badge(
                 status_labels.get(status, status),

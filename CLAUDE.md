@@ -108,7 +108,7 @@ re-renders — only the very first page load. Use the value guard above instead.
 ## HierarchicalLabel specifics
 
 - `HierarchicalLabelCompactWidget`: shows only the selected node per navigated level; uses
-  `▾` chevron separators; wraps sections in `dmc.Stack(gap=2)`.
+  `tabler:chevron-right` icon separators between levels; wraps sections in `dmc.Stack(gap=2)`.
 - `HierarchicalLabelFullWidget`: shows all siblings at every expanded level; shows path breadcrumb
   below search bar.
 - `_find_path(root, name)` does a DFS from root returning the full path list to a node.

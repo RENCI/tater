@@ -7,6 +7,7 @@ from typing import Any, Optional, Union
 
 from dash import dcc, Input, Output, State, ALL, no_update, ctx
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 from tater.widgets.base import TaterWidget, _unwrap_optional, _resolve_field_info
 
@@ -458,7 +459,7 @@ def _make_buttons(
                 dmc.Group(
                     [
                         dmc.Text(str(len(node.children)), size="xs", lh=1),
-                        dmc.Text("▾", size="lg", lh=1),
+                        DashIconify(icon="tabler:chevron-down", width=12),
                     ],
                     gap=0,
                 ),
@@ -524,7 +525,7 @@ def _build_sections_compact(
 
     def _add(buttons: list) -> None:
         if sections:
-            sections.append(dmc.Text("▾", size="xl", c="dimmed", lh=0.5, pl="sm"))
+            sections.append(dmc.Box(DashIconify(icon="tabler:chevron-down", width=16, color="gray"), pl="xs", style={"lineHeight": 0, "display": "block"}))
         sections.append(dmc.Group(buttons, gap="xs", wrap="wrap"))
 
     for depth, name in enumerate(path):

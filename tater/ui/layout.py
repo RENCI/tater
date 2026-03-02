@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from dash import html, dcc
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -167,7 +168,8 @@ def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
     """Build the navigation button row with document filter."""
     button_row = dmc.Flex([
         dmc.Box(
-            dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", fullWidth=True),
+            dmc.Button("Previous", id="btn-prev", variant="outline", fullWidth=True,
+                       leftSection=DashIconify(icon="tabler:arrow-left", width=16)),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
@@ -179,17 +181,19 @@ def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
                             id="document-selector-button",
                             variant="outline",
                             fullWidth=True,
+                            rightSection=DashIconify(icon="tabler:chevron-down", width=16),
                         ),
                         boxWrapperProps={"className": "menu-target-wrapper"},
                     ),
                     dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
-                ], position="bottom-start", withArrow=True, withinPortal=True, width="target"),
+                ], position="bottom-start", withArrow=True, withinPortal=True, width="target", zIndex=600),
                 dmc.Checkbox(id="filter-flagged", label="Show flagged only", size="xs", checked=False),
             ], gap="xs"),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
-            dmc.Button("Next \u2192", id="btn-next", variant="outline", fullWidth=True),
+            dmc.Button("Next", id="btn-next", variant="outline", fullWidth=True,
+                       rightSection=DashIconify(icon="tabler:arrow-right", width=16)),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
     ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
@@ -204,7 +208,7 @@ def _build_footer_bar() -> dmc.Box:
                 dmc.Box(
                     dmc.Group([                        
                         dmc.ActionIcon(
-                            "⏸",
+                            DashIconify(icon="tabler:player-pause", width=16),
                             id="btn-pause-timer",
                             size="sm",
                             variant="outline",

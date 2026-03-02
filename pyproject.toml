@@ -5,6 +5,7 @@ description = "Clinical Note Annotation Application"
 requires-python = ">=3.10"
 dependencies = [
     "dash>=2.14.0",
+    "dash-iconify>=0.1.2",
     "dash-mantine-components>=0.12.0",
     "pandas>=2.0.0",
     "pydantic>=2.0.0",
