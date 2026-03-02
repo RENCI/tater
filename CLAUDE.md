@@ -100,6 +100,10 @@ re-renders — only the very first page load. Use the value guard above instead.
   type doesn't match what the widget expects.
 - `register_callbacks(app)` captures `self` fields into the closure — don't rely on `self` inside
   callback functions (capture to local variables before the `@app.callback` decorator).
+- `required=True` is **UI-only**: it shows a `*` indicator and drives the `in_progress` /
+  `complete` status badge, but does not prevent saving an empty value. This is intentional —
+  annotation tools need to support partial saves so annotators can leave fields blank and
+  return later. Pydantic-level enforcement would break loading incomplete annotation files.
 
 ## HierarchicalLabel specifics
 
