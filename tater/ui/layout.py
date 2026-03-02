@@ -164,25 +164,28 @@ def _build_document_controls() -> dmc.Stack:
 
 
 def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
-    """Build the navigation button row."""
-    return dmc.Flex([
+    """Build the navigation button row with document filter."""
+    button_row = dmc.Flex([
         dmc.Box(
             dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", fullWidth=True),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
-            dmc.Menu([
-                dmc.MenuTarget(
-                    dmc.Button(
-                        "Select document",
-                        id="document-selector-button",
-                        variant="outline",
-                        fullWidth=True,
+            dmc.Stack([
+                dmc.Menu([
+                    dmc.MenuTarget(
+                        dmc.Button(
+                            "Select document",
+                            id="document-selector-button",
+                            variant="outline",
+                            fullWidth=True,
+                        ),
+                        boxWrapperProps={"className": "menu-target-wrapper"},
                     ),
-                    boxWrapperProps={"className": "menu-target-wrapper"},
-                ),
-                dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
-            ], position="bottom-start", withArrow=True, withinPortal=True, width="target"),
+                    dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
+                ], position="bottom-start", withArrow=True, withinPortal=True, width="target"),
+                dmc.Checkbox(id="filter-flagged", label="Show flagged only", size="xs", checked=False),
+            ], gap="xs"),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
@@ -190,6 +193,7 @@ def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
             style={"flex": "1 1 0", "minWidth": 0},
         ),
     ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
+    return button_row
 
 
 def _build_footer_bar() -> dmc.Box:
@@ -198,17 +202,17 @@ def _build_footer_bar() -> dmc.Box:
         dmc.Group(
             [
                 dmc.Box(
-                    dmc.Group([
-                        dmc.Text(
-                            id="timing-text",
-                            size="sm",
-                            c="dimmed",
-                        ),
+                    dmc.Group([                        
                         dmc.ActionIcon(
                             "⏸",
                             id="btn-pause-timer",
                             size="sm",
-                            variant="subtle",
+                            variant="outline",
+                        ),
+                        dmc.Text(
+                            id="timing-text",
+                            size="sm",
+                            c="dimmed",
                         ),
                     ], gap="xs"),
                     style={"flex": "1"},

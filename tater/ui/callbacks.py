@@ -130,30 +130,31 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("document-menu-dropdown", "children"),
         Input("timing-store", "data"),
         Input("status-store", "data"),
+        Input("filter-flagged", "checked"),
     )
-    def update_menu_items(timing_data, status_data):
-        return _build_menu_items(tater_app)
+    def update_menu_items(timing_data, status_data, flagged_only):
+        return _build_menu_items(tater_app, flagged_only=bool(flagged_only))
 
     # Handle flag-document changes
+    # Outputs to timing-store so update_menu_items re-runs after metadata is updated.
     @app.callback(
-        Output("flag-document", "id"),  # Dummy output
+        Output("timing-store", "data", allow_duplicate=True),
         Input("flag-document", "checked"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
-        prevent_initial_call=True
+        prevent_initial_call=True,
     )
     def save_flag(checked, doc_id, timing_data):
         import time
         if not doc_id:
-            return "flag-document"
-        
+            return no_update
+
         tater_app.metadata[doc_id].flagged = checked
-        
-        # Update save time
+
         if timing_data is None:
             timing_data = {}
         timing_data["last_save_time"] = time.time()
-        return "flag-document"
+        return timing_data
 
     # Handle document-notes changes
     @app.callback(
@@ -505,25 +506,34 @@ def _has_value(value) -> bool:
     return True
 
 
-def _build_menu_items(tater_app: TaterApp) -> list:
-    """Build document menu items with status badges."""
+def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
+    """Build document menu items with status badges and flag indicators."""
     status_labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
     status_colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
     items = []
     for i, doc in enumerate(tater_app.documents):
         meta = tater_app.metadata.get(doc.id)
+        flagged = meta.flagged if meta else False
+        if flagged_only and not flagged:
+            continue
         status = meta.status if meta else "not_started"
+        right_children = []
+        if flagged:
+            right_children.append(dmc.Text("⚑", c="red", size="sm"))
+        right_children.append(
+            dmc.Badge(
+                status_labels.get(status, status),
+                color=status_colors.get(status, "gray"),
+                variant="light",
+                size="xs",
+            )
+        )
         items.append(
             dmc.MenuItem(
                 dmc.Group(
                     [
                         dmc.Text(f"{i + 1}. {doc.file_path.split('/')[-1]}", size="sm"),
-                        dmc.Badge(
-                            status_labels.get(status, status),
-                            color=status_colors.get(status, "gray"),
-                            variant="light",
-                            size="xs",
-                        ),
+                        dmc.Group(right_children, gap="xs"),
                     ],
                     gap="xs",
                     wrap="nowrap",
@@ -532,6 +542,8 @@ def _build_menu_items(tater_app: TaterApp) -> list:
                 id={"type": "document-menu-item", "index": i},
             )
         )
+    if not items:
+        items.append(dmc.Text("No flagged documents", size="sm", c="dimmed", p="xs"))
     return items
 
 
