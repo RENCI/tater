@@ -181,6 +181,23 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     """Setup callbacks for save time and document timing display."""
     app = tater_app.app
 
+    # Manual save button
+    @app.callback(
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("btn-save", "n_clicks"),
+        State("timing-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_save_click(n_clicks, timing_data):
+        import time
+        if not n_clicks:
+            return no_update
+        tater_app._save_annotations_to_file()
+        if timing_data is None:
+            timing_data = {}
+        timing_data["last_save_time"] = time.time()
+        return timing_data
+
     # Handle document changes to initialize timing
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),

@@ -14,8 +14,10 @@ if TYPE_CHECKING:
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
     from tater.widgets.span import SpanAnnotationWidget
+    from tater.ui.callbacks import _collect_value_capture_widgets
 
     annotation_components = _build_annotation_components(tater_app.widgets)
+    has_required = any(w.required for w in _collect_value_capture_widgets(tater_app.widgets))
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls(tater_app)
@@ -45,7 +47,13 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         ], span={"base": 12, "md": 7}),
         dmc.GridCol([
             dmc.Paper(
-                dmc.Stack(annotation_components, gap="md"),
+                dmc.Stack(
+                    annotation_components + [
+                        dmc.Divider(),
+                        dmc.Button("Save", id="btn-save", variant="outline", fullWidth=True),
+                    ] + ([dmc.Text("* Required", size="xs", c="red")] if has_required else []),
+                    gap="md",
+                ),
                 p="md",
                 withBorder=True,
                 shadow="sm"
@@ -104,19 +112,11 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
 def _build_annotation_components(widgets: list[TaterWidget]) -> list:
     """Create annotation fields from widgets with dividers between them."""
-    from tater.ui.callbacks import _collect_value_capture_widgets
     annotation_components = []
-    has_required = any(w.required for w in _collect_value_capture_widgets(widgets))
-
     for i, widget in enumerate(widgets):
         annotation_components.append(widget.render_field())
         if i < len(widgets) - 1:
             annotation_components.append(dmc.Divider())
-
-    if has_required:
-        annotation_components.append(dmc.Divider())
-        annotation_components.append(dmc.Text("* Required", size="xs", c="red"))
-
     return annotation_components
 
 
