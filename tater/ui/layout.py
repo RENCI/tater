@@ -14,10 +14,8 @@ if TYPE_CHECKING:
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
     from tater.widgets.span import SpanAnnotationWidget
-    from tater.ui.callbacks import _collect_value_capture_widgets
-
     annotation_components = _build_annotation_components(tater_app.widgets)
-    has_required = any(w.required for w in _collect_value_capture_widgets(tater_app.widgets))
+    has_required = any(w.required for w in tater_app._collect_value_capture_widgets(tater_app.widgets))
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls(tater_app)
