@@ -49,7 +49,8 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 dmc.Stack(
                     annotation_components + [
                         dmc.Divider(),
-                        dmc.Button("Save", id="btn-save", variant="outline", fullWidth=True),
+                        dmc.Button("Save", id="btn-save", variant="outline", fullWidth=True,
+                                   leftSection=DashIconify(icon="tabler:device-floppy", width=16)),
                     ] + ([dmc.Text("* Required", size="xs", c="red")] if has_required else []),
                     gap="md",
                 ),

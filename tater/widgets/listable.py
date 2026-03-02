@@ -8,6 +8,7 @@ from typing import Optional, Any
 from dash import dcc, html, Input, Output, State, ctx, ALL
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 import typing
 from .base import ContainerWidget, TaterWidget, _resolve_field_info, _unwrap_optional
@@ -118,12 +119,12 @@ class ListableWidget(ContainerWidget):
                 dmc.Card([
                     dmc.Group([
                         dmc.Text(f"Item {index + 1}", fw=500, size="sm"),
-                        dmc.Button(
-                            self.delete_label,
+                        dmc.ActionIcon(
+                            DashIconify(icon="tabler:x", width=14),
                             id={"type": self._delete_type(), "index": index},
-                            variant="outline",
-                            color="red",
-                            size="xs",
+                            variant="subtle",
+                            color="gray",
+                            size="sm",
                         ),
                     ], justify="space-between"),
                     dmc.Stack(self._render_item_widgets(index, tater_app, doc_id), gap="sm"),
@@ -137,7 +138,8 @@ class ListableWidget(ContainerWidget):
         return dmc.Stack([
             dmc.Group([
                 dmc.Text(self.label, fw=500, size="sm"),
-                dmc.Button(self.add_label, id=self._add_id(), variant="outline", size="xs"),
+                dmc.Button(self.add_label, id=self._add_id(), variant="outline", size="xs",
+                           leftSection=DashIconify(icon="tabler:plus", width=14)),
             ], justify="space-between"),
             dmc.Text(self.description or "", size="xs", c="dimmed") if self.description else None,
             dmc.Stack(self._render_items(store_data["indices"], None, None), id=self._items_id(), gap="md"),
