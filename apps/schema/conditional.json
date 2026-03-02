@@ -1,0 +1,37 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "is_indoor",
+      "type": "boolean"
+    },
+    {
+      "id": "indoor_location",
+      "type": "free_text",
+      "conditional_on": {"field": "is_indoor", "value": true}
+    },
+    {
+      "id": "has_health_issue",
+      "type": "boolean"
+    },
+    {
+      "id": "health_description",
+      "type": "free_text",
+      "conditional_on": {"field": "has_health_issue", "value": true}
+    },
+    {
+      "id": "is_stray",
+      "type": "boolean"
+    },
+    {
+      "id": "rescue_org",
+      "type": "free_text",
+      "conditional_on": {"field": "is_stray", "value": true}
+    },
+    {
+      "id": "rescue_notes",
+      "type": "free_text",
+      "conditional_on": {"field": "is_stray", "value": true}
+    }
+  ]
+}

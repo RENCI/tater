@@ -149,6 +149,7 @@ class TaterApp:
         # Register any widget-specific callbacks
         for widget in self.widgets:
             widget.register_callbacks(self.app)
+            widget._register_conditional_callbacks(self.app)
         
         self._setup_layout()
         self._setup_callbacks()

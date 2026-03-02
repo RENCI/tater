@@ -1,0 +1,51 @@
+{
+  "spec_version": "1.0",
+  "data_schema": [
+    {
+      "id": "is_indoor",
+      "type": "boolean",
+      "label": "Indoor?",
+      "description": "Is this an indoor setting?",
+      "widget": {"type": "switch"}
+    },
+    {
+      "id": "indoor_location",
+      "type": "free_text",
+      "label": "Indoor Location",
+      "widget": {"type": "text_input", "placeholder": "e.g. living room, kitchen"},
+      "conditional_on": {"field": "is_indoor", "value": true}
+    },
+    {
+      "id": "has_health_issue",
+      "type": "boolean",
+      "label": "Has health issue?"
+    },
+    {
+      "id": "health_description",
+      "type": "free_text",
+      "label": "Health Description",
+      "widget": {"type": "textarea", "placeholder": "Describe the health issue..."},
+      "conditional_on": {"field": "has_health_issue", "value": true}
+    },
+    {
+      "id": "is_stray",
+      "type": "boolean",
+      "label": "Is stray?",
+      "widget": {"type": "switch"}
+    },
+    {
+      "id": "rescue_org",
+      "type": "free_text",
+      "label": "Rescue Organisation",
+      "widget": {"type": "text_input", "placeholder": "Organisation name"},
+      "conditional_on": {"field": "is_stray", "value": true}
+    },
+    {
+      "id": "rescue_notes",
+      "type": "free_text",
+      "label": "Rescue Notes",
+      "widget": {"type": "textarea", "placeholder": "Additional notes about rescue..."},
+      "conditional_on": {"field": "is_stray", "value": true}
+    }
+  ]
+}

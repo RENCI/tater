@@ -58,6 +58,21 @@ class TaterWidget(ABC):
         self._full_path: Optional[str] = None
         self.label = label
         self.description = description
+        self._condition: Optional[tuple[str, bool]] = None
+
+    def conditional_on(self, field: str, value: bool) -> "TaterWidget":
+        """Set conditional visibility. Returns self for chaining.
+
+        Args:
+            field: The schema_field of the controlling boolean widget.
+            value: Show this widget when the controlling field equals this value.
+
+        Example::
+
+            TextInputWidget("indoor_location", label="Location").conditional_on("is_indoor", True)
+        """
+        self._condition = (field, value)
+        return self
 
     @property
     def field_path(self) -> str:
@@ -79,10 +94,21 @@ class TaterWidget(ABC):
     def component_id(self) -> str:
         return f"annotation-{self.field_path.replace('.', '-')}"
 
+    @property
+    def conditional_wrapper_id(self) -> str:
+        return f"visibility-wrapper-{self.field_path.replace('.', '-')}"
+
     def component_id_dict(self, pattern_type: str = "widget") -> dict:
         return {"type": pattern_type, "field": self.field_path}
 
     def render_field(self, mt: str = "md") -> Any:
+        content = self._build_field_content(mt)
+        if self._condition is not None:
+            from dash import html
+            return html.Div(content, id=self.conditional_wrapper_id)
+        return content
+
+    def _build_field_content(self, mt: str = "md") -> Any:
         required = getattr(self, "required", False)
         if self.renders_own_label:
             if required:
@@ -106,6 +132,44 @@ class TaterWidget(ABC):
                 items.append(dmc.Text(self.description, size="xs", c="dimmed"))
             items.append(self.component())
             return dmc.Stack(items, gap="xs", mt=mt)
+
+    def _register_conditional_callbacks(self, app: Any) -> None:
+        """Register clientside + server callbacks for conditional visibility.
+
+        The clientside callback immediately toggles display style (no round-trip).
+        The server callback clears the widget value when it becomes hidden, so
+        stale values are not saved. Only supported for boolean controlling fields.
+        """
+        if self._condition is None:
+            return
+        from dash import Output, Input, no_update
+
+        controlling_field, target_value = self._condition
+        controlling_id = f"annotation-{controlling_field.replace('.', '-')}"
+        target_js = "true" if target_value else "false"
+
+        # Clientside: toggle display instantly without a server round-trip.
+        app.clientside_callback(
+            f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
+            Output(self.conditional_wrapper_id, "style"),
+            Input(controlling_id, "checked"),
+            prevent_initial_call=False,
+        )
+
+        # Server: clear value when widget is hidden so stale data is not saved.
+        _empty = self.empty_value
+        _value_prop = self.value_prop
+        _target = target_value
+
+        @app.callback(
+            Output(self.component_id, _value_prop, allow_duplicate=True),
+            Input(controlling_id, "checked"),
+            prevent_initial_call=True,
+        )
+        def _clear_when_hidden(v):
+            if v != _target:
+                return _empty
+            return no_update
 
     @property
     @abstractmethod

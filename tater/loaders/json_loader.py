@@ -344,10 +344,14 @@ def _process_field(
     else:
         raise ValueError(f"Unknown field type {ftype!r} for field {local_id!r}")
 
-    return field_def, _build_widget(
+    widget = _build_widget(
         local_id, ftype, required, label, description, widget_type, widget_spec, spec,
         hierarchy_map,
     )
+    condition = spec.get("conditional_on")
+    if condition is not None:
+        widget.conditional_on(condition["field"], bool(condition["value"]))
+    return field_def, widget
 
 
 def _build_widget(

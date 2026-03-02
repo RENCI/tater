@@ -392,10 +392,19 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
         status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
         return widget_id, status
 
-    # Callback for updating widget value when document changes
+    # Callback for updating widget value when document changes.
+    # allow_duplicate=True is required when the widget also has a _clear_when_hidden
+    # callback writing to the same output (added by _register_conditional_callbacks).
+    doc_value_output = (
+        Output(widget_id, value_prop, allow_duplicate=True)
+        if widget._condition is not None
+        else Output(widget_id, value_prop)
+    )
+
     @app.callback(
-        Output(widget_id, value_prop),
+        doc_value_output,
         Input("current-doc-id", "data"),
+        prevent_initial_call="initial_duplicate" if widget._condition is not None else False,
     )
     def update_widget_value(doc_id):
         if not doc_id or doc_id not in tater_app.annotations:
