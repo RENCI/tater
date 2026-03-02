@@ -71,8 +71,21 @@ if not ctx.triggered or not ctx.triggered[0].get("value"):
 
 **`allow_duplicate` must be consistent**: if *any* callback uses
 `Output(component_id, prop, allow_duplicate=True)`, then *all* callbacks writing to that same
-output must also use `allow_duplicate=True`. Missing it on one will cause Dash to fire that
-callback unexpectedly.
+output must also use `allow_duplicate=True`. Missing it on one will cause Dash to raise a
+`DuplicateCallback` error at startup. Two specific outputs in this codebase are affected:
+
+- **`current-doc-id` / `data`** — written by the prev/next buttons and the document-menu
+  selector. All three already use `allow_duplicate=True`; any new navigation callback must too.
+  See the comment block on the first such callback in `callbacks.py`.
+
+- **Widget value props** (e.g. `annotation-<field>` / `value` or `checked`) — when a widget
+  has `_condition` set, two callbacks both write to its value prop: `update_widget_value`
+  (in `_register_widget_value_capture`, triggered by doc load) and `_clear_when_hidden` (in
+  `TaterWidget._register_conditional_callbacks`, triggered by the controlling field). Both
+  use `allow_duplicate=True`; `prevent_initial_call='initial_duplicate'` is also required on
+  the doc-load callback because `allow_duplicate=True` normally forbids initial calls.
+  This is enforced automatically in `_register_widget_value_capture` when `widget._condition
+  is not None` — don't remove that branch.
 
 **`prevent_initial_call=True` does not suppress pattern-matching fires** caused by component
 re-renders — only the very first page load. Use the value guard above instead.
