@@ -161,6 +161,8 @@ class SpanAnnotationWidget(TaterWidget):
         delete_proxy_id = f"span-delete-proxy-{component_id}"
 
         # ---- 1. Clientside: capture text selection when an entity button is clicked ----
+        # captureSelection and captureDelete are defined in tater/ui/assets/span_annotations.js,
+        # which Dash serves automatically from the assets/ directory.
         app.clientside_callback(
             "window.dash_clientside.tater.captureSelection",
             Output(selection_store_id, "data"),
