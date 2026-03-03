@@ -12,27 +12,34 @@ Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v0.14 / Mantine v
 
 ```
 tater/                  # Library package
-  __init__.py           # Public API: TaterApp, parse_args, SpanAnnotation
+  __init__.py           # Public API: TaterApp, parse_args, SpanAnnotation,
+                        #   SpanAnnotationWidget, EntityType, load_schema,
+                        #   parse_schema, widgets_from_model
   models/               # Pydantic data models (Document, SpanAnnotation)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
   widgets/              # All widget classes
-    base.py             # TaterWidget, ControlWidget, ContainerWidget base classes
+    base.py             # Widget base class hierarchy (see Widget conventions)
     hierarchical_label.py  # HierarchicalLabel* widgets + Node tree utilities
     ...
-apps/                   # Runnable example apps (not part of the library)
+apps/
+  config/               # Python config-file examples (simple, hooks, nested, …)
+  schema/               # JSON schema-file examples + schemas
 data/                   # Sample documents and ontologies for examples
 spec/                   # Design documents (see below)
 ```
 
 ## Running examples
 
+Apps are run via the `tater` CLI, which requires either `--config` (Python) or `--schema` (JSON):
+
 ```bash
-python apps/app_simple.py --documents data/documents.json
-python apps/app_multiple.py --documents data/documents.json
-python apps/app_hierarchical.py --documents data/documents.json
+tater --config apps/config/simple.py --documents data/documents.json
+tater --config apps/config/hooks.py  --documents data/documents.json
+tater --schema apps/schema/simple.json --documents data/documents.json
 ```
 
-All examples accept the same CLI flags (`--port`, `--debug`, `--annotations`, etc.)
+CLI flags: `--documents` (required), `--config` or `--schema` (one required),
+`--annotations`, `--port`, `--host`, `--debug` (also via `TATER_DEBUG` / `TATER_PORT` / `TATER_HOST` env vars).
 
 ## Architecture
 
@@ -92,7 +99,16 @@ re-renders — only the very first page load. Use the value guard above instead.
 
 ## Widget conventions
 
-- All widgets inherit from `TaterWidget` (or `ControlWidget` / `ContainerWidget`).
+Widget base class hierarchy in `base.py`:
+- `TaterWidget` — abstract root; all widgets inherit from this
+- `ControlWidget(TaterWidget)` — leaf widgets that capture a value; adds `required`, `auto_advance`, `value_prop`, `empty_value`
+  - `ChoiceWidget` — single `Literal[...]` field; derives `options` from schema
+  - `MultiChoiceWidget` — `List[Literal[...]]` field; derives `options` from schema
+  - `BooleanWidget` — `bool` field; `value_prop = "checked"`
+  - `NumericWidget` — numeric field
+  - `TextWidget` — string field
+- `ContainerWidget(TaterWidget)` — widgets that contain other widgets (GroupWidget, ListableWidget)
+
 - Constructor signature: `(schema_field, label="", description=None, ...)`.
 - `renders_own_label` property: if `True`, the widget renders its own label (skips the outer
   wrapper label in layout). Most widgets return `False`; GroupWidget/ListableWidget return `True`.
@@ -100,6 +116,11 @@ re-renders — only the very first page load. Use the value guard above instead.
   type doesn't match what the widget expects.
 - `register_callbacks(app)` captures `self` fields into the closure — don't rely on `self` inside
   callback functions (capture to local variables before the `@app.callback` decorator).
+- **Escape-hatch callbacks**: for cross-field rules that can't be expressed as widget declarations,
+  assign widgets to named variables and use `widget.component_id` in `Output`/`Input` — avoids
+  hard-coding ID strings. See `apps/config/hooks.py` for the pattern. The `configure(app)` function
+  in a config module is the right place for these; it is called after `set_annotation_widgets` so
+  all component IDs are finalised.
 - `required=True` is **UI-only**: it shows a `*` indicator and drives the `in_progress` /
   `complete` status badge, but does not prevent saving an empty value. This is intentional —
   annotation tools need to support partial saves so annotators can leave fields blank and
