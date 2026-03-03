@@ -15,6 +15,7 @@ ENV/
 # Annotations output
 annotations/
 data/*_annotations.json
+data/*.jsonl
 *.json.tmp
 *.json.backup.*
 

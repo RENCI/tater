@@ -37,11 +37,10 @@ def main() -> None:
     # ------------------------------------------------------------------
     # on_save hook: append one JSON line per save to an audit log.
     # ------------------------------------------------------------------
-    audit_path = (
-        Path(args.annotations).parent / "audit.jsonl"
-        if args.annotations
-        else Path("audit.jsonl")
+    data_dir = (
+        Path(args.annotations).parent if args.annotations else Path(args.documents).parent
     )
+    audit_path = data_dir / "audit.jsonl"
 
     def log_save(doc_id: str, annotation: SimpleAnnotation) -> None:
         with open(audit_path, "a") as f:
