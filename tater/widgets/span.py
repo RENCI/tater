@@ -115,6 +115,14 @@ class SpanAnnotationWidget(TaterWidget):
 
     def component(self) -> Any:
         """Render the entity-type button row shown in the annotation panel."""
+        from dash import html
+        return html.Div(
+            id=f"span-entity-buttons-{self.component_id}",
+            children=self._make_buttons({}),
+        )
+
+    def _make_buttons(self, counts: dict) -> Any:
+        """Build the entity-type button group with per-entity span counts."""
         buttons = [
             dmc.Button(
                 et.name,
@@ -124,6 +132,12 @@ class SpanAnnotationWidget(TaterWidget):
                 fw=600,
                 style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
                        "color": "var(--mantine-color-gray-9)"},
+                rightSection=dmc.Badge(
+                    str(counts.get(et.name, 0)),
+                    size="sm",
+                    variant="filled",
+                    style={"backgroundColor": _lighten_hex(et.color, 0.7), "color": "var(--mantine-color-gray-9)", "lineHeight": "1"},
+                ),
             )
             for et in self.entity_types
         ]
@@ -156,9 +170,28 @@ class SpanAnnotationWidget(TaterWidget):
         component_id = self.component_id
         selection_store_id = f"span-selection-{component_id}"
         trigger_store_id = f"span-trigger-{component_id}"
+        buttons_container_id = f"span-entity-buttons-{component_id}"
 
         delete_store_id = f"span-delete-{component_id}"
         delete_proxy_id = f"span-delete-proxy-{component_id}"
+        _make_buttons = self._make_buttons
+
+        # ---- 0. Update per-entity span counts on the buttons ----
+        @app.callback(
+            Output(buttons_container_id, "children"),
+            Input(trigger_store_id, "data"),
+            Input("current-doc-id", "data"),
+        )
+        def update_entity_counts(trigger, doc_id):
+            counts = {}
+            if doc_id:
+                tater_app = app._tater_app
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation:
+                    spans = value_helpers.get_model_value(annotation, field_path) or []
+                    for span in spans:
+                        counts[span.tag] = counts.get(span.tag, 0) + 1
+            return _make_buttons(counts)
 
         # ---- 1. Clientside: capture text selection when an entity button is clicked ----
         # captureSelection and captureDelete are defined in tater/ui/assets/span_annotations.js,
