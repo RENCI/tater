@@ -1,5 +1,5 @@
 """Main TaterApp application class."""
-from typing import Optional, Type, Any, Callable
+from typing import Optional, Type, Any
 from pathlib import Path
 import json
 
@@ -13,6 +13,7 @@ from tater.models import Document
 from tater.widgets.base import TaterWidget
 from tater.ui import callbacks
 from tater.ui import value_helpers
+from tater.ui.hooks import OnSaveHook
 
 
 class TaterApp:
@@ -24,7 +25,7 @@ class TaterApp:
         theme: str = "light",
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
-        on_save: Optional[Callable[[str, BaseModel], None]] = None,
+        on_save: Optional[OnSaveHook] = None,
     ):
         """
         Initialize the Tater app.

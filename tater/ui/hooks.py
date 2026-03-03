@@ -33,8 +33,6 @@ Add a new type alias below, add the corresponding parameter to
 ``callbacks.py`` or ``tater_app.py``.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
@@ -46,4 +44,4 @@ if TYPE_CHECKING:
 
 #: Called after annotations are written to disk for a specific document.
 #: ``(doc_id: str, annotation: BaseModel) -> None``
-OnSaveHook = Callable[["str", "BaseModel"], None]
+OnSaveHook = Callable[[str, "BaseModel"], None]
