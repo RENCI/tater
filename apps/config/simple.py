@@ -11,7 +11,6 @@ class Schema(BaseModel):
 
 
 title = "tater - simple"
-description = "Sentiment and relevance annotation using segmented control and checkbox."
 
 widgets = [
     SegmentedControlWidget(

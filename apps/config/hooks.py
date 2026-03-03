@@ -53,7 +53,7 @@ def configure(app) -> None:
         else Path("audit.jsonl")
     )
 
-    def _log_save(doc_id: str, annotation: SimpleAnnotation) -> None:
+    def _log_save(doc_id: str, annotation: Schema) -> None:
         with open(audit_path, "a") as f:
             f.write(json.dumps({"doc": doc_id, **annotation.model_dump()}) + "\n")
 
