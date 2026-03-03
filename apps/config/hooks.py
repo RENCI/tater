@@ -30,19 +30,19 @@ class Schema(BaseModel):
 title = "tater - hooks"
 description = "Demonstrates the on_save hook and escape-hatch Dash callback pattern."
 
-widgets = [
-    SegmentedControlWidget(
-        schema_field="sentiment",
-        label="Sentiment",
-        description="Overall sentiment of the document",
-        required=True,
-    ),
-    CheckboxWidget(
-        schema_field="is_relevant",
-        label="Relevant?",
-        description="Is this document relevant?",
-    ),
-]
+sentiment = SegmentedControlWidget(
+    schema_field="sentiment",
+    label="Sentiment",
+    description="Overall sentiment of the document",
+    required=True,
+)
+is_relevant = CheckboxWidget(
+    schema_field="is_relevant",
+    label="Relevant?",
+    description="Is this document relevant?",
+)
+
+widgets = [sentiment, is_relevant]
 
 
 def configure(app) -> None:
@@ -63,8 +63,8 @@ def configure(app) -> None:
     from dash import Input, Output, no_update
 
     @app.app.callback(
-        Output("annotation-sentiment", "value", allow_duplicate=True),
-        Input("annotation-is_relevant", "checked"),
+        Output(sentiment.component_id, "value", allow_duplicate=True),
+        Input(is_relevant.component_id, "checked"),
         prevent_initial_call=True,
     )
     def clear_sentiment_when_irrelevant(is_relevant):
