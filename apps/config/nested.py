@@ -19,6 +19,7 @@ class Schema(BaseModel):
 
 
 title = "tater - nested"
+description = "Single level of nesting via GroupWidget for owner information."
 
 widgets = [
     SegmentedControlWidget(

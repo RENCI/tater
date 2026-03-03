@@ -12,6 +12,7 @@ class Schema(BaseModel):
 
 
 title = "tater - span annotation"
+description = "Tag named entities in clinical text using the span annotation widget."
 
 widgets = [
     SpanAnnotationWidget(

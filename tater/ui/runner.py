@@ -4,13 +4,13 @@ import sys
 from tater.ui.cli import parse_args
 from tater.ui.tater_app import TaterApp
 
-
 def main() -> None:
     args = parse_args()
 
     schema_model = None
     widgets = None
-    title = "Tater"
+    title = None
+    description = None
     theme = "light"
     on_save = None
     configure = None
@@ -22,13 +22,18 @@ def main() -> None:
         schema_model = config["schema_model"]
         widgets = config["widgets"]
         title = config["title"]
+        description = config["description"]
         theme = config["theme"]
         on_save = config["on_save"]
         configure = config["configure"]
     elif args.schema:
-        from tater.loaders import load_schema
+        from tater.loaders import load_schema_full
 
-        schema_model, widgets = load_schema(args.schema)
+        config = load_schema_full(args.schema)
+        schema_model = config["schema_model"]
+        widgets = config["widgets"]
+        title = config["title"]
+        description = config["description"]
     else:
         print("error: one of --config or --schema is required", file=sys.stderr)
         sys.exit(1)
@@ -48,6 +53,7 @@ def main() -> None:
 
     app = TaterApp(
         title=title,
+        description=description,
         theme=theme,
         annotations_path=args.annotations,
         schema_model=schema_model,

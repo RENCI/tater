@@ -12,6 +12,7 @@ class Schema(BaseModel):
 
 
 title = "tater - hierarchical"
+description = "Ontology-driven annotation using compact and full hierarchical label widgets."
 
 ontology = load_hierarchy_from_yaml("data/breast_fdx_ontology.yaml")
 

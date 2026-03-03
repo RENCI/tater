@@ -25,6 +25,7 @@ class Schema(BaseModel):
 
 
 title = "tater - multiple"
+description = "Showcases all available widget types in a single annotation schema."
 
 widgets = [
     RadioGroupWidget(

@@ -1,5 +1,7 @@
 {
   "spec_version": "1.0",
+  "title": "tater - hierarchical",
+  "description": "Breast pathology ontology annotation without widget hints.",
   "hierarchies": {
     "ontology": "../../data/breast_fdx_ontology.yaml"
   },

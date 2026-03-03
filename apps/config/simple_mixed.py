@@ -16,6 +16,7 @@ class Schema(BaseModel):
 
 
 title = "tater - simple (mixed)"
+description = "Explicitly specifies one widget; the remaining fields are auto-generated."
 
 widgets = [
     RadioGroupWidget(

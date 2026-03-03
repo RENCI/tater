@@ -444,6 +444,31 @@ def _build_widget(
     raise ValueError(f"Unknown field type {ftype!r}")
 
 
+def load_schema_full(path: str | Path) -> dict:
+    """Load a schema JSON file and return a config dict for the runner.
+
+    In addition to ``model_class`` and ``widgets``, extracts the optional
+    top-level ``title`` and ``description`` fields from the schema file.
+
+    Args:
+        path: Path to a tater JSON schema file.
+
+    Returns:
+        A dict with keys ``schema_model``, ``widgets``, ``title``,
+        ``description``.
+    """
+    path = Path(path)
+    with open(path) as f:
+        data = json.load(f)
+    schema_model, widgets = parse_schema(data, base_dir=path.parent)
+    return {
+        "schema_model": schema_model,
+        "widgets": widgets,
+        "title": data.get("title"),
+        "description": data.get("description"),
+    }
+
+
 def load_schema(path: str | Path) -> tuple[type[BaseModel], list[TaterWidget]]:
     """Load a schema JSON file and return ``(model_class, widgets)``.
 

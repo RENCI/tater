@@ -28,6 +28,7 @@ class Schema(BaseModel):
 
 
 title = "tater - hooks"
+description = "Demonstrates the on_save hook and escape-hatch Dash callback pattern."
 
 widgets = [
     SegmentedControlWidget(

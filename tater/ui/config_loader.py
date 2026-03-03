@@ -24,7 +24,11 @@ def load_config_module(path: str) -> dict[str, Any]:
         omitted entirely, all widgets are auto-generated.
 
     ``title``
-        App window title string (optional, defaults to "Tater").
+        App window title string (optional, defaults to
+        ``"tater - document annotation"``).
+
+    ``description``
+        Optional subtitle shown below the title (optional).
 
     ``theme``
         ``"light"`` or ``"dark"`` (optional, defaults to ``"light"``).
@@ -56,7 +60,8 @@ def load_config_module(path: str) -> dict[str, Any]:
     return {
         "schema_model": schema_model,
         "widgets": getattr(module, "widgets", None),
-        "title": getattr(module, "title", "Tater"),
+        "title": getattr(module, "title", None),
+        "description": getattr(module, "description", None),
         "theme": getattr(module, "theme", "light"),
         "on_save": getattr(module, "on_save", None),
         "configure": getattr(module, "configure", None),

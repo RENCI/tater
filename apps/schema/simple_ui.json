@@ -1,5 +1,7 @@
 {
   "spec_version": "1.0",
+  "title": "tater - simple",
+  "description": "Sentiment and relevance annotation with explicit widget hints.",
   "data_schema": [
     {
       "id": "sentiment",

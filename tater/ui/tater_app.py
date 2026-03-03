@@ -21,7 +21,8 @@ class TaterApp:
 
     def __init__(
         self,
-        title: str = "Tater",
+        title: Optional[str] = None,
+        description: Optional[str] = None,
         theme: str = "light",
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
@@ -32,11 +33,13 @@ class TaterApp:
 
         Args:
             title: Application title
+            description: Optional subtitle shown below the title
             theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
         """
-        self.title = title
+        self.title = title or "tater - document annotation"
+        self.description = description
         self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model

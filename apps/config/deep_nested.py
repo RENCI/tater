@@ -20,6 +20,7 @@ class Schema(BaseModel):
 
 
 title = "tater - deep nested"
+description = "Two levels of GroupWidget nesting demonstrating deep schema paths."
 
 widgets = [
     SegmentedControlWidget(

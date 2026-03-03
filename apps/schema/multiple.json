@@ -1,5 +1,7 @@
 {
   "spec_version": "1.0",
+  "title": "tater - multiple",
+  "description": "Schema showcasing all supported field types without UI hints.",
   "data_schema": [
     {
       "id": "pet_type",

@@ -76,7 +76,10 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
             dmc.Container([
                 dmc.Stack([
                     dmc.Center(
-                        dmc.Title(tater_app.title, order=1, mt="xl")
+                        dmc.Stack([
+                            dmc.Title(tater_app.title, order=1, mt="xl"),
+                            dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
+                        ], gap="xs", align="center")
                     ),
                     dmc.Stack([
                         dmc.Group([

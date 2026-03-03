@@ -22,6 +22,7 @@ class Schema(BaseModel):
 
 
 title = "tater - conditional"
+description = "Widgets that appear only when a parent boolean field is enabled."
 
 widgets = [
     SwitchWidget(
