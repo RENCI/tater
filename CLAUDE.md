@@ -127,7 +127,6 @@ re-renders — only the very first page load. Use the value guard above instead.
 - Auto-save, progress tracking, flag/notes, annotation timing
 
 **Not yet implemented (from spec):**
-- Auto-generation of widgets from Pydantic model introspection
 - `RepeaterWidget` for arbitrary nested list models (ListableWidget covers the current use case)
 
 ## spec/ files

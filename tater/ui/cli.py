@@ -14,6 +14,12 @@ def parse_args() -> Namespace:
         help="Path to documents JSON file or directory"
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        required=False,
+        help="Path to a Python config file defining schema_model and widgets"
+    )
+    parser.add_argument(
         "--schema",
         type=str,
         required=False,

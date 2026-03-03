@@ -12,6 +12,9 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.scripts]
+tater = "tater.ui.runner:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
