@@ -15,6 +15,31 @@
  *    × delete button when the mouse enters a <mark data-start> element.
  */
 
+// ---------- scroll preservation ----------
+// Saves document-content scrollTop before a server round-trip and restores it
+// after Dash replaces the element's children.
+
+var _savedDocScroll = null;
+
+(function () {
+    function restoreScroll() {
+        if (_savedDocScroll === null) { return; }
+        var el = document.getElementById('document-content');
+        if (el) { el.scrollTop = _savedDocScroll; }
+        _savedDocScroll = null;
+    }
+
+    function setupObserver() {
+        var el = document.getElementById('document-content');
+        if (!el) { setTimeout(setupObserver, 200); return; }
+        new MutationObserver(function () {
+            requestAnimationFrame(restoreScroll);
+        }).observe(el, { childList: true, subtree: false });
+    }
+    setupObserver();
+})();
+
+
 // ---------- clientside callbacks ----------
 
 window.dash_clientside = window.dash_clientside || {};
@@ -57,6 +82,7 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         var start = preRange.toString().length;
         var end = start + selectedText.length;
 
+        _savedDocScroll = docEl.scrollTop;
         return { text: selectedText, start: start, end: end, tag: tag, ts: Date.now() };
     },
 
@@ -123,6 +149,8 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
                 end:   parseInt(end,   10),
                 ts:    Date.now()
             };
+            var docEl = document.getElementById('document-content');
+            if (docEl) { _savedDocScroll = docEl.scrollTop; }
             var proxy = document.getElementById('span-delete-proxy-' + field);
             if (proxy) { proxy.click(); }
             t.style.display = 'none';
