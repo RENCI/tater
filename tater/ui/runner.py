@@ -37,9 +37,14 @@ def main() -> None:
         print("error: no schema_model found in config", file=sys.stderr)
         sys.exit(1)
 
+    from tater.loaders import widgets_from_model
+
     if not widgets:
-        from tater.loaders import widgets_from_model
+        # No widgets supplied — auto-generate all.
         widgets = widgets_from_model(schema_model)
+    elif not _covers_all_fields(widgets, schema_model):
+        # Partial list — treat as overrides, auto-generate the rest.
+        widgets = widgets_from_model(schema_model, overrides=widgets)
 
     app = TaterApp(
         title=title,
@@ -58,3 +63,9 @@ def main() -> None:
         configure(app)
 
     app.run(debug=args.debug, port=args.port, host=args.host)
+
+
+def _covers_all_fields(widgets: list, schema_model) -> bool:
+    """Return True if widgets account for every top-level model field."""
+    covered = {w.schema_field for w in widgets}
+    return covered >= set(schema_model.model_fields.keys())

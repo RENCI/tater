@@ -10,14 +10,18 @@ from typing import Any
 def load_config_module(path: str) -> dict[str, Any]:
     """Import a .py config file and extract well-known names.
 
-    The module may define any of:
+    The module must define:
 
-    ``schema_model``
-        A Pydantic BaseModel subclass (required).  If not assigned explicitly,
-        the first BaseModel subclass defined in the module is used.
+    ``Schema``
+        A Pydantic BaseModel subclass used as the annotation schema.
+
+    The module may also define:
 
     ``widgets``
-        A list of TaterWidget instances (required).
+        A list of TaterWidget instances (optional).  If the list covers all
+        top-level model fields it is used as-is; if it covers only some fields
+        the runner treats it as overrides and auto-generates the rest.  If
+        omitted entirely, all widgets are auto-generated.
 
     ``title``
         App window title string (optional, defaults to "Tater").
@@ -47,20 +51,7 @@ def load_config_module(path: str) -> dict[str, Any]:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[union-attr]
 
-    # Resolve schema_model: explicit assignment first, then autodiscover.
-    schema_model = getattr(module, "schema_model", None)
-    if schema_model is None:
-        from pydantic import BaseModel
-
-        for obj in vars(module).values():
-            if (
-                isinstance(obj, type)
-                and issubclass(obj, BaseModel)
-                and obj is not BaseModel
-                and obj.__module__ == module.__name__
-            ):
-                schema_model = obj
-                break
+    schema_model = getattr(module, "Schema", None)
 
     return {
         "schema_model": schema_model,
