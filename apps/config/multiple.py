@@ -19,7 +19,7 @@ class Schema(BaseModel):
     traits: Optional[List[Literal["friendly", "playful", "lazy", "energetic", "shy"]]] = None
     pet_age: Optional[float] = None
     confidence: Optional[float] = None
-    age_range: list[float] = [0.0, 30.0]
+    age_range: Optional[list[float]] = None
     reviewer_note: Optional[str] = None
     detailed_notes: Optional[str] = None
 

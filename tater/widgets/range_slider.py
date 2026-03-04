@@ -11,8 +11,8 @@ from .base import ControlWidget, _unwrap_optional, _resolve_field_info
 class RangeSliderWidget(ControlWidget):
     """Widget for selecting a min/max numeric range via a slider.
 
-    The schema field must be ``list[float]``, ``list[int]``, or ``Optional``
-    thereof. The value is stored as a two-element list ``[min, max]``.
+    The schema field must be ``Optional[list[float]]`` or ``Optional[list[int]]``
+    with a default of ``None``. The value is stored as a two-element list ``[min, max]``.
     """
 
     min_value: float = 0
@@ -45,8 +45,8 @@ class RangeSliderWidget(ControlWidget):
             )
 
     @property
-    def empty_value(self) -> list:
-        return [self.min_value, self.max_value]
+    def empty_value(self) -> None:
+        return None
 
     def component(self) -> dmc.RangeSlider:
         return dmc.RangeSlider(
