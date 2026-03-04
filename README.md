@@ -7,6 +7,14 @@ Define your annotation schema as a Pydantic model, pick widgets, and get a web-b
 ## Installation
 
 ```bash
+pip install .
+```
+
+For development (editable install):
+
+```bash
+pip install -e .
+# or with uv:
 uv sync
 ```
 
