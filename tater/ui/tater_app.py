@@ -44,7 +44,7 @@ class TaterApp:
         self.annotations_path = annotations_path
         self.schema_model = schema_model
         self.on_save = on_save
-        self.app = Dash(__name__, suppress_callback_exceptions=True)
+        self.app = Dash(__name__, title="tater", suppress_callback_exceptions=True)
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
         self.current_doc_index = 0
