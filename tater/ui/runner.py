@@ -1,46 +1,27 @@
 """Entry point for the ``tater`` CLI command."""
-import sys
-
 from tater.ui.cli import parse_args
 from tater.ui.tater_app import TaterApp
 
 def main() -> None:
     args = parse_args()
 
-    schema_model = None
-    widgets = None
-    title = None
-    description = None
-    theme = "light"
-    on_save = None
-    configure = None
-
     if args.config:
         from tater.ui.config_loader import load_config_module
-
         config = load_config_module(args.config)
-        schema_model = config["schema_model"]
-        widgets = config["widgets"]
-        title = config["title"]
-        description = config["description"]
-        theme = config["theme"]
-        on_save = config["on_save"]
-        configure = config["configure"]
-    elif args.schema:
-        from tater.loaders import load_schema_full
-
-        config = load_schema_full(args.schema)
-        schema_model = config["schema_model"]
-        widgets = config["widgets"]
-        title = config["title"]
-        description = config["description"]
     else:
-        print("error: one of --config or --schema is required", file=sys.stderr)
-        sys.exit(1)
+        from tater.loaders import load_schema
+        config = load_schema(args.schema)
+
+    schema_model = config.get("schema_model")
+    widgets = config.get("widgets")
+    title = config.get("title")
+    description = config.get("description")
+    theme = config.get("theme", "light")
+    on_save = config.get("on_save")
+    configure = config.get("configure")
 
     if schema_model is None:
-        print("error: no schema_model found in config", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit("error: no schema_model found in config")
 
     from tater.loaders import widgets_from_model
 

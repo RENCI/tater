@@ -2,9 +2,9 @@
 
 ## Project overview
 
-Tater is a Python library for building document annotation UIs. Users define a Pydantic model,
-pick widgets, and get a Dash web app. It is **not** a standalone app — it's a library that app
-scripts import from.
+Tater is a Python library for building document annotation UIs. Users provide a config file
+(Python or JSON) defining a Pydantic schema and optional widget overrides, then run the `tater`
+CLI to launch a Dash web app.
 
 Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v0.14 / Mantine v7**, Pydantic v2.
 
@@ -12,9 +12,8 @@ Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v0.14 / Mantine v
 
 ```
 tater/                  # Library package
-  __init__.py           # Public API: TaterApp, parse_args, SpanAnnotation,
-                        #   SpanAnnotationWidget, EntityType, load_schema,
-                        #   parse_schema, widgets_from_model
+  __init__.py           # Public API: SpanAnnotation, SpanAnnotationWidget,
+                        #   EntityType, load_schema, parse_schema, widgets_from_model
   models/               # Pydantic data models (Document, SpanAnnotation)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
   widgets/              # All widget classes
@@ -22,7 +21,7 @@ tater/                  # Library package
     hierarchical_label.py  # HierarchicalLabel* widgets + Node tree utilities
     ...
 apps/
-  config/               # Python config-file examples (simple, hooks, nested, …)
+  config/               # Python config-file examples (simple, simple_defaults, simple_mixed, hooks, nested, list_nested, …)
   schema/               # JSON schema-file examples + schemas
 data/                   # Sample documents and ontologies for examples
 spec/                   # Design documents (see below)
@@ -152,8 +151,8 @@ Widget base class hierarchy in `base.py`:
 
 ## spec/ files
 
-- `spec/tater.md` — Pydantic-first redesign spec; mostly implemented; some sections (auto-widget
-  generation, nested list repeater) are aspirational.
+- `spec/tater.md` — Pydantic-first redesign spec; mostly implemented; nested list repeater
+  (`RepeaterWidget`) remains aspirational.
 - `spec/app.md` — Original v1 spec with JSON schema files; obsolete.
 - `spec/STAND_LIBRARY_SPECIFICATION.md` — Spec for a Streamlit-based predecessor (STAND);
   kept as reference only.

@@ -1,22 +1,16 @@
 """JSON schema loader for Tater.
 
-Converts a tater JSON schema file into a Pydantic model and widget list,
-so users don't need to write Python to define their annotation schema.
+Converts a tater JSON schema file into a Pydantic model and widget list.
+Schema files are used with the ``tater --schema`` CLI flag:
 
-Usage::
-
-    from tater.loaders import load_schema
-
-    model, widgets = load_schema("data/simple_schema.json")
-    app = TaterApp(title="My App", schema_model=model)
-    app.load_documents(args.documents)
-    app.set_annotation_widgets(widgets)
-    app.run(...)
+    tater --schema apps/schema/simple.json --documents data/documents.json
 
 Schema format::
 
     {
       "spec_version": "1.0",
+      "title": "My Annotation App",
+      "description": "Optional subtitle shown below the title.",
       "hierarchies": {
         "ontology": "data/my_ontology.yaml",
         "regions": {"Head": ["Brain", "Eye"], "Thorax": ["Lung", "Heart"]}
@@ -36,7 +30,7 @@ Schema format::
           "type": "hierarchical_label",
           "hierarchy_ref": "ontology",
           "label": "Diagnosis",
-          "widget": {"type": "compact", "searchable": true}
+          "widget": {"searchable": true}
         },
         {
           "id": "address",
@@ -63,7 +57,28 @@ Schema format::
 The ``widget`` object is optional on leaf fields. Without it, a sensible
 default widget is chosen for each field type.
 
-For ``hierarchical`` fields, ``hierarchy_ref`` must match a key in the
+Field types:
+  ``choice``            — single selection from ``options`` (default: SegmentedControlWidget)
+  ``multi_choice``      — multiple selections from ``options`` (default: MultiSelectWidget)
+  ``text``              — free text (default: TextInputWidget)
+  ``boolean``           — true/false (default: CheckboxWidget)
+  ``numeric``           — number (default: NumberInputWidget)
+  ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
+  ``span_annotation``   — text span labelling (SpanAnnotationWidget)
+  ``hierarchical_label``— tree-based label (default: HierarchicalLabelCompactWidget)
+  ``group``             — nested sub-model with ``fields``
+  ``listable``          — repeatable list of sub-items with ``item_fields``
+
+Widget override types (``"widget": {"type": "..."}``):
+  ``radio_group``             — for ``choice`` fields
+  ``select``                  — for ``choice`` fields
+  ``chip_group``              — for ``choice`` or ``multi_choice`` fields
+  ``text_area``               — for ``text`` fields
+  ``switch``                  — for ``boolean`` fields
+  ``slider``                  — for ``numeric`` fields
+  ``hierarchical_label_full`` — for ``hierarchical_label`` fields
+
+For ``hierarchical_label`` fields, ``hierarchy_ref`` must match a key in the
 top-level ``hierarchies`` dict. File paths in ``hierarchies`` are resolved
 relative to the schema file's directory when using ``load_schema``.
 """
@@ -140,7 +155,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
 
     # Literal["a", "b"] → SegmentedControlWidget
     if origin is Literal:
-        return _build_widget(field_name, "single_choice", False, label, None, None, {}, {}, {})
+        return _build_widget(field_name, "choice", False, label, None, None, {}, {}, {})
 
     # list[X]
     if origin is list:
@@ -174,7 +189,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
         return _build_widget(field_name, "boolean", False, label, None, None, {}, {}, {})
 
     if annotation is str:
-        return _build_widget(field_name, "free_text", False, label, None, None, {}, {}, {})
+        return _build_widget(field_name, "text", False, label, None, None, {}, {}, {})
 
     if annotation in (float, int):
         return _build_widget(field_name, "numeric", False, label, None, None, {}, {}, {})
@@ -444,14 +459,12 @@ def _build_widget(
     raise ValueError(f"Unknown field type {ftype!r}")
 
 
-def load_schema_full(path: str | Path) -> dict:
-    """Load a schema JSON file and return a config dict for the runner.
-
-    In addition to ``model_class`` and ``widgets``, extracts the optional
-    top-level ``title`` and ``description`` fields from the schema file.
+def load_schema(path: str | Path) -> dict:
+    """Load a schema JSON file and return a config dict.
 
     Args:
-        path: Path to a tater JSON schema file.
+        path: Path to a tater JSON schema file. Relative paths in the
+              ``hierarchies`` section are resolved from this file's directory.
 
     Returns:
         A dict with keys ``schema_model``, ``widgets``, ``title``,
@@ -467,19 +480,3 @@ def load_schema_full(path: str | Path) -> dict:
         "title": data.get("title"),
         "description": data.get("description"),
     }
-
-
-def load_schema(path: str | Path) -> tuple[type[BaseModel], list[TaterWidget]]:
-    """Load a schema JSON file and return ``(model_class, widgets)``.
-
-    Args:
-        path: Path to a tater JSON schema file. Relative paths in the
-              ``hierarchies`` section are resolved from this file's directory.
-
-    Returns:
-        A ``(model_class, widgets)`` tuple.
-    """
-    path = Path(path)
-    with open(path) as f:
-        data = json.load(f)
-    return parse_schema(data, base_dir=path.parent)

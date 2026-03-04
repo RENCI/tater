@@ -13,16 +13,15 @@ def parse_args() -> Namespace:
         required=True,
         help="Path to documents JSON file or directory"
     )
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
         "--config",
         type=str,
-        required=False,
         help="Path to a Python config file defining schema_model and widgets"
     )
-    parser.add_argument(
+    group.add_argument(
         "--schema",
         type=str,
-        required=False,
         help="Path to a tater JSON schema file"
     )
     parser.add_argument(
