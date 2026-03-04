@@ -14,7 +14,11 @@ For development (editable install):
 
 ```bash
 pip install -e .
-# or with uv:
+```
+
+— or with uv —
+
+```bash
 uv sync
 ```
 
@@ -110,12 +114,14 @@ All widgets accept `label`, `description`, and most accept `required`.
 |--------|-------------|--------------|
 | `NumberInputWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
 | `SliderWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+| `RangeSliderWidget` | `Optional[list[float]]` | `min_value`, `max_value`, `step` |
 
 ### Text
 
 | Widget | Schema type | Extra params |
 |--------|-------------|--------------|
 | `TextInputWidget` | `str` | `placeholder` |
+| `TextAreaWidget` | `str` | `placeholder` |
 
 ### Containers
 
