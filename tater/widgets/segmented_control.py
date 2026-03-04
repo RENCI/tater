@@ -1,9 +1,11 @@
 """SegmentedControl widget for single-choice annotations."""
+from dataclasses import dataclass
 import dash_mantine_components as dmc
 
 from .base import ChoiceWidget
 
 
+@dataclass(eq=False)
 class SegmentedControlWidget(ChoiceWidget):
     """Widget for selecting from a list of mutually exclusive options."""
 

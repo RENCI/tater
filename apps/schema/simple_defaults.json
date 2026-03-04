@@ -1,0 +1,17 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - simple (defaults)",
+  "description": "All widgets are auto-generated from the schema.",
+  "data_schema": [
+    {
+      "id": "sentiment",
+      "type": "choice",
+      "options": ["positive", "negative", "neutral"],
+      "required": true
+    },
+    {
+      "id": "is_relevant",
+      "type": "boolean"
+    }
+  ]
+}

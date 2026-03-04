@@ -1,0 +1,38 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - list (nested)",
+  "description": "List of structured items, each with multiple fields.",
+  "data_schema": [
+    {
+      "id": "medications",
+      "type": "listable",
+      "label": "Medications",
+      "widget": {
+        "add_label": "Add Medication",
+        "delete_label": "Remove",
+        "initial_count": 1
+      },
+      "item_fields": [
+        {
+          "id": "name",
+          "type": "text",
+          "label": "Medication Name",
+          "placeholder": "e.g. Ibuprofen"
+        },
+        {
+          "id": "route",
+          "type": "choice",
+          "options": ["oral", "iv", "topical", "inhaled"],
+          "label": "Route",
+          "widget": {"type": "radio_group", "orientation": "horizontal"}
+        },
+        {
+          "id": "frequency",
+          "type": "choice",
+          "options": ["once daily", "twice daily", "as needed"],
+          "label": "Frequency"
+        }
+      ]
+    }
+  ]
+}

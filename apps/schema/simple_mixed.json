@@ -1,9 +1,11 @@
 {
   "spec_version": "1.0",
+  "title": "tater - simple (mixed)",
+  "description": "Sentiment shown as a vertical radio group; relevance uses the default widget.",
   "data_schema": [
     {
       "id": "sentiment",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["positive", "negative", "neutral"],
       "required": true,
       "label": "Sentiment",

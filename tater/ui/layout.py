@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from dash import html, dcc
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -14,8 +15,8 @@ if TYPE_CHECKING:
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
     from tater.widgets.span import SpanAnnotationWidget
-
     annotation_components = _build_annotation_components(tater_app.widgets)
+    has_required = any(w.required for w in tater_app._collect_value_capture_widgets(tater_app.widgets))
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls(tater_app)
@@ -45,7 +46,14 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         ], span={"base": 12, "md": 7}),
         dmc.GridCol([
             dmc.Paper(
-                dmc.Stack(annotation_components, gap="md"),
+                dmc.Stack(
+                    annotation_components + [
+                        dmc.Divider(),
+                        dmc.Button("Save", id="btn-save", variant="outline", fullWidth=True,
+                                   leftSection=DashIconify(icon="tabler:device-floppy", width=16)),
+                    ] + ([dmc.Text("* Required", size="xs", c="red")] if has_required else []),
+                    gap="md",
+                ),
                 p="md",
                 withBorder=True,
                 shadow="sm"
@@ -56,15 +64,22 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     return dmc.MantineProvider(
         theme={"colorScheme": tater_app.theme},
         children=[
+            dmc.NotificationContainer(position="top-center", notificationMaxHeight=300, zIndex=1000, withinPortal=True),
+            html.Div(id="notification-container"),
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
             dcc.Store(id="status-store", data="not_started"),
+            dcc.Store(id="auto-advance-store", data=0),
+            dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             *span_stores,
             dmc.Container([
                 dmc.Stack([
                     dmc.Center(
-                        dmc.Title(tater_app.title, order=1, mt="xl")
+                        dmc.Stack([
+                            dmc.Title(tater_app.title, order=1, mt="xl"),
+                            dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
+                        ], gap="xs", align="center")
                     ),
                     dmc.Stack([
                         dmc.Group([
@@ -100,20 +115,21 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
 
 def _build_annotation_components(widgets: list[TaterWidget]) -> list:
-    """Create annotation fields from widgets with dividers between them."""
-    from tater.ui.callbacks import _collect_value_capture_widgets
+    """Create annotation fields from widgets with dividers between them.
+
+    For conditional widgets the preceding divider is placed inside the
+    conditional wrapper so it is hidden together with the widget.
+    """
     annotation_components = []
-    has_required = any(w.required for w in _collect_value_capture_widgets(widgets))
-
     for i, widget in enumerate(widgets):
-        annotation_components.append(widget.render_field())
-        if i < len(widgets) - 1:
-            annotation_components.append(dmc.Divider())
-
-    if has_required:
-        annotation_components.append(dmc.Divider())
-        annotation_components.append(dmc.Text("* Required", size="xs", c="red"))
-
+        has_leading_divider = i > 0
+        if widget._condition is not None:
+            children = ([dmc.Divider()] if has_leading_divider else []) + [widget._build_field_content()]
+            annotation_components.append(html.Div(children, id=widget.conditional_wrapper_id))
+        else:
+            if has_leading_divider:
+                annotation_components.append(dmc.Divider())
+            annotation_components.append(widget.render_field())
     return annotation_components
 
 
@@ -154,32 +170,39 @@ def _build_document_controls() -> dmc.Stack:
 
 
 def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
-    """Build the navigation button row."""
-    return dmc.Flex([
+    """Build the navigation button row with document filter."""
+    button_row = dmc.Flex([
         dmc.Box(
-            dmc.Button("\u2190 Previous", id="btn-prev", variant="outline", fullWidth=True),
+            dmc.Button("Previous", id="btn-prev", variant="outline", fullWidth=True,
+                       leftSection=DashIconify(icon="tabler:arrow-left", width=16)),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
-            dmc.Menu([
-                dmc.MenuTarget(
-                    dmc.Button(
-                        "Select document",
-                        id="document-selector-button",
-                        variant="outline",
-                        fullWidth=True,
+            dmc.Stack([
+                dmc.Menu([
+                    dmc.MenuTarget(
+                        dmc.Button(
+                            "Select document",
+                            id="document-selector-button",
+                            variant="outline",
+                            fullWidth=True,
+                            rightSection=DashIconify(icon="tabler:chevron-down", width=16),
+                        ),
+                        boxWrapperProps={"className": "menu-target-wrapper"},
                     ),
-                    boxWrapperProps={"className": "menu-target-wrapper"},
-                ),
-                dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
-            ], position="bottom-start", withArrow=True, withinPortal=True, width="target"),
+                    dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
+                ], position="bottom-start", withArrow=True, withinPortal=True, width="target", zIndex=600),
+                dmc.Checkbox(id="filter-flagged", label="Show flagged only", size="xs", checked=False),
+            ], gap="xs"),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
-            dmc.Button("Next \u2192", id="btn-next", variant="outline", fullWidth=True),
+            dmc.Button("Next", id="btn-next", variant="outline", fullWidth=True,
+                       rightSection=DashIconify(icon="tabler:arrow-right", width=16)),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
     ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
+    return button_row
 
 
 def _build_footer_bar() -> dmc.Box:
@@ -188,11 +211,19 @@ def _build_footer_bar() -> dmc.Box:
         dmc.Group(
             [
                 dmc.Box(
-                    dmc.Text(
-                        id="timing-text",
-                        size="sm",
-                        c="dimmed",
-                    ),
+                    dmc.Group([                        
+                        dmc.ActionIcon(
+                            DashIconify(icon="tabler:player-pause", width=16),
+                            id="btn-pause-timer",
+                            size="sm",
+                            variant="outline",
+                        ),
+                        dmc.Text(
+                            id="timing-text",
+                            size="sm",
+                            c="dimmed",
+                        ),
+                    ], gap="xs"),
                     style={"flex": "1"},
                 ),
                 dmc.Divider(orientation="vertical"),

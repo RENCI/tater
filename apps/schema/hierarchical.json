@@ -1,18 +1,26 @@
 {
   "spec_version": "1.0",
+  "title": "tater - hierarchical",
+  "description": "Breast pathology ontology with compact and full hierarchical label widgets.",
   "hierarchies": {
     "ontology": "../../data/breast_fdx_ontology.yaml"
   },
   "data_schema": [
     {
       "id": "diagnosis",
-      "type": "hierarchical",
-      "hierarchy_ref": "ontology"
+      "type": "hierarchical_label",
+      "hierarchy_ref": "ontology",
+      "label": "Diagnosis",
+      "description": "Navigate the ontology to select a diagnosis.",
+      "widget": {"type": "compact", "searchable": true}
     },
     {
       "id": "secondary_diagnosis",
-      "type": "hierarchical",
-      "hierarchy_ref": "ontology"
+      "type": "hierarchical_label",
+      "hierarchy_ref": "ontology",
+      "label": "Secondary Diagnosis",
+      "description": "Navigate the ontology to select a secondary diagnosis.",
+      "widget": {"type": "hierarchical_label_full", "searchable": true}
     }
   ]
 }

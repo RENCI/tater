@@ -1,16 +1,21 @@
 {
   "spec_version": "1.0",
+  "title": "tater - simple",
+  "description": "All widgets specified explicitly.",
   "data_schema": [
     {
       "id": "sentiment",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["positive", "negative", "neutral"],
       "required": true,
+      "label": "Sentiment",
       "description": "Overall sentiment of the document"
     },
     {
       "id": "is_relevant",
-      "type": "boolean"
+      "type": "boolean",
+      "label": "Relevant?",
+      "description": "Is this document relevant?"
     }
   ]
 }

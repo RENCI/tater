@@ -24,7 +24,7 @@ Schema format::
       "data_schema": [
         {
           "id": "sentiment",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["positive", "negative", "neutral"],
           "required": true,
           "label": "Sentiment",
@@ -33,7 +33,7 @@ Schema format::
         },
         {
           "id": "diagnosis",
-          "type": "hierarchical",
+          "type": "hierarchical_label",
           "hierarchy_ref": "ontology",
           "label": "Diagnosis",
           "widget": {"type": "compact", "searchable": true}
@@ -43,17 +43,17 @@ Schema format::
           "type": "group",
           "label": "Location",
           "fields": [
-            {"id": "city",    "type": "free_text", "label": "City"},
-            {"id": "country", "type": "free_text", "label": "Country"}
+            {"id": "city",    "type": "text", "label": "City"},
+            {"id": "country", "type": "text", "label": "Country"}
           ]
         },
         {
           "id": "pets",
-          "type": "list",
+          "type": "listable",
           "label": "Pets",
           "item_fields": [
-            {"id": "name", "type": "free_text",     "label": "Name"},
-            {"id": "kind", "type": "single_choice", "label": "Kind",
+            {"id": "name", "type": "text",   "label": "Name"},
+            {"id": "kind", "type": "choice", "label": "Kind",
              "options": ["cat", "dog"]}
           ]
         }
@@ -88,6 +88,8 @@ from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
+from tater.widgets.textarea import TextAreaWidget
+from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
@@ -210,7 +212,7 @@ def widgets_from_model(
         A list of ``TaterWidget`` instances ready to pass to
         ``set_annotation_widgets``, in model field order.
     """
-    override_map = {w._local_path: w for w in (overrides or [])}
+    override_map = {w.schema_field: w for w in (overrides or [])}
     result = []
     for name, fi in model.model_fields.items():
         if name in override_map:
@@ -292,7 +294,7 @@ def _process_field(
             local_id, label=label, description=description, children=child_widgets
         )
 
-    if ftype == "list":
+    if ftype == "listable":
         item_model_fields: dict[str, Any] = {}
         item_widgets: list[TaterWidget] = []
         for child_spec in spec.get("item_fields", []):
@@ -319,29 +321,37 @@ def _process_field(
     widget_spec = spec.get("widget") or {}
     widget_type: str | None = widget_spec.get("type")
 
-    if ftype == "single_choice":
+    if ftype == "choice":
         lit = _make_literal(options)
         field_def = (Optional[lit], default)
     elif ftype == "multi_choice":
         lit = _make_literal(options)
         field_def = (list[lit], Field(default_factory=list))
-    elif ftype == "free_text":
+    elif ftype == "text":
         field_def = (Optional[str], default)
     elif ftype == "boolean":
         field_def = (bool, default if default is not None else False)
     elif ftype == "numeric":
         field_def = (Optional[float], default)
+    elif ftype == "range_slider":
+        _min = float(widget_spec.get("min_value", 0))
+        _max = float(widget_spec.get("max_value", 100))
+        field_def = (list[float], Field(default_factory=lambda a=_min, b=_max: [a, b]))
     elif ftype == "span_annotation":
         field_def = (list[SpanAnnotation], Field(default_factory=list))
-    elif ftype == "hierarchical":
+    elif ftype == "hierarchical_label":
         field_def = (Optional[str], None)
     else:
         raise ValueError(f"Unknown field type {ftype!r} for field {local_id!r}")
 
-    return field_def, _build_widget(
+    widget = _build_widget(
         local_id, ftype, required, label, description, widget_type, widget_spec, spec,
         hierarchy_map,
     )
+    condition = spec.get("conditional_on")
+    if condition is not None:
+        widget.conditional_on(condition["field"], bool(condition["value"]))
+    return field_def, widget
 
 
 def _build_widget(
@@ -355,7 +365,7 @@ def _build_widget(
     spec: dict,
     hierarchy_map: dict[str, Node],
 ) -> TaterWidget:
-    if ftype == "single_choice":
+    if ftype == "choice":
         if widget_type == "radio_group":
             return RadioGroupWidget(
                 fid, label=label, description=description, required=required,
@@ -372,7 +382,12 @@ def _build_widget(
             return ChipGroupWidget(fid, label=label, description=description, required=required)
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
-    if ftype == "free_text":
+    if ftype == "text":
+        if widget_type == "text_area":
+            return TextAreaWidget(
+                fid, label=label, description=description, required=required,
+                placeholder=widget_spec.get("placeholder"),
+            )
         return TextInputWidget(
             fid, label=label, description=description, required=required,
             placeholder=widget_spec.get("placeholder"),
@@ -399,15 +414,24 @@ def _build_widget(
             step=widget_spec.get("step"),
         )
 
+    if ftype == "range_slider":
+        return RangeSliderWidget(
+            fid, label=label, description=description, required=required,
+            min_value=widget_spec.get("min_value", 0),
+            max_value=widget_spec.get("max_value", 100),
+            step=widget_spec.get("step"),
+            default=spec.get("default"),
+        )
+
     if ftype == "span_annotation":
         entity_types = [EntityType(name=et) for et in spec.get("entity_types", [])]
         return SpanAnnotationWidget(fid, label=label, entity_types=entity_types, description=description)
 
-    if ftype == "hierarchical":
+    if ftype == "hierarchical_label":
         ref = spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
-        if widget_type == "full":
+        if widget_type == "hierarchical_label_full":
             return HierarchicalLabelFullWidget(
                 fid, label=label, description=description,
                 hierarchy=hierarchy, searchable=searchable,
@@ -418,6 +442,31 @@ def _build_widget(
         )
 
     raise ValueError(f"Unknown field type {ftype!r}")
+
+
+def load_schema_full(path: str | Path) -> dict:
+    """Load a schema JSON file and return a config dict for the runner.
+
+    In addition to ``model_class`` and ``widgets``, extracts the optional
+    top-level ``title`` and ``description`` fields from the schema file.
+
+    Args:
+        path: Path to a tater JSON schema file.
+
+    Returns:
+        A dict with keys ``schema_model``, ``widgets``, ``title``,
+        ``description``.
+    """
+    path = Path(path)
+    with open(path) as f:
+        data = json.load(f)
+    schema_model, widgets = parse_schema(data, base_dir=path.parent)
+    return {
+        "schema_model": schema_model,
+        "widgets": widgets,
+        "title": data.get("title"),
+        "description": data.get("description"),
+    }
 
 
 def load_schema(path: str | Path) -> tuple[type[BaseModel], list[TaterWidget]]:

@@ -13,6 +13,7 @@ from tater.models import Document
 from tater.widgets.base import TaterWidget
 from tater.ui import callbacks
 from tater.ui import value_helpers
+from tater.ui.hooks import OnSaveHook
 
 
 class TaterApp:
@@ -20,24 +21,29 @@ class TaterApp:
 
     def __init__(
         self,
-        title: str = "Tater",
+        title: Optional[str] = None,
+        description: Optional[str] = None,
         theme: str = "light",
         annotations_path: Optional[str] = None,
-        schema_model: Optional[Type[BaseModel]] = None
+        schema_model: Optional[Type[BaseModel]] = None,
+        on_save: Optional[OnSaveHook] = None,
     ):
         """
         Initialize the Tater app.
 
         Args:
             title: Application title
+            description: Optional subtitle shown below the title
             theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
         """
-        self.title = title
+        self.title = title or "tater - document annotation"
+        self.description = description
         self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model
+        self.on_save = on_save
         self.app = Dash(__name__, suppress_callback_exceptions=True)
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
@@ -46,6 +52,8 @@ class TaterApp:
         # Store metadata (DocumentMetadata) separately from annotations
         from tater.models.document import DocumentMetadata
         self.metadata: dict[str, DocumentMetadata] = {}
+        self._save_error: str | None = None
+        self._schema_warnings: dict[str, list[str]] = {}
 
     def load_documents(self, source: str) -> bool:
         """
@@ -61,14 +69,10 @@ class TaterApp:
             with open(source, 'r') as f:
                 data = json.load(f)
             
-            # Handle both formats: {"documents": [...]} and [...]
-            if isinstance(data, dict) and "documents" in data:
-                doc_dicts = data["documents"]
-            elif isinstance(data, list):
-                doc_dicts = data
-            else:
+            if not isinstance(data, list):
                 print(f"Error: Invalid document format in {source}")
                 return False
+            doc_dicts = data
             
             # Parse into Document instances
             documents = []
@@ -127,6 +131,18 @@ class TaterApp:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
             seen.add(path)
 
+        # Enforce that all schema fields have defaults (required for safe annotation loading)
+        if self.schema_model is not None:
+            required_fields = [
+                name for name, fi in self.schema_model.model_fields.items()
+                if fi.is_required()
+            ]
+            if required_fields:
+                raise ValueError(
+                    f"All schema model fields must have default values. "
+                    f"Fields without defaults: {', '.join(required_fields)}"
+                )
+
         # Bind widgets against the schema model (validates types, derives options)
         if self.schema_model is not None:
             for widget in self.widgets:
@@ -135,6 +151,7 @@ class TaterApp:
         # Register any widget-specific callbacks
         for widget in self.widgets:
             widget.register_callbacks(self.app)
+            widget._register_conditional_callbacks(self.app)
         
         self._setup_layout()
         self._setup_callbacks()
@@ -157,48 +174,69 @@ class TaterApp:
             with open(path, 'r') as f:
                 data = json.load(f)
             
-            # Handle both old format (flat) and new format (with metadata)
             from tater.models.document import DocumentMetadata
+            extra_fields: set[str] = set()
+            missing_fields: set[str] = set()
+
             for doc_id, doc_data in data.items():
-                if isinstance(doc_data, dict) and "annotations" in doc_data:
-                    # New format with metadata
-                    ann_data = doc_data["annotations"]
-                    meta = doc_data.get("metadata", {})
-                    self.metadata[doc_id] = DocumentMetadata(
-                        flagged=meta.get("flagged", False),
-                        notes=meta.get("notes", ""),
-                        annotation_seconds=meta.get("annotation_seconds", 0.0),
-                        visited=meta.get("visited", False),
-                        status=meta.get("status", "not_started"),
-                    )
-                else:
-                    # Old format (flat) - treat as annotations only
-                    ann_data = doc_data
-                    self.metadata[doc_id] = DocumentMetadata()
+                ann_data = doc_data.get("annotations", {})
+                meta = doc_data.get("metadata", {})
+                self.metadata[doc_id] = DocumentMetadata(
+                    flagged=meta.get("flagged", False),
+                    notes=meta.get("notes", ""),
+                    annotation_seconds=meta.get("annotation_seconds", 0.0),
+                    visited=meta.get("visited", False),
+                    status=meta.get("status", "not_started"),
+                )
                 if self.schema_model and ann_data:
+                    schema_fields = set(self.schema_model.model_fields.keys())
+                    ann_fields = set(ann_data.keys())
+                    extra_fields |= ann_fields - schema_fields
+                    missing_fields |= schema_fields - ann_fields
                     self.annotations[doc_id] = self.schema_model(**ann_data)
+
+            self._schema_warnings = {}
+            if extra_fields:
+                self._schema_warnings["extra"] = sorted(extra_fields)
+            if missing_fields:
+                self._schema_warnings["missing"] = sorted(missing_fields)
+
             print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
             print(f"Error loading annotations: {e}")
 
-    def _save_annotations_to_file(self) -> None:
-        """Save all annotations to the annotations file."""
+    def _save_annotations_to_file(self, doc_id: Optional[str] = None) -> None:
+        """Save all annotations to the annotations file.
+
+        Args:
+            doc_id: The document whose annotation triggered this save.  When
+                provided and an ``on_save`` hook is configured, the hook is
+                called with this document's annotation after writing.
+        """
         try:
             path = Path(self.annotations_path)
             path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Combine annotations and metadata into save format
             save_dict = {}
-            for doc_id, annotation in self.annotations.items():
-                meta: DocumentMetadata = self.metadata.get(doc_id, DocumentMetadata())
-                save_dict[doc_id] = {
+            for d_id, annotation in self.annotations.items():
+                meta: DocumentMetadata = self.metadata.get(d_id, DocumentMetadata())
+                save_dict[d_id] = {
                     "annotations": annotation.model_dump(),
                     "metadata": meta.model_dump(),
                 }
-            
+
             with open(path, 'w') as f:
                 json.dump(save_dict, f, indent=2)
+            self._save_error = None
+
+            if self.on_save and doc_id and doc_id in self.annotations:
+                try:
+                    self.on_save(doc_id, self.annotations[doc_id])
+                except Exception as hook_err:
+                    print(f"on_save hook error: {hook_err}")
         except Exception as e:
+            self._save_error = str(e)
             print(f"Error saving annotations: {e}")
 
     def _setup_callbacks(self) -> None:

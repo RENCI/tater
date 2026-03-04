@@ -1,10 +1,22 @@
 # Tater
 
-A Python library for building document annotation interfaces with [Dash](https://dash.plotly.com/) and [Pydantic](https://docs.pydantic.dev/).
+A Python library for building document annotation interfaces with [Pydantic](https://docs.pydantic.dev/) and [Dash](https://dash.plotly.com/).
 
 Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
 ## Installation
+
+```bash
+pip install .
+```
+
+For development (editable install):
+
+```bash
+pip install -e .
+```
+
+— or with uv —
 
 ```bash
 uv sync
@@ -12,34 +24,142 @@ uv sync
 
 ## Quick Start
 
-```python
-from typing import Literal, Optional
-from pydantic import BaseModel
-from tater import TaterApp, parse_args
-from tater.widgets import SegmentedControlWidget, TextInputWidget
+Create a Python config file (`my_config.py`):
 
-class NoteAnnotation(BaseModel):
-    sentiment: Literal["positive", "negative", "neutral"]
-    summary: Optional[str] = None
+```python
+from typing import Optional, Literal
+from pydantic import BaseModel
+
+class Schema(BaseModel):
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    is_relevant: bool = False
+```
+
+Run it — widgets are auto-generated from the schema:
+
+```bash
+tater --config my_config.py --documents data/documents.json
+```
+
+Or specify widgets explicitly:
+
+```python
+from typing import Optional, Literal
+from pydantic import BaseModel
+from tater.widgets import SegmentedControlWidget, CheckboxWidget
+
+class Schema(BaseModel):
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    is_relevant: bool = False
+
+title = "My Annotator"
 
 widgets = [
-    SegmentedControlWidget("sentiment", label="Sentiment"),
-    TextInputWidget("summary", label="Summary", description="Brief summary of the note"),
+    SegmentedControlWidget("sentiment", label="Sentiment", required=True),
+    CheckboxWidget("is_relevant", label="Relevant?"),
 ]
-
-args = parse_args()
-app = TaterApp(title="My Annotator", schema_model=NoteAnnotation, annotations_path=args.annotations)
-app.load_documents(args.documents)
-app.set_annotation_widgets(widgets)
-app.run(debug=args.debug, port=args.port, host=args.host)
 ```
 
-Run with:
+Alternatively, use a JSON schema file (`my_schema.json`):
+
+```json
+{
+  "spec_version": "1.0",
+  "title": "My Annotator",
+  "data_schema": [
+    {"id": "sentiment", "type": "choice", "options": ["positive", "negative", "neutral"], "required": true},
+    {"id": "is_relevant", "type": "boolean"}
+  ]
+}
+```
+
 ```bash
-python my_app.py --documents data/documents.json
+tater --schema my_schema.json --documents data/documents.json
 ```
 
-Example apps for all widget types are in [apps/](apps/).
+Example configs and schemas are in [apps/](apps/).
+
+## Python config reference
+
+A config file is a plain Python module. The `tater` CLI looks for these names:
+
+| Name | Required | Description |
+|------|----------|-------------|
+| `Schema` | **yes** | Pydantic `BaseModel` subclass defining the annotation fields |
+| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest |
+| `title` | no | App window title (default: `"tater - document annotation"`) |
+| `description` | no | Subtitle shown below the title |
+| `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
+| `on_save` | no | Callable `(doc_id: str, annotation: BaseModel) -> None` called after each auto-save |
+| `configure` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks |
+
+## JSON schema reference
+
+A JSON schema file has this top-level structure:
+
+```json
+{
+  "spec_version": "1.0",
+  "title": "My Annotator",
+  "description": "Optional subtitle",
+  "hierarchies": {
+    "ontology": "path/to/ontology.yaml"
+  },
+  "data_schema": [ ... ]
+}
+```
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `spec_version` | **yes** | Must be `"1.0"` |
+| `data_schema` | **yes** | Array of field definitions |
+| `title` | no | App window title |
+| `description` | no | Subtitle shown below the title |
+| `hierarchies` | no | Map of named hierarchies (YAML file path or inline dict) used by `hierarchical_label` fields |
+
+### Field definition
+
+Every entry in `data_schema` (and `item_fields` / `fields` for list/group types) has:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `id` | **yes** | Field name (used as Pydantic field name and widget ID) |
+| `type` | **yes** | Field type — see table below |
+| `label` | no | Display label (defaults to humanized `id`) |
+| `description` | no | Help text shown below the widget |
+| `required` | no | `true` marks the field as required for completion tracking |
+| `widget` | no | Object with widget-type overrides — see per-type notes below |
+
+### Field types
+
+| `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
+|--------|-------------|----------------|----------------------------------|
+| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_group` |
+| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `chip_group` |
+| `text` | `str` | `TextInputWidget` | `text_area` |
+| `boolean` | `bool` | `CheckboxWidget` | `switch` |
+| `numeric` | `float` | `NumberInputWidget` | `slider` |
+| `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
+| `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full` |
+| `group` | nested model | `GroupWidget` | — |
+| `listable` | `list[model]` | `ListableWidget` | — |
+
+**`choice` / `multi_choice`** — requires `options` array.
+
+**`numeric` / `range_slider`** — `widget` may include `min_value`, `max_value`, `step`.
+
+**`text`** — `widget` may include `placeholder`.
+
+**`radio_group`** — `widget.orientation`: `"vertical"` or `"horizontal"`.
+
+**`hierarchical_label`** — requires `hierarchy_ref` matching a key in `hierarchies`. `widget` may include `searchable` (default `true`).
+
+**`span_annotation`** — requires `entity_types` array of strings.
+
+**`group`** — requires `fields` array of child field definitions.
+
+**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`.
 
 ## Widgets
 
@@ -76,12 +196,14 @@ All widgets accept `label`, `description`, and most accept `required`.
 |--------|-------------|--------------|
 | `NumberInputWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
 | `SliderWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+| `RangeSliderWidget` | `Optional[list[float]]` | `min_value`, `max_value`, `step` |
 
 ### Text
 
 | Widget | Schema type | Extra params |
 |--------|-------------|--------------|
 | `TextInputWidget` | `str` | `placeholder` |
+| `TextAreaWidget` | `str` | `placeholder` |
 
 ### Containers
 
@@ -141,23 +263,6 @@ HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, 
 
 Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
 
-## TaterApp
-
-```python
-TaterApp(
-    title="My App",                # Browser tab title
-    theme="light",                 # "light" or "dark"
-    schema_model=MyModel,          # Pydantic BaseModel subclass
-    annotations_path="out.json",   # Where to save annotations (optional)
-)
-```
-
-| Method | Description |
-|--------|-------------|
-| `load_documents(path)` | Load documents from a JSON file. Returns `False` on error. |
-| `set_annotation_widgets(widgets)` | Set the widget list (must be called after `load_documents`). |
-| `run(debug, port, host)` | Start the Dash server. |
-
 ## Document format
 
 JSON file listing documents to annotate:
@@ -167,11 +272,6 @@ JSON file listing documents to annotate:
   {"file_path": "data/note_001.txt"},
   {"file_path": "data/note_002.txt", "name": "Patient 2", "info": {"date": "2024-01-15"}}
 ]
-```
-
-Or with a top-level `"documents"` key:
-```json
-{"documents": [{"file_path": "data/note_001.txt"}]}
 ```
 
 Each document may have:
@@ -197,18 +297,19 @@ Status values: `"not_started"`, `"in_progress"`, `"complete"`.
 
 ## CLI
 
-`parse_args()` provides standard CLI flags for any tater app:
+```
+tater --config CONFIG --documents PATH [options]
+tater --schema SCHEMA --documents PATH [options]
+```
 
-```
---documents PATH     Documents JSON file (required)
---annotations PATH   Annotations output file (default: <documents>_annotations.json)
---port INT           Server port (default: 8050)
---host STR           Bind address (default: 127.0.0.1)
---debug              Enable debug/hot-reload mode
-```
+| Flag | Description |
+|------|-------------|
+| `--config PATH` | Python config file (one of `--config` / `--schema` required) |
+| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required) |
+| `--documents PATH` | Documents JSON file (required) |
+| `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
+| `--port INT` | Server port (default: `8050`) |
+| `--host STR` | Bind address (default: `127.0.0.1`) |
+| `--debug` | Enable debug/hot-reload mode |
 
 Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
-
-## License
-
-MIT

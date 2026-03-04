@@ -1,4 +1,4 @@
-"""Text input widget for free-form string annotations."""
+"""Textarea widget for multi-line text annotations."""
 from dataclasses import dataclass
 from typing import Optional
 import dash_mantine_components as dmc
@@ -7,8 +7,8 @@ from .base import TextWidget
 
 
 @dataclass(eq=False)
-class TextInputWidget(TextWidget):
-    """Widget for entering a single line of text."""
+class TextAreaWidget(TextWidget):
+    """Widget for entering multi-line text."""
 
     default: Optional[str] = None
     placeholder: Optional[str] = None
@@ -17,8 +17,8 @@ class TextInputWidget(TextWidget):
     def empty_value(self) -> str:
         return ""
 
-    def component(self) -> dmc.TextInput:
-        return dmc.TextInput(
+    def component(self) -> dmc.Textarea:
+        return dmc.Textarea(
             id=self.component_id,
             value=self.default if self.default is not None else self.empty_value,
             placeholder=self.placeholder,

@@ -1,24 +1,33 @@
 {
   "spec_version": "1.0",
+  "title": "tater - nested",
+  "description": "Single-level grouped fields with labels, descriptions, and widget hints.",
   "data_schema": [
     {
       "id": "document_sentiment",
-      "type": "single_choice",
-      "options": ["positive", "negative", "neutral"]
+      "type": "choice",
+      "options": ["positive", "negative", "neutral"],
+      "label": "Document Sentiment",
+      "description": "Overall sentiment of the entire document"
     },
     {
       "id": "owner",
       "type": "group",
+      "label": "Owner Information",
+      "description": "Information about the pet owner",
       "fields": [
         {
           "id": "sentiment",
-          "type": "single_choice",
-          "options": ["positive", "negative", "neutral"]
+          "type": "choice",
+          "options": ["positive", "negative", "neutral"],
+          "label": "Owner Sentiment"
         },
         {
           "id": "pet_type",
-          "type": "single_choice",
-          "options": ["cat", "dog", "fish"]
+          "type": "choice",
+          "options": ["cat", "dog", "fish"],
+          "label": "Owner's Pet Type",
+          "widget": {"type": "radio_group", "orientation": "vertical"}
         }
       ]
     }

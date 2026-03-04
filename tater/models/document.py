@@ -53,5 +53,8 @@ class Document(BaseModel):
             FileNotFoundError: If the file doesn't exist
             IOError: If there's an error reading the file
         """
+        # NOTE: file_path comes from user-supplied JSON and is not validated against
+        # a safe base directory. A malicious documents file could read arbitrary paths.
+        # Consider adding base_dir restriction in TaterApp if exposure is a concern.
         with open(self.file_path, 'r', encoding='utf-8') as f:
             return f.read()

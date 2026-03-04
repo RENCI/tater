@@ -1,12 +1,13 @@
 """Hierarchical label widget for tree-based label selection."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field as dc_field
 from pathlib import Path
 from typing import Any, Optional, Union
 
 from dash import dcc, Input, Output, State, ALL, no_update, ctx
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 from tater.widgets.base import TaterWidget, _unwrap_optional, _resolve_field_info
 
@@ -20,7 +21,7 @@ class Node:
     """A node in the label hierarchy tree."""
 
     name: str
-    children: list[Node] = field(default_factory=list)
+    children: list[Node] = dc_field(default_factory=list)
 
     @property
     def is_leaf(self) -> bool:
@@ -139,6 +140,7 @@ def load_hierarchy_from_yaml(path: Union[str, Path]) -> Node:
 # Base widget
 # ---------------------------------------------------------------------------
 
+@dataclass(eq=False)
 class HierarchicalLabelWidget(TaterWidget):
     """Base class for hierarchical label widgets.
 
@@ -148,22 +150,17 @@ class HierarchicalLabelWidget(TaterWidget):
     The schema field must be ``str`` or ``Optional[str]``.
     """
 
-    def __init__(
-        self,
-        schema_field: str,
-        label: str = "",
-        hierarchy: Union[Node, dict, list, str, Path, None] = None,
-        description: Optional[str] = None,
-        searchable: bool = True,
-    ):
-        super().__init__(schema_field=schema_field, label=label, description=description)
-        if isinstance(hierarchy, (str, Path)):
-            self.root = load_hierarchy_from_yaml(hierarchy)
-        elif isinstance(hierarchy, Node):
-            self.root = hierarchy
+    hierarchy: Union[Node, dict, list, str, Path, None] = None
+    searchable: bool = True
+    root: Node = dc_field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.hierarchy, (str, Path)):
+            self.root = load_hierarchy_from_yaml(self.hierarchy)
+        elif isinstance(self.hierarchy, Node):
+            self.root = self.hierarchy
         else:
-            self.root = build_tree(hierarchy or {})
-        self.searchable = searchable
+            self.root = build_tree(self.hierarchy or {})
 
     # ------------------------------------------------------------------
     # TaterWidget interface
@@ -394,6 +391,7 @@ class HierarchicalLabelWidget(TaterWidget):
 # Concrete widgets
 # ---------------------------------------------------------------------------
 
+@dataclass(eq=False)
 class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
     """Progressive disclosure widget showing all sibling nodes at each level.
 
@@ -412,6 +410,7 @@ class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
         return _build_sections_full(self.root, path, cid, selected_value=selected_value)
 
 
+@dataclass(eq=False)
 class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
     """Compact hierarchical widget showing only the selected node per level.
 
@@ -458,7 +457,7 @@ def _make_buttons(
                 dmc.Group(
                     [
                         dmc.Text(str(len(node.children)), size="xs", lh=1),
-                        dmc.Text("▾", size="lg", lh=1),
+                        DashIconify(icon="tabler:chevron-down", width=12),
                     ],
                     gap=0,
                 ),
@@ -524,7 +523,7 @@ def _build_sections_compact(
 
     def _add(buttons: list) -> None:
         if sections:
-            sections.append(dmc.Text("▾", size="xl", c="dimmed", lh=0.5, pl="sm"))
+            sections.append(dmc.Box(DashIconify(icon="tabler:chevron-down", width=16, color="gray"), pl="xs", style={"lineHeight": 0, "display": "block"}))
         sections.append(dmc.Group(buttons, gap="xs", wrap="wrap"))
 
     for depth, name in enumerate(path):
