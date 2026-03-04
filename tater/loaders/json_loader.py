@@ -383,7 +383,7 @@ def _build_widget(
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
     if ftype == "text":
-        if widget_type == "textarea":
+        if widget_type == "text_area":
             return TextAreaWidget(
                 fid, label=label, description=description, required=required,
                 placeholder=widget_spec.get("placeholder"),
@@ -431,7 +431,7 @@ def _build_widget(
         ref = spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
-        if widget_type == "full":
+        if widget_type == "hierarchical_label_full":
             return HierarchicalLabelFullWidget(
                 fid, label=label, description=description,
                 hierarchy=hierarchy, searchable=searchable,

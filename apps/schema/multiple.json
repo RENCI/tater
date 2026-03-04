@@ -96,7 +96,7 @@
       "type": "text",
       "label": "Detailed Notes",
       "description": "Extended notes about this document",
-      "widget": {"type": "textarea", "placeholder": "Enter detailed notes...", "min_rows": 4}
+      "widget": {"type": "text_area", "placeholder": "Enter detailed notes...", "min_rows": 4}
     }
   ]
 }

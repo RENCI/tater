@@ -136,12 +136,12 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 |--------|-------------|----------------|----------------------------------|
 | `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_group` |
 | `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `chip_group` |
-| `text` | `str` | `TextInputWidget` | `textarea` |
+| `text` | `str` | `TextInputWidget` | `text_area` |
 | `boolean` | `bool` | `CheckboxWidget` | `switch` |
 | `numeric` | `float` | `NumberInputWidget` | `slider` |
 | `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
 | `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
-| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `full` |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full` |
 | `group` | nested model | `GroupWidget` | — |
 | `listable` | `list[model]` | `ListableWidget` | — |
 

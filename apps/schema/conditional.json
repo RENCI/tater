@@ -26,7 +26,7 @@
       "id": "health_description",
       "type": "text",
       "label": "Health Description",
-      "widget": {"type": "textarea", "placeholder": "Describe the health issue..."},
+      "widget": {"type": "text_area", "placeholder": "Describe the health issue..."},
       "conditional_on": {"field": "has_health_issue", "value": true}
     },
     {
@@ -46,7 +46,7 @@
       "id": "rescue_notes",
       "type": "text",
       "label": "Rescue Notes",
-      "widget": {"type": "textarea", "placeholder": "Additional notes about rescue..."},
+      "widget": {"type": "text_area", "placeholder": "Additional notes about rescue..."},
       "conditional_on": {"field": "is_stray", "value": true}
     }
   ]
