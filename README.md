@@ -313,7 +313,3 @@ tater --schema SCHEMA --documents PATH [options]
 | `--debug` | Enable debug/hot-reload mode |
 
 Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
-
-## License
-
-MIT
