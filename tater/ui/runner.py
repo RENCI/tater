@@ -27,9 +27,9 @@ def main() -> None:
         on_save = config["on_save"]
         configure = config["configure"]
     elif args.schema:
-        from tater.loaders import load_schema_full
+        from tater.loaders import load_schema
 
-        config = load_schema_full(args.schema)
+        config = load_schema(args.schema)
         schema_model = config["schema_model"]
         widgets = config["widgets"]
         title = config["title"]
