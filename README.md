@@ -12,34 +12,60 @@ uv sync
 
 ## Quick Start
 
-```python
-from typing import Literal, Optional
-from pydantic import BaseModel
-from tater import TaterApp, parse_args
-from tater.widgets import SegmentedControlWidget, TextInputWidget
+Create a Python config file (`my_config.py`):
 
-class NoteAnnotation(BaseModel):
-    sentiment: Literal["positive", "negative", "neutral"]
-    summary: Optional[str] = None
+```python
+from typing import Optional, Literal
+from pydantic import BaseModel
+
+class Schema(BaseModel):
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    is_relevant: bool = False
+```
+
+Run it — widgets are auto-generated from the schema:
+
+```bash
+tater --config my_config.py --documents data/documents.json
+```
+
+Or specify widgets explicitly:
+
+```python
+from typing import Optional, Literal
+from pydantic import BaseModel
+from tater.widgets import SegmentedControlWidget, CheckboxWidget
+
+class Schema(BaseModel):
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    is_relevant: bool = False
+
+title = "My Annotator"
 
 widgets = [
-    SegmentedControlWidget("sentiment", label="Sentiment"),
-    TextInputWidget("summary", label="Summary", description="Brief summary of the note"),
+    SegmentedControlWidget("sentiment", label="Sentiment", required=True),
+    CheckboxWidget("is_relevant", label="Relevant?"),
 ]
-
-args = parse_args()
-app = TaterApp(title="My Annotator", schema_model=NoteAnnotation, annotations_path=args.annotations)
-app.load_documents(args.documents)
-app.set_annotation_widgets(widgets)
-app.run(debug=args.debug, port=args.port, host=args.host)
 ```
 
-Run with:
+Alternatively, use a JSON schema file (`my_schema.json`):
+
+```json
+{
+  "spec_version": "1.0",
+  "title": "My Annotator",
+  "data_schema": [
+    {"id": "sentiment", "type": "single_choice", "options": ["positive", "negative", "neutral"], "required": true},
+    {"id": "is_relevant", "type": "boolean"}
+  ]
+}
+```
+
 ```bash
-python my_app.py --documents data/documents.json
+tater --schema my_schema.json --documents data/documents.json
 ```
 
-Example apps for all widget types are in [apps/](apps/).
+Example configs and schemas are in [apps/](apps/).
 
 ## Widgets
 
@@ -197,15 +223,20 @@ Status values: `"not_started"`, `"in_progress"`, `"complete"`.
 
 ## CLI
 
-`parse_args()` provides standard CLI flags for any tater app:
+```
+tater --config CONFIG --documents PATH [options]
+tater --schema SCHEMA --documents PATH [options]
+```
 
-```
---documents PATH     Documents JSON file (required)
---annotations PATH   Annotations output file (default: <documents>_annotations.json)
---port INT           Server port (default: 8050)
---host STR           Bind address (default: 127.0.0.1)
---debug              Enable debug/hot-reload mode
-```
+| Flag | Description |
+|------|-------------|
+| `--config PATH` | Python config file (one of `--config` / `--schema` required) |
+| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required) |
+| `--documents PATH` | Documents JSON file (required) |
+| `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
+| `--port INT` | Server port (default: `8050`) |
+| `--host STR` | Bind address (default: `127.0.0.1`) |
+| `--debug` | Enable debug/hot-reload mode |
 
 Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
 
