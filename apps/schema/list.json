@@ -1,16 +1,23 @@
 {
   "spec_version": "1.0",
   "title": "tater - list",
-  "description": "Repeatable pet entries as a list field.",
+  "description": "Repeatable pet entries with list widget configuration.",
   "data_schema": [
     {
       "id": "pets",
       "type": "list",
+      "label": "Pets",
+      "widget": {
+        "add_label": "Add Pet",
+        "delete_label": "Delete Pet",
+        "initial_count": 1
+      },
       "item_fields": [
         {
           "id": "kind",
           "type": "single_choice",
-          "options": ["cat", "dog", "fish"]
+          "options": ["cat", "dog", "fish"],
+          "label": "Pet Type"
         }
       ]
     }

@@ -11,6 +11,7 @@ class Schema(BaseModel):
 
 
 title = "tater - simple"
+description = "All widgets specified explicitly."
 
 widgets = [
     SegmentedControlWidget(
