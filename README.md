@@ -1,6 +1,6 @@
 # Tater
 
-A Python library for building document annotation interfaces with [Dash](https://dash.plotly.com/) and [Pydantic](https://docs.pydantic.dev/).
+A Python library for building document annotation interfaces with [Pydantic](https://docs.pydantic.dev/) and [Dash](https://dash.plotly.com/).
 
 Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
