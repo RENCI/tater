@@ -69,14 +69,10 @@ class TaterApp:
             with open(source, 'r') as f:
                 data = json.load(f)
             
-            # Handle both formats: {"documents": [...]} and [...]
-            if isinstance(data, dict) and "documents" in data:
-                doc_dicts = data["documents"]
-            elif isinstance(data, list):
-                doc_dicts = data
-            else:
+            if not isinstance(data, list):
                 print(f"Error: Invalid document format in {source}")
                 return False
+            doc_dicts = data
             
             # Parse into Document instances
             documents = []

@@ -274,11 +274,6 @@ JSON file listing documents to annotate:
 ]
 ```
 
-Or with a top-level `"documents"` key:
-```json
-{"documents": [{"file_path": "data/note_001.txt"}]}
-```
-
 Each document may have:
 - `file_path` (required) — path to a `.txt` file
 - `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
