@@ -5,7 +5,7 @@
   "data_schema": [
     {
       "id": "document_sentiment",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["positive", "negative", "neutral"],
       "label": "Document Sentiment",
       "description": "Overall sentiment of the entire document"
@@ -18,13 +18,13 @@
       "fields": [
         {
           "id": "sentiment",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["positive", "negative", "neutral"],
           "label": "Owner Sentiment"
         },
         {
           "id": "pet_type",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["cat", "dog", "fish"],
           "label": "Owner's Pet Type",
           "widget": {"type": "radio_group", "orientation": "vertical"}

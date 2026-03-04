@@ -67,7 +67,7 @@ Alternatively, use a JSON schema file (`my_schema.json`):
   "spec_version": "1.0",
   "title": "My Annotator",
   "data_schema": [
-    {"id": "sentiment", "type": "single_choice", "options": ["positive", "negative", "neutral"], "required": true},
+    {"id": "sentiment", "type": "choice", "options": ["positive", "negative", "neutral"], "required": true},
     {"id": "is_relevant", "type": "boolean"}
   ]
 }
@@ -78,6 +78,88 @@ tater --schema my_schema.json --documents data/documents.json
 ```
 
 Example configs and schemas are in [apps/](apps/).
+
+## Python config reference
+
+A config file is a plain Python module. The `tater` CLI looks for these names:
+
+| Name | Required | Description |
+|------|----------|-------------|
+| `Schema` | **yes** | Pydantic `BaseModel` subclass defining the annotation fields |
+| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest |
+| `title` | no | App window title (default: `"tater - document annotation"`) |
+| `description` | no | Subtitle shown below the title |
+| `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
+| `on_save` | no | Callable `(doc_id: str, annotation: BaseModel) -> None` called after each auto-save |
+| `configure` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks |
+
+## JSON schema reference
+
+A JSON schema file has this top-level structure:
+
+```json
+{
+  "spec_version": "1.0",
+  "title": "My Annotator",
+  "description": "Optional subtitle",
+  "hierarchies": {
+    "ontology": "path/to/ontology.yaml"
+  },
+  "data_schema": [ ... ]
+}
+```
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `spec_version` | **yes** | Must be `"1.0"` |
+| `data_schema` | **yes** | Array of field definitions |
+| `title` | no | App window title |
+| `description` | no | Subtitle shown below the title |
+| `hierarchies` | no | Map of named hierarchies (YAML file path or inline dict) used by `hierarchical_label` fields |
+
+### Field definition
+
+Every entry in `data_schema` (and `item_fields` / `fields` for list/group types) has:
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `id` | **yes** | Field name (used as Pydantic field name and widget ID) |
+| `type` | **yes** | Field type — see table below |
+| `label` | no | Display label (defaults to humanized `id`) |
+| `description` | no | Help text shown below the widget |
+| `required` | no | `true` marks the field as required for completion tracking |
+| `widget` | no | Object with widget-type overrides — see per-type notes below |
+
+### Field types
+
+| `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
+|--------|-------------|----------------|----------------------------------|
+| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_group` |
+| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `chip_group` |
+| `text` | `str` | `TextInputWidget` | `textarea` |
+| `boolean` | `bool` | `CheckboxWidget` | `switch` |
+| `numeric` | `float` | `NumberInputWidget` | `slider` |
+| `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
+| `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `full` |
+| `group` | nested model | `GroupWidget` | — |
+| `listable` | `list[model]` | `ListableWidget` | — |
+
+**`choice` / `multi_choice`** — requires `options` array.
+
+**`numeric` / `range_slider`** — `widget` may include `min_value`, `max_value`, `step`.
+
+**`text`** — `widget` may include `placeholder`.
+
+**`radio_group`** — `widget.orientation`: `"vertical"` or `"horizontal"`.
+
+**`hierarchical_label`** — requires `hierarchy_ref` matching a key in `hierarchies`. `widget` may include `searchable` (default `true`).
+
+**`span_annotation`** — requires `entity_types` array of strings.
+
+**`group`** — requires `fields` array of child field definitions.
+
+**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`.
 
 ## Widgets
 
@@ -180,23 +262,6 @@ HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, 
 ```
 
 Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
-
-## TaterApp
-
-```python
-TaterApp(
-    title="My App",                # Browser tab title
-    theme="light",                 # "light" or "dark"
-    schema_model=MyModel,          # Pydantic BaseModel subclass
-    annotations_path="out.json",   # Where to save annotations (optional)
-)
-```
-
-| Method | Description |
-|--------|-------------|
-| `load_documents(path)` | Load documents from a JSON file. Returns `False` on error. |
-| `set_annotation_widgets(widgets)` | Set the widget list (must be called after `load_documents`). |
-| `run(debug, port, host)` | Start the Dash server. |
 
 ## Document format
 

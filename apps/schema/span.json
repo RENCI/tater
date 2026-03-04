@@ -12,7 +12,7 @@
     },
     {
       "id": "quality",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["high", "medium", "low"],
       "required": true,
       "label": "Note Quality"

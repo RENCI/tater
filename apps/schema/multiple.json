@@ -5,7 +5,7 @@
   "data_schema": [
     {
       "id": "pet_type",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["cat", "dog", "fish"],
       "required": true,
       "label": "Pet Type",
@@ -14,7 +14,7 @@
     },
     {
       "id": "sentiment",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["positive", "negative", "neutral"],
       "required": true,
       "label": "Sentiment",
@@ -22,7 +22,7 @@
     },
     {
       "id": "location",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["home", "park", "vet", "shelter", "other"],
       "required": true,
       "label": "Location",
@@ -78,14 +78,14 @@
     },
     {
       "id": "age_range",
-      "type": "range",
+      "type": "range_slider",
       "label": "Age Range",
       "description": "Estimated age range of the pet",
       "widget": {"min_value": 0, "max_value": 30, "step": 1}
     },
     {
       "id": "reviewer_note",
-      "type": "free_text",
+      "type": "text",
       "required": true,
       "label": "Reviewer note",
       "description": "Optional short note about this document",
@@ -93,7 +93,7 @@
     },
     {
       "id": "detailed_notes",
-      "type": "free_text",
+      "type": "text",
       "label": "Detailed Notes",
       "description": "Extended notes about this document",
       "widget": {"type": "textarea", "placeholder": "Enter detailed notes...", "min_rows": 4}

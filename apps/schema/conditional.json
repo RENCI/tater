@@ -12,7 +12,7 @@
     },
     {
       "id": "indoor_location",
-      "type": "free_text",
+      "type": "text",
       "label": "Indoor Location",
       "widget": {"type": "text_input", "placeholder": "e.g. living room, kitchen"},
       "conditional_on": {"field": "is_indoor", "value": true}
@@ -24,7 +24,7 @@
     },
     {
       "id": "health_description",
-      "type": "free_text",
+      "type": "text",
       "label": "Health Description",
       "widget": {"type": "textarea", "placeholder": "Describe the health issue..."},
       "conditional_on": {"field": "has_health_issue", "value": true}
@@ -37,14 +37,14 @@
     },
     {
       "id": "rescue_org",
-      "type": "free_text",
+      "type": "text",
       "label": "Rescue Organisation",
       "widget": {"type": "text_input", "placeholder": "Organisation name"},
       "conditional_on": {"field": "is_stray", "value": true}
     },
     {
       "id": "rescue_notes",
-      "type": "free_text",
+      "type": "text",
       "label": "Rescue Notes",
       "widget": {"type": "textarea", "placeholder": "Additional notes about rescue..."},
       "conditional_on": {"field": "is_stray", "value": true}

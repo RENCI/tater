@@ -5,7 +5,7 @@
   "data_schema": [
     {
       "id": "sentiment",
-      "type": "single_choice",
+      "type": "choice",
       "options": ["positive", "negative", "neutral"],
       "required": true
     },

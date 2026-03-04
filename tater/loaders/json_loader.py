@@ -24,7 +24,7 @@ Schema format::
       "data_schema": [
         {
           "id": "sentiment",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["positive", "negative", "neutral"],
           "required": true,
           "label": "Sentiment",
@@ -33,7 +33,7 @@ Schema format::
         },
         {
           "id": "diagnosis",
-          "type": "hierarchical",
+          "type": "hierarchical_label",
           "hierarchy_ref": "ontology",
           "label": "Diagnosis",
           "widget": {"type": "compact", "searchable": true}
@@ -43,17 +43,17 @@ Schema format::
           "type": "group",
           "label": "Location",
           "fields": [
-            {"id": "city",    "type": "free_text", "label": "City"},
-            {"id": "country", "type": "free_text", "label": "Country"}
+            {"id": "city",    "type": "text", "label": "City"},
+            {"id": "country", "type": "text", "label": "Country"}
           ]
         },
         {
           "id": "pets",
-          "type": "list",
+          "type": "listable",
           "label": "Pets",
           "item_fields": [
-            {"id": "name", "type": "free_text",     "label": "Name"},
-            {"id": "kind", "type": "single_choice", "label": "Kind",
+            {"id": "name", "type": "text",   "label": "Name"},
+            {"id": "kind", "type": "choice", "label": "Kind",
              "options": ["cat", "dog"]}
           ]
         }
@@ -294,7 +294,7 @@ def _process_field(
             local_id, label=label, description=description, children=child_widgets
         )
 
-    if ftype == "list":
+    if ftype == "listable":
         item_model_fields: dict[str, Any] = {}
         item_widgets: list[TaterWidget] = []
         for child_spec in spec.get("item_fields", []):
@@ -321,25 +321,25 @@ def _process_field(
     widget_spec = spec.get("widget") or {}
     widget_type: str | None = widget_spec.get("type")
 
-    if ftype == "single_choice":
+    if ftype == "choice":
         lit = _make_literal(options)
         field_def = (Optional[lit], default)
     elif ftype == "multi_choice":
         lit = _make_literal(options)
         field_def = (list[lit], Field(default_factory=list))
-    elif ftype == "free_text":
+    elif ftype == "text":
         field_def = (Optional[str], default)
     elif ftype == "boolean":
         field_def = (bool, default if default is not None else False)
     elif ftype == "numeric":
         field_def = (Optional[float], default)
-    elif ftype == "range":
+    elif ftype == "range_slider":
         _min = float(widget_spec.get("min_value", 0))
         _max = float(widget_spec.get("max_value", 100))
         field_def = (list[float], Field(default_factory=lambda a=_min, b=_max: [a, b]))
     elif ftype == "span_annotation":
         field_def = (list[SpanAnnotation], Field(default_factory=list))
-    elif ftype == "hierarchical":
+    elif ftype == "hierarchical_label":
         field_def = (Optional[str], None)
     else:
         raise ValueError(f"Unknown field type {ftype!r} for field {local_id!r}")
@@ -365,7 +365,7 @@ def _build_widget(
     spec: dict,
     hierarchy_map: dict[str, Node],
 ) -> TaterWidget:
-    if ftype == "single_choice":
+    if ftype == "choice":
         if widget_type == "radio_group":
             return RadioGroupWidget(
                 fid, label=label, description=description, required=required,
@@ -382,7 +382,7 @@ def _build_widget(
             return ChipGroupWidget(fid, label=label, description=description, required=required)
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
-    if ftype == "free_text":
+    if ftype == "text":
         if widget_type == "textarea":
             return TextAreaWidget(
                 fid, label=label, description=description, required=required,
@@ -414,7 +414,7 @@ def _build_widget(
             step=widget_spec.get("step"),
         )
 
-    if ftype == "range":
+    if ftype == "range_slider":
         return RangeSliderWidget(
             fid, label=label, description=description, required=required,
             min_value=widget_spec.get("min_value", 0),
@@ -427,7 +427,7 @@ def _build_widget(
         entity_types = [EntityType(name=et) for et in spec.get("entity_types", [])]
         return SpanAnnotationWidget(fid, label=label, entity_types=entity_types, description=description)
 
-    if ftype == "hierarchical":
+    if ftype == "hierarchical_label":
         ref = spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)

@@ -5,7 +5,7 @@
   "data_schema": [
     {
       "id": "pets",
-      "type": "list",
+      "type": "listable",
       "label": "Pets",
       "widget": {
         "add_label": "Add Pet",
@@ -15,7 +15,7 @@
       "item_fields": [
         {
           "id": "kind",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["cat", "dog", "fish"],
           "label": "Pet Type"
         }

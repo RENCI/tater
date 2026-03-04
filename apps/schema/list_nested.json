@@ -5,7 +5,7 @@
   "data_schema": [
     {
       "id": "medications",
-      "type": "list",
+      "type": "listable",
       "label": "Medications",
       "widget": {
         "add_label": "Add Medication",
@@ -15,20 +15,20 @@
       "item_fields": [
         {
           "id": "name",
-          "type": "free_text",
+          "type": "text",
           "label": "Medication Name",
           "placeholder": "e.g. Ibuprofen"
         },
         {
           "id": "route",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["oral", "iv", "topical", "inhaled"],
           "label": "Route",
           "widget": {"type": "radio_group", "orientation": "horizontal"}
         },
         {
           "id": "frequency",
-          "type": "single_choice",
+          "type": "choice",
           "options": ["once daily", "twice daily", "as needed"],
           "label": "Frequency"
         }
