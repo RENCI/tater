@@ -227,36 +227,35 @@ class ListableWidget(ContainerWidget):
             if "." not in triggered_prop:
                 return all_ids if all_ids else []
 
+            triggered_id_str = triggered_prop.split(".")[0]
             try:
-                triggered_id_str = triggered_prop.split(".")[0]
                 triggered_id = json.loads(triggered_id_str)
+            except (json.JSONDecodeError, ValueError):
+                return all_ids if all_ids else []
 
-                if not isinstance(triggered_id, dict):
-                    return all_ids if all_ids else []
+            if not isinstance(triggered_id, dict):
+                return all_ids if all_ids else []
 
-                index = triggered_id.get("index")
-                field = triggered_id.get("field")
+            index = triggered_id.get("index")
+            field = triggered_id.get("field")
 
-                if index is None or field is None:
-                    return all_ids if all_ids else []
+            if index is None or field is None:
+                return all_ids if all_ids else []
 
-                full_field_path = f"{self.field_path}.{index}.{field}"
+            full_field_path = f"{self.field_path}.{index}.{field}"
 
-                for i, widget_id in enumerate(all_ids or []):
-                    if isinstance(widget_id, dict) and widget_id.get("index") == index:
-                        if i < len(all_values):
-                            value = all_values[i]
+            for i, widget_id in enumerate(all_ids or []):
+                if isinstance(widget_id, dict) and widget_id.get("index") == index:
+                    if i < len(all_values):
+                        value = all_values[i]
 
-                            if tater_app.schema_model:
-                                if doc_id not in tater_app.annotations:
-                                    tater_app.annotations[doc_id] = tater_app.schema_model()
+                        if tater_app.schema_model:
+                            if doc_id not in tater_app.annotations:
+                                tater_app.annotations[doc_id] = tater_app.schema_model()
 
-                                model = tater_app.annotations[doc_id]
-                                tater_app._set_model_value(model, full_field_path, value)
-                            break
-
-            except Exception:
-                pass
+                            model = tater_app.annotations[doc_id]
+                            tater_app._set_model_value(model, full_field_path, value)
+                    break
 
             return all_ids if all_ids else []
 
