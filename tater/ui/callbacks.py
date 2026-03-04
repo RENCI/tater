@@ -186,15 +186,15 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     )
     def save_notes(notes, doc_id, timing_data):
         if not doc_id:
-            return "document-notes"
-        
+            return no_update
+
         tater_app.metadata[doc_id].notes = notes if notes else ""
-        
+
         # Update save time
         if timing_data is None:
             timing_data = {}
         timing_data["last_save_time"] = time.time()
-        return "document-notes"
+        return no_update
 
 
 def _setup_timing_callbacks(tater_app: TaterApp) -> None:
