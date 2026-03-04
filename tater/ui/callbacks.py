@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dash import Input, Output, State, ALL
+import json
+import time
+from datetime import datetime
+
+from dash import Input, Output, State, ALL, ctx, no_update, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from tater.ui import value_helpers
@@ -82,8 +86,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True
     )
     def navigate_buttons(prev_clicks, next_clicks, current_doc_id, timing_data):
-        from dash import ctx, no_update
-
         if not ctx.triggered or not tater_app.documents:
             return no_update, no_update
 
@@ -110,8 +112,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True
     )
     def navigate_menu_item(menu_clicks, current_doc_id, timing_data):
-        from dash import ctx, no_update
-
         if not ctx.triggered or not tater_app.documents:
             return no_update, no_update
 
@@ -119,9 +119,8 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         if not triggered["value"]:
             return no_update, no_update
 
-        import json as _json
         prop_id = triggered["prop_id"].split(".")[0]
-        new_index = _json.loads(prop_id)["index"]
+        new_index = json.loads(prop_id)["index"]
 
         doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, new_index, timing_data)
         return doc_id, new_timing
@@ -137,7 +136,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def navigate_auto_advance(trigger, current_doc_id, timing_data):
-        from dash import no_update
         if not trigger:
             return no_update, no_update
         current_index = next(
@@ -168,7 +166,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def save_flag(checked, doc_id, timing_data):
-        import time
         if not doc_id:
             return no_update
 
@@ -188,7 +185,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True
     )
     def save_notes(notes, doc_id, timing_data):
-        import time
         if not doc_id:
             return "document-notes"
         
@@ -214,8 +210,6 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def on_save_click(n_clicks, current_doc_id, timing_data):
-        import time
-        from dash import no_update
         if not n_clicks:
             return no_update
         tater_app._save_annotations_to_file(doc_id=current_doc_id)
@@ -233,8 +227,6 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call='initial_duplicate',
     )
     def on_doc_change(doc_id, timing_data):
-        import time
-
         if doc_id:
             tater_app.metadata[doc_id].visited = True
             update_status_for_doc(tater_app, doc_id)
@@ -265,8 +257,6 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=False,
     )
     def update_footer(n_intervals, timing_data, doc_id):
-        import time
-        from datetime import datetime
         now = time.time()
 
         # Save status text - show error in red, or timestamp of last save
@@ -319,7 +309,6 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def toggle_pause(n_clicks, timing_data, doc_id):
-        import time
         if not n_clicks:
             return no_update
         if timing_data is None:
@@ -353,7 +342,6 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         Input("schema-warnings-store", "data"),
     )
     def show_schema_warnings(warnings):
-        from dash import no_update, html
         if not warnings:
             return no_update
 
@@ -464,7 +452,6 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
             prevent_initial_call=True,
         )
         def _trigger_auto_advance(value, current_count, _empty=_empty):
-            from dash import no_update
             if value is None or value == _empty:
                 return no_update
             return (current_count or 0) + 1
@@ -585,8 +572,6 @@ def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
 
 def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int, timing_data: dict) -> tuple:
     """Shared navigation logic: accumulate timing, save, and return new doc_id and timing."""
-    import time
-
     now = time.time()
     if current_doc_id:
         start = timing_data.get("doc_start_time") if timing_data else None
@@ -615,9 +600,6 @@ def _render_document_content(text: str, doc_id: str, span_widgets: list, tater_a
     When no SpanAnnotationWidgets are present, returns the raw text string.
     Otherwise builds a list of strings and highlighted html.Span components.
     """
-    from dash import html
-    from tater.ui import value_helpers
-
     if not span_widgets or not doc_id:
         return text
 
