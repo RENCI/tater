@@ -14,7 +14,15 @@ class Schema(BaseModel):
 title = "tater - hierarchical"
 description = "Ontology-driven annotation using compact and full hierarchical label widgets."
 
-instructions = "Browse the pet ontology using the chevron buttons or search. Select a primary breed with the compact widget and optionally a secondary breed with the full widget."
+instructions = """## Navigation
+
+- Use **chevron buttons** (→) to explore the ontology
+- Use **search** to find breeds by name
+- Expand/collapse branches with the tree UI
+
+**Primary Breed** uses compact view (shows only selected).
+**Secondary Breed** uses full view (shows all siblings).
+"""
 
 ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 

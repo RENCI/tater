@@ -13,9 +13,9 @@ class Schema(BaseModel):
 title = "tater - simple"
 description = "All widgets specified explicitly."
 
-instructions = """Annotate the pet's current mood using the segmented control.
-Check the 'Needs Attention' box if this pet requires immediate care.
-"""
+instructions = """**Annotate the pet's current mood** using the segmented control.
+
+**Mark 'Needs Attention'** if this pet requires immediate care."""
 
 widgets = [
     SegmentedControlWidget(

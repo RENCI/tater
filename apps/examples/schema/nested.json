@@ -2,7 +2,7 @@
   "spec_version": "1.0",
   "title": "tater - nested",
   "description": "Single-level grouped fields with labels, descriptions, and widget hints.",
-  "instructions": "Fill in the document mood at the top level. Expand the 'Owner Information' group to enter owner details.",
+  "instructions": "1. Set the **Document Mood** (top level)\n2. Expand **Owner Information** to reveal:\n   - Owner name\n   - Contact info\n   - Address details\n",
   "data_schema": [
     {
       "id": "document_mood",
