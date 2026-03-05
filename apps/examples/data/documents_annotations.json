@@ -1,0 +1,38 @@
+{
+  "doc_000": {
+    "annotations": {
+      "pets": []
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 0.0,
+      "status": "complete"
+    }
+  },
+  "doc_001": {
+    "annotations": {
+      "pets": []
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": false,
+      "annotation_seconds": 0.0,
+      "status": "not_started"
+    }
+  },
+  "doc_002": {
+    "annotations": {
+      "pets": []
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": false,
+      "annotation_seconds": 0.0,
+      "status": "not_started"
+    }
+  }
+}
