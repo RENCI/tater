@@ -1,6 +1,6 @@
 """Document and metadata models for Tater."""
 from typing import Optional, Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DocumentMetadata(BaseModel):
@@ -17,9 +17,39 @@ class Document(BaseModel):
     """Represents a document to be annotated."""
     
     id: str = Field(description="Unique document identifier")
-    file_path: str = Field(description="Path to the document file")
+    file_path: Optional[str] = Field(None, description="Path to the document file")
+    text: Optional[str] = Field(None, description="Document text content (inline)")
     name: Optional[str] = Field(None, description="Human-readable document name")
     info: Optional[dict[str, Any]] = Field(None, description="User-supplied metadata/information")
+    
+    @model_validator(mode="after")
+    def validate_content_source(self) -> "Document":
+        """Ensure exactly one of file_path or text is provided."""
+        has_file_path = bool(self.file_path)
+        has_text = bool(self.text)
+        
+        if has_file_path and has_text:
+            raise ValueError("Cannot provide both 'file_path' and 'text'; provide exactly one")
+        
+        if not has_file_path and not has_text:
+            raise ValueError("Must provide either 'file_path' or 'text'")
+        
+        return self
+    
+    def display_name(self) -> str:
+        """
+        Get a human-readable display name for this document.
+        
+        Returns (in priority order):
+        1. The 'name' field if provided
+        2. The filename from 'file_path' if provided
+        3. The document 'id'
+        """
+        if self.name:
+            return self.name
+        if self.file_path:
+            return self.file_path.split('/')[-1]
+        return self.id
     
     @classmethod
     def from_dict(cls, doc_dict: dict[str, Any], index: int = 0) -> "Document":
@@ -50,11 +80,14 @@ class Document(BaseModel):
             The document's text content
             
         Raises:
-            FileNotFoundError: If the file doesn't exist
+            FileNotFoundError: If file_path is set but the file doesn't exist
             IOError: If there's an error reading the file
         """
-        # NOTE: file_path comes from user-supplied JSON and is not validated against
-        # a safe base directory. A malicious documents file could read arbitrary paths.
-        # Consider adding base_dir restriction in TaterApp if exposure is a concern.
+        # If text is provided inline, return it directly
+        if self.text is not None:
+            return self.text
+        
+        # Otherwise, load from file_path
+        assert self.file_path is not None  # Guaranteed by validate_content_source
         with open(self.file_path, 'r', encoding='utf-8') as f:
             return f.read()

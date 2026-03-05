@@ -12,7 +12,7 @@ import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 import typing
-from .base import ContainerWidget, TaterWidget, _resolve_field_info, _unwrap_optional
+from .base import ContainerWidget, TaterWidget, ControlWidget, _resolve_field_info, _unwrap_optional
 
 
 @dataclass(eq=False)
@@ -228,7 +228,10 @@ class ListableWidget(ContainerWidget):
 
         if tater_app:
             for item_widget_template in self.item_widgets:
-                self._register_item_pattern_callback(item_widget_template, app, tater_app)
+                # Only register pattern callbacks for ControlWidget instances (which have value_prop)
+                # Skip container widgets like SpanAnnotationWidget
+                if isinstance(item_widget_template, ControlWidget):
+                    self._register_item_pattern_callback(item_widget_template, app, tater_app)
 
     def _register_item_pattern_callback(self, item_widget_template: TaterWidget, app: Any, tater_app: Any) -> None:
         """Register a single pattern-matching callback that handles all items for this widget type."""
