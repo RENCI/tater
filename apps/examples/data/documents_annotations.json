@@ -1,0 +1,56 @@
+{
+  "doc_000": {
+    "annotations": {
+      "document_mood": "positive",
+      "address": {
+        "location": {
+          "location_mood": "cheerful"
+        },
+        "pet_type": "dog"
+      }
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 87.94078254699707,
+      "status": "complete"
+    }
+  },
+  "doc_001": {
+    "annotations": {
+      "document_mood": null,
+      "address": {
+        "location": {
+          "location_mood": null
+        },
+        "pet_type": null
+      }
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 23.154891967773438,
+      "status": "complete"
+    }
+  },
+  "doc_002": {
+    "annotations": {
+      "document_mood": null,
+      "address": {
+        "location": {
+          "location_mood": null
+        },
+        "pet_type": null
+      }
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 39.79374551773071,
+      "status": "in_progress"
+    }
+  }
+}

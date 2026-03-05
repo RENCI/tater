@@ -1,4 +1,4 @@
-"""Span annotation example for tagging medical entities."""
+"""Span annotation example for tagging pet-related entities."""
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
@@ -12,23 +12,23 @@ class Schema(BaseModel):
 
 
 title = "tater - span annotation"
-description = "Tag named entities in clinical text using the span annotation widget."
+description = "Tag named entities in pet-related text using the span annotation widget."
 
 widgets = [
     SpanAnnotationWidget(
         schema_field="entities",
-        label="Clinical Entities",
+        label="Pet Entities",
         description="Highlight text then click an entity type to label it.",
         entity_types=[
-            EntityType("Medication"),
-            EntityType("Diagnosis"),
-            EntityType("Symptom"),
-            EntityType("Procedure"),
+            EntityType("Pet"),
+            EntityType("Breed"),
+            EntityType("Behavior"),
+            EntityType("Activity"),
         ],
     ),
     SegmentedControlWidget(
         schema_field="quality",
-        label="Note Quality",
+        label="Record Quality",
         required=True,
     ),
 ]

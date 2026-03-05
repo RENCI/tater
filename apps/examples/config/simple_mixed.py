@@ -1,7 +1,7 @@
 """Simple annotation using default widget generation with one override.
 
-Only ``sentiment`` is specified explicitly; the runner detects the partial
-list and auto-generates the remaining fields (``is_relevant``) via
+Only ``pet_mood`` is specified explicitly; the runner detects the partial
+list and auto-generates the remaining fields (``needs_attention``) via
 ``widgets_from_model``.
 """
 from typing import Optional, Literal
@@ -11,8 +11,8 @@ from tater.widgets import RadioGroupWidget
 
 
 class Schema(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
-    is_relevant: bool = False
+    pet_mood: Optional[Literal["happy", "anxious", "calm"]] = None
+    needs_attention: bool = False
 
 
 title = "tater - simple (mixed)"
@@ -20,9 +20,9 @@ description = "Explicitly specifies one widget; the remaining fields are auto-ge
 
 widgets = [
     RadioGroupWidget(
-        schema_field="sentiment",
-        label="Sentiment",
-        description="Overall sentiment of the document",
+        schema_field="pet_mood",
+        label="Pet Mood",
+        description="Overall mood of the pet in this record",
         required=True,
         vertical=True,
     ),

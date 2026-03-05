@@ -1,0 +1,22 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - simple (mixed)",
+  "description": "Pet mood shown as a vertical radio group; attention uses the default widget.",
+  "data_schema": [
+    {
+      "id": "pet_mood",
+      "type": "choice",
+      "options": ["happy", "anxious", "calm"],
+      "required": true,
+      "label": "Pet Mood",
+      "description": "Overall mood of the pet in this record",
+      "widget": {"type": "radio_group", "orientation": "vertical"}
+    },
+    {
+      "id": "needs_attention",
+      "type": "boolean",
+      "label": "Needs Attention?",
+      "description": "Does this pet require immediate attention?"
+    }
+  ]
+}

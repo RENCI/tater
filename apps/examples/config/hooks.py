@@ -8,8 +8,8 @@ Instead, ``configure`` sets ``app.on_save`` after the app is created.
 
 Escape hatch
 ------------
-``configure`` also registers a Dash callback that clears ``sentiment``
-whenever ``is_relevant`` is unchecked — a cross-field rule that can't be
+``configure`` also registers a Dash callback that clears ``pet_mood``
+whenever ``needs_attention`` is unchecked — a cross-field rule that can't be
 expressed as a widget declaration.  It runs after ``set_annotation_widgets``
 so that Tater's component IDs are already finalised.
 """
@@ -23,26 +23,26 @@ from tater.widgets import SegmentedControlWidget, CheckboxWidget
 
 
 class Schema(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
-    is_relevant: bool = False
+    pet_mood: Optional[Literal["happy", "anxious", "calm"]] = None
+    needs_attention: bool = False
 
 
 title = "tater - hooks"
 description = "Demonstrates the on_save hook and escape-hatch Dash callback pattern."
 
-sentiment = SegmentedControlWidget(
-    schema_field="sentiment",
-    label="Sentiment",
-    description="Overall sentiment of the document",
+pet_mood = SegmentedControlWidget(
+    schema_field="pet_mood",
+    label="Pet Mood",
+    description="Overall mood of the pet in this record",
     required=True,
 )
-is_relevant = CheckboxWidget(
-    schema_field="is_relevant",
-    label="Relevant?",
-    description="Is this document relevant?",
+needs_attention = CheckboxWidget(
+    schema_field="needs_attention",
+    label="Needs Attention?",
+    description="Does this pet require immediate attention?",
 )
 
-widgets = [sentiment, is_relevant]
+widgets = [pet_mood, needs_attention]
 
 
 def configure(app) -> None:
@@ -59,15 +59,15 @@ def configure(app) -> None:
 
     app.on_save = _log_save
 
-    # Escape hatch: clear sentiment when document is marked not relevant.
+    # Escape hatch: clear pet_mood when pet does not need attention.
     from dash import Input, Output, no_update
 
     @app.app.callback(
-        Output(sentiment.component_id, "value", allow_duplicate=True),
-        Input(is_relevant.component_id, "checked"),
+        Output(pet_mood.component_id, "value", allow_duplicate=True),
+        Input(needs_attention.component_id, "checked"),
         prevent_initial_call=True,
     )
-    def clear_sentiment_when_irrelevant(is_relevant):
-        if not is_relevant:
+    def clear_mood_when_no_attention(needs_attention):
+        if not needs_attention:
             return None
         return no_update

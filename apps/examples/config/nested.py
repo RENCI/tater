@@ -9,12 +9,12 @@ from tater.widgets import SegmentedControlWidget, RadioGroupWidget, GroupWidget
 
 
 class OwnerInfo(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    owner_mood: Optional[Literal["happy", "anxious", "calm"]] = None
     pet_type: Optional[Literal["cat", "dog", "fish"]] = None
 
 
 class Schema(BaseModel):
-    document_sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    document_mood: Optional[Literal["positive", "negative", "neutral"]] = None
     owner: OwnerInfo = Field(default_factory=OwnerInfo)
 
 
@@ -23,9 +23,9 @@ description = "Single level of nesting via GroupWidget for owner information."
 
 widgets = [
     SegmentedControlWidget(
-        schema_field="document_sentiment",
-        label="Document Sentiment",
-        description="Overall sentiment of the entire document",
+        schema_field="document_mood",
+        label="Document Mood",
+        description="Overall tone of the entire document",
     ),
     GroupWidget(
         schema_field="owner",
@@ -33,8 +33,8 @@ widgets = [
         description="Information about the pet owner",
         children=[
             SegmentedControlWidget(
-                schema_field="sentiment",
-                label="Owner Sentiment",
+                schema_field="owner_mood",
+                label="Owner Mood",
             ),
             RadioGroupWidget(
                 schema_field="pet_type",
