@@ -24,6 +24,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
     app = tater_app.app
     span_widgets = [w for w in tater_app.widgets if isinstance(w, SpanAnnotationWidget)]
+    has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
 
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app)
@@ -195,6 +196,17 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             timing_data = {}
         timing_data["last_save_time"] = time.time()
         return no_update
+
+    if has_instructions:
+        @app.callback(
+            Output("instructions-drawer", "opened"),
+            Input("btn-open-instructions", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def open_instructions(n_clicks):
+            if not n_clicks:
+                return no_update
+            return True
 
 
 def _setup_timing_callbacks(tater_app: TaterApp) -> None:

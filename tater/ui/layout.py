@@ -21,6 +21,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_controls = _build_document_controls()
     nav_controls = _build_navigation_controls(tater_app)
     footer_bar = _build_footer_bar()
+    has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
 
     # Stores + hidden proxy button per SpanAnnotationWidget
     span_stores = []
@@ -77,7 +78,26 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     dmc.Center(
                         dmc.Stack([
                             dmc.Title(tater_app.title, order=1, mt="xl"),
-                            dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
+                            dmc.Group(
+                                [
+                                    dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center"),
+                                    dmc.ActionIcon(
+                                        DashIconify(icon="tabler:help-circle", width=16),
+                                        id="btn-open-instructions",
+                                        variant="subtle",
+                                        size="sm",
+                                    ) if has_instructions else None,
+                                ],
+                                gap="xs",
+                                justify="center",
+                            ) if tater_app.description else (
+                                dmc.ActionIcon(
+                                    DashIconify(icon="tabler:help-circle", width=16),
+                                    id="btn-open-instructions",
+                                    variant="subtle",
+                                    size="sm",
+                                ) if has_instructions else None
+                            ),
                         ], gap="xs", align="center")
                     ),
                     dmc.Stack([
@@ -108,6 +128,20 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     nav_controls,
                 ], gap="lg")
             ], size="xl", py="xl", fluid=True, pb="100px"),
+            dmc.Drawer(
+                title="",
+                id="instructions-drawer",
+                opened=False,
+                position="right",
+                size="lg",
+                padding="md",
+                children=dmc.Stack(
+                    [
+                        dcc.Markdown(tater_app.instructions or ""),
+                    ],
+                    gap="md",
+                ),
+            ) if has_instructions else None,
             footer_bar,
         ]
     )

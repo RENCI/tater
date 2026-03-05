@@ -9,12 +9,12 @@ whether it's definitive or not-yet-definitive.
 """
 from typing import Optional, List
 from pydantic import BaseModel, Field
-import yaml
 
 from tater.widgets import (
-    SelectWidget, CheckboxWidget, HierarchicalLabelCompactWidget,
-    ListableWidget, EntityType
+    CheckboxWidget, HierarchicalLabelCompactWidget,
+    ListableWidget
 )
+from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 
 class DiagnosisItem(BaseModel):
@@ -29,15 +29,11 @@ class Schema(BaseModel):
     diagnoses: List[DiagnosisItem] = Field(default_factory=list)
 
 
-title = "tater - Granular breast diagnosis annotation"
+title = "tater - granular breast diagnosis annotation"
 description = "Annotate individual breast cancer diagnoses with definitive status."
 
 # Load the hierarchical diagnosis ontology
-def load_hierarchy():
-    """Load and return the breast_fdx oncology hierarchy."""
-    with open("apps/examples/data/breast_fdx_ontology.yaml") as f:
-        hierarchy = yaml.safe_load(f)
-    return hierarchy
+ontology = load_hierarchy_from_yaml("apps/pathology/granular_breast_fdx/breast_fdx_ontology.yaml")
 
 
 widgets = [
@@ -51,7 +47,8 @@ widgets = [
                 schema_field="diagnosis_code",
                 label="Diagnosis",
                 description="Browse the hierarchical diagnosis ontology",
-                hierarchy_source=load_hierarchy,
+                hierarchy=ontology,
+                searchable=True,
             ),
             
             CheckboxWidget(

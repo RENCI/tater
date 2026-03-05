@@ -16,6 +16,7 @@ def main() -> None:
     widgets = config.get("widgets")
     title = config.get("title")
     description = config.get("description")
+    instructions = config.get("instructions")
     theme = config.get("theme", "light")
     on_save = config.get("on_save")
     configure = config.get("configure")
@@ -35,6 +36,7 @@ def main() -> None:
     app = TaterApp(
         title=title,
         description=description,
+        instructions=instructions,
         theme=theme,
         annotations_path=args.annotations,
         schema_model=schema_model,
