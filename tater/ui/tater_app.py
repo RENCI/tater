@@ -107,6 +107,16 @@ class TaterApp:
             print(f"Error loading documents: {e}")
             return False
 
+    def _collect_all_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
+        """Recursively collect all widgets including nested ones from GroupWidget, ListableWidget, etc."""
+        all_widgets = []
+        for widget in widgets:
+            all_widgets.append(widget)
+            # If the widget has children (GroupWidget, ListableWidget), recurse into them
+            if hasattr(widget, "children") and widget.children:
+                all_widgets.extend(self._collect_all_widgets(widget.children))
+        return all_widgets
+
     def set_annotation_widgets(self, widgets: list[TaterWidget]) -> None:
         """
         Set the widgets for annotation.
@@ -123,9 +133,12 @@ class TaterApp:
         for widget in self.widgets:
             widget._finalize_paths()
 
+        # Collect all widgets (including nested) for lookup by field_path
+        self._all_widgets = self._collect_all_widgets(self.widgets)
+
         # Duplicate field check
         seen: set[str] = set()
-        for widget in self.widgets:
+        for widget in self._all_widgets:
             path = widget.field_path
             if path in seen:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
