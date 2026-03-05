@@ -256,9 +256,9 @@ class SpanAnnotationWidget(TaterWidget):
             annotation = tater_app.annotations[doc_id]
             current_spans: list[SpanAnnotation] = value_helpers.get_model_value(annotation, field_path) or []
 
-            # Skip exact duplicate
+            # Skip if overlapping with any existing span (includes exact duplicates)
             for existing in current_spans:
-                if existing.start == start and existing.end == end:
+                if start < existing.end and end > existing.start:
                     return no_update
 
             new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
