@@ -20,14 +20,13 @@ widgets = [
     ListableWidget(
         schema_field="pets",
         label="Pets",
+        description="Track one or more pets for this record.",
+        item_label="Pet",
         item_widgets=[
             SegmentedControlWidget(
                 schema_field="kind",
                 label="Pet Type",
             ),
         ],
-        add_label="Add Pet",
-        delete_label="Delete Pet",
-        initial_count=1,
     ),
 ]

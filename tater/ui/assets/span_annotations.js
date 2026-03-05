@@ -83,6 +83,7 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         var end = start + selectedText.length;
 
         _savedDocScroll = docEl.scrollTop;
+        selection.removeAllRanges();
         return { text: selectedText, start: start, end: end, tag: tag, ts: Date.now() };
     },
 

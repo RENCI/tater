@@ -27,6 +27,8 @@ widgets = [
     ListableWidget(
         schema_field="medications",
         label="Medications",
+        description="Add each medication entry with name, route, and frequency.",
+        item_label="Medication",
         item_widgets=[
             TextInputWidget(
                 schema_field="name",
@@ -43,8 +45,5 @@ widgets = [
                 label="Frequency",
             ),
         ],
-        add_label="Add Medication",
-        delete_label="Remove",
-        initial_count=1,
     ),
 ]

@@ -338,7 +338,7 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         return label, color
 
     @app.callback(
-        Output("notification-container", "children"),
+        Output("notification-container", "sendNotifications"),
         Input("schema-warnings-store", "data"),
     )
     def show_schema_warnings(warnings):
@@ -363,15 +363,14 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
                 style={"margin": "2px 0 0 0", "paddingLeft": "16px", "listStylePosition": "inside"},
             ))
 
-        return dmc.Notification(
-            id="schema-mismatch-notification",
-            title="Schema mismatch",
-            message=html.Div(sections),
-            color="yellow",
-            action="show",
-            autoClose=False,
-            styles={"description": {"maxHeight": "200px", "overflowY": "auto"}},
-        )
+        return [{
+            "id": "schema-mismatch-notification",
+            "title": "Schema mismatch",
+            "message": html.Div(sections, style={"maxHeight": "200px", "overflowY": "auto"}),
+            "color": "yellow",
+            "action": "show",
+            "autoClose": False,
+        }]
 
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:

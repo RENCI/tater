@@ -7,10 +7,9 @@
       "id": "medications",
       "type": "listable",
       "label": "Medications",
+      "description": "Add each medication entry with name, route, and frequency.",
       "widget": {
-        "add_label": "Add Medication",
-        "delete_label": "Remove",
-        "initial_count": 1
+        "item_label": "Medication"
       },
       "item_fields": [
         {
