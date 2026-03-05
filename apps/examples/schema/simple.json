@@ -1,0 +1,21 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - simple",
+  "description": "All widgets specified explicitly.",
+  "data_schema": [
+    {
+      "id": "pet_mood",
+      "type": "choice",
+      "options": ["happy", "anxious", "calm"],
+      "required": true,
+      "label": "Pet Mood",
+      "description": "Overall mood of the pet in this record"
+    },
+    {
+      "id": "needs_attention",
+      "type": "boolean",
+      "label": "Needs Attention?",
+      "description": "Does this pet require immediate attention?"
+    }
+  ]
+}

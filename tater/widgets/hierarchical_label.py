@@ -521,6 +521,12 @@ def _build_sections_compact(
     sections = []
     current_node = root
 
+    # If there's a selected value but no navigation path, find the path to it
+    if selected_value and not path:
+        computed_path = _find_path(root, selected_value)
+        if computed_path:
+            path = computed_path
+
     def _add(buttons: list) -> None:
         if sections:
             sections.append(dmc.Box(DashIconify(icon="tabler:chevron-down", width=16, color="gray"), pl="xs", style={"lineHeight": 0, "display": "block"}))
@@ -530,8 +536,8 @@ def _build_sections_compact(
         child = current_node.find(name)
 
         if child is not None and child.is_leaf:
-            # Show all siblings at this leaf level with the leaf highlighted
-            _add(_make_buttons(current_node.children, cid, idx=depth, selected_name=name))
+            # Show only the selected leaf node
+            _add(_make_buttons([child], cid, idx=depth, selected_name=name))
             return sections
 
         # Intermediate: collapse to just the selected button
@@ -541,8 +547,15 @@ def _build_sections_compact(
             return sections
         current_node = child
 
-    # Active level: show all children of the current node
+    # Active level: if there's a selected leaf value in current children, show only that
+    # Otherwise show all children for selection
     depth = len(path)
+    if selected_value:
+        selected_child = current_node.find(selected_value)
+        if selected_child and selected_child.is_leaf:
+            _add(_make_buttons([selected_child], cid, idx=depth, selected_name=selected_value))
+            return sections
+    
     _add(_make_buttons(current_node.children, cid, idx=depth, selected_name=selected_value))
 
     return sections

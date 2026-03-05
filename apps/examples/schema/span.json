@@ -1,13 +1,13 @@
 {
   "spec_version": "1.0",
   "title": "tater - span annotation",
-  "description": "Tag medical entities with explicit labels, descriptions, and entity types.",
+  "description": "Tag pet-related entities with explicit labels, descriptions, and entity types.",
   "data_schema": [
     {
       "id": "entities",
       "type": "span_annotation",
-      "entity_types": ["Medication", "Diagnosis", "Symptom", "Procedure"],
-      "label": "Clinical Entities",
+      "entity_types": ["Pet", "Breed", "Behavior", "Activity"],
+      "label": "Pet Entities",
       "description": "Highlight text then click an entity type to label it."
     },
     {
@@ -15,7 +15,7 @@
       "type": "choice",
       "options": ["high", "medium", "low"],
       "required": true,
-      "label": "Note Quality"
+      "label": "Record Quality"
     }
   ]
 }

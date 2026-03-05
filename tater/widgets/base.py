@@ -56,16 +56,20 @@ class TaterWidget:
     _full_path: Optional[str] = field(init=False, default=None, repr=False)
     _condition: Optional[tuple] = field(init=False, default=None, repr=False)
 
-    def conditional_on(self, controlling_field: str, value: bool) -> "TaterWidget":
+    def conditional_on(self, controlling_field: str, value: Any) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
 
         Args:
-            controlling_field: The schema_field of the controlling boolean widget.
+            controlling_field: The schema_field of the controlling widget (boolean or option).
             value: Show this widget when the controlling field equals this value.
+                   For booleans: True or False. For options: string value (e.g., "dog").
 
         Example::
 
             TextInputWidget("indoor_location", label="Location").conditional_on("is_indoor", True)
+            TextInputWidget("breed_notes", label="Breed").conditional_on("pet_type", "dog")
+
+        Note: Controlling widget must be declared before this widget in the widget list.
         """
         self._condition = (controlling_field, value)
         return self
@@ -132,7 +136,7 @@ class TaterWidget:
 
         The clientside callback immediately toggles display style (no round-trip).
         The server callback clears the widget value when it becomes hidden, so
-        stale values are not saved. Only supported for boolean controlling fields.
+        stale values are not saved. Supports boolean and option-based conditions.
         """
         if self._condition is None:
             return
@@ -140,13 +144,24 @@ class TaterWidget:
 
         controlling_field, target_value = self._condition
         controlling_id = f"annotation-{controlling_field.replace('.', '-')}"
-        target_js = "true" if target_value else "false"
+
+        # Determine which property the controlling widget uses.
+        # For simplicity: assume it's "checked" for BooleanWidget, "value" for all others.
+        # This will be refined via the app's widget registry if needed.
+        controlling_prop = self._get_controlling_property(app, controlling_field)
+
+        # Serialize target_value for JavaScript comparison.
+        # For booleans: use true/false; for strings: use quoted "value".
+        if isinstance(target_value, bool):
+            target_js = "true" if target_value else "false"
+        else:
+            target_js = f'"{target_value}"'
 
         # Clientside: toggle display instantly without a server round-trip.
         app.clientside_callback(
             f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
             Output(self.conditional_wrapper_id, "style"),
-            Input(controlling_id, "checked"),
+            Input(controlling_id, controlling_prop),
             prevent_initial_call=False,
         )
 
@@ -157,13 +172,28 @@ class TaterWidget:
 
         @app.callback(
             Output(self.component_id, _value_prop, allow_duplicate=True),
-            Input(controlling_id, "checked"),
+            Input(controlling_id, controlling_prop),
             prevent_initial_call=True,
         )
         def _clear_when_hidden(v):
             if v != _target:
                 return _empty
             return no_update
+
+    def _get_controlling_property(self, app: Any, controlling_field: str) -> str:
+        """Determine which property (checked/value) the controlling widget uses.
+
+        Returns "checked" for BooleanWidget, "value" for all others.
+        """
+        # Try to look up the controlling widget from the app's registry.
+        # If not found, default to "value" (which works for most option widgets).
+        if hasattr(app, "_tater_app") and hasattr(app._tater_app, "_all_widgets"):
+            for widget in app._tater_app._all_widgets:
+                if widget.field_path == controlling_field:
+                    # BooleanWidget has value_prop="checked"
+                    return getattr(widget, "value_prop", "value")
+        # Default: assume option/choice widget uses "value"
+        return "value"
 
     # Subclasses must override these three methods.
     # Without ABC enforcement, forgetting to do so will cause a runtime error

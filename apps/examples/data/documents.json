@@ -1,0 +1,26 @@
+[
+  {
+    "file_path": "apps/examples/data/note_001.txt",
+    "info": {
+      "date": "2024-01-15",
+      "pet_id": "12345",
+      "pet_name": "Whiskers"
+    }
+  },
+  {
+    "file_path": "apps/examples/data/note_002.txt",
+    "info": {
+      "date": "2024-01-16",
+      "pet_id": "67890",
+      "pet_name": "Max"
+    }
+  },
+  {
+    "file_path": "apps/examples/data/note_003.txt",
+    "info": {
+      "date": "2024-01-17",
+      "pet_id": "11223",
+      "pet_name": "Luna"
+    }
+  }
+]

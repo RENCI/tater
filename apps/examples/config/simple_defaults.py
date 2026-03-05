@@ -4,8 +4,8 @@ from pydantic import BaseModel
 
 
 class Schema(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
-    is_relevant: bool = False
+    pet_mood: Optional[Literal["happy", "anxious", "calm"]] = None
+    needs_attention: bool = False
 
 
 title = "tater - simple (defaults)"

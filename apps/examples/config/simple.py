@@ -6,8 +6,8 @@ from tater.widgets import SegmentedControlWidget, CheckboxWidget
 
 
 class Schema(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
-    is_relevant: bool = False
+    pet_mood: Optional[Literal["happy", "anxious", "calm"]] = None
+    needs_attention: bool = False
 
 
 title = "tater - simple"
@@ -15,14 +15,14 @@ description = "All widgets specified explicitly."
 
 widgets = [
     SegmentedControlWidget(
-        schema_field="sentiment",
-        label="Sentiment",
-        description="Overall sentiment of the document",
+        schema_field="pet_mood",
+        label="Pet Mood",
+        description="Overall mood of the pet in this record",
         required=True,
     ),
     CheckboxWidget(
-        schema_field="is_relevant",
-        label="Relevant?",
-        description="Is this document relevant?",
+        schema_field="needs_attention",
+        label="Needs Attention?",
+        description="Does this pet require immediate attention?",
     ),
 ]

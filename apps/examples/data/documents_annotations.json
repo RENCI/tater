@@ -1,0 +1,53 @@
+{
+  "doc_000": {
+    "annotations": {
+      "pet_type": "fish",
+      "dog_breed": "",
+      "dog_temperament": null,
+      "cat_color": "",
+      "fish_tank_size": null,
+      "additional_notes": ""
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 113.967276096344,
+      "status": "complete"
+    }
+  },
+  "doc_001": {
+    "annotations": {
+      "pet_type": null,
+      "dog_breed": "",
+      "dog_temperament": null,
+      "cat_color": "",
+      "fish_tank_size": null,
+      "additional_notes": ""
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 24.980422496795654,
+      "status": "in_progress"
+    }
+  },
+  "doc_002": {
+    "annotations": {
+      "pet_type": null,
+      "dog_breed": null,
+      "dog_temperament": null,
+      "cat_color": null,
+      "fish_tank_size": null,
+      "additional_notes": null
+    },
+    "metadata": {
+      "flagged": false,
+      "notes": "",
+      "visited": true,
+      "annotation_seconds": 39.79374551773071,
+      "status": "in_progress"
+    }
+  }
+}
