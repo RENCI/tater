@@ -7,10 +7,9 @@
       "id": "pets",
       "type": "listable",
       "label": "Pets",
+      "description": "Track one or more pets for this record.",
       "widget": {
-        "add_label": "Add Pet",
-        "delete_label": "Delete Pet",
-        "initial_count": 1
+        "item_label": "Pet"
       },
       "item_fields": [
         {

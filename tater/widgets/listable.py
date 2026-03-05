@@ -20,12 +20,7 @@ class ListableWidget(ContainerWidget):
     """Widget for managing a list of repeated field groups."""
 
     item_widgets: list[TaterWidget] = field(kw_only=True, default_factory=list)
-    add_label: str = field(kw_only=True, default="Add")
-    delete_label: str = field(kw_only=True, default="Delete")
-    initial_count: int = field(kw_only=True, default=1)
-
-    def __post_init__(self) -> None:
-        self.initial_count = max(0, self.initial_count)
+    item_label: str = field(kw_only=True, default="Item")
 
     def _store_id(self) -> str:
         return f"{self.component_id}-list-store"
@@ -39,11 +34,8 @@ class ListableWidget(ContainerWidget):
     def _delete_type(self) -> str:
         return f"{self.component_id}-delete"
 
-    def _initial_store_data(self) -> dict[str, Any]:
-        return {
-            "indices": list(range(self.initial_count)),
-            "next_index": self.initial_count,
-        }
+    def _empty_store_data(self) -> dict[str, Any]:
+        return {"indices": [], "next_index": 0}
 
     def _render_item_widgets(self, index: int, tater_app: Optional[Any] = None, doc_id: Optional[str] = None) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
@@ -93,7 +85,7 @@ class ListableWidget(ContainerWidget):
             items.append(
                 dmc.Card([
                     dmc.Group([
-                        dmc.Text(f"Item {index + 1}", fw=500, size="sm"),
+                        dmc.Text(f"{self.item_label} {index + 1}", size="xs", c="dimmed"),
                         dmc.ActionIcon(
                             DashIconify(icon="tabler:x", width=14),
                             id={"type": self._delete_type(), "index": index},
@@ -109,11 +101,11 @@ class ListableWidget(ContainerWidget):
 
     def component(self) -> dmc.Stack:
         """Return Dash component for the list widget."""
-        store_data = self._initial_store_data()
+        store_data = self._empty_store_data()
         return dmc.Stack([
             dmc.Group([
                 dmc.Text(self.label, fw=500, size="sm"),
-                dmc.Button(self.add_label, id=self._add_id(), variant="outline", size="xs",
+                dmc.Button(f"Add {self.item_label}", id=self._add_id(), variant="outline", size="xs",
                            leftSection=DashIconify(icon="tabler:plus", width=14)),
             ], justify="space-between"),
             dmc.Text(self.description or "", size="xs", c="dimmed") if self.description else None,
@@ -133,6 +125,43 @@ class ListableWidget(ContainerWidget):
         items_id = self._items_id()
         store_id = self._store_id()
         delete_type = self._delete_type()
+        field_path = self.field_path
+        item_widget_templates = self.item_widgets
+
+        def _sync_annotation_add(doc_id: str, new_index: int) -> None:
+            """Append an empty item to the annotation list at new_index."""
+            annotation = tater_app.annotations.get(doc_id)
+            if annotation is None:
+                return
+            extended = False
+            for iw in item_widget_templates:
+                try:
+                    empty_val = iw.empty_value if hasattr(iw, "empty_value") else None
+                    tater_app._set_model_value(
+                        annotation,
+                        f"{field_path}.{new_index}.{iw.schema_field}",
+                        empty_val,
+                    )
+                    extended = True
+                except Exception:
+                    pass
+            if not extended:
+                # Fallback: extend the list directly with None
+                try:
+                    tater_app._set_model_value(annotation, f"{field_path}.{new_index}", None)
+                except Exception:
+                    pass
+            tater_app._save_annotations_to_file(doc_id=doc_id)
+
+        def _sync_annotation_delete(doc_id: str, del_position: int) -> None:
+            """Remove the item at del_position from the annotation list."""
+            annotation = tater_app.annotations.get(doc_id)
+            if annotation is None:
+                return
+            current_list = tater_app._get_model_value(annotation, field_path)
+            if isinstance(current_list, list) and del_position < len(current_list):
+                current_list.pop(del_position)
+            tater_app._save_annotations_to_file(doc_id=doc_id)
 
         @app.callback(
             [Output(store_id, "data"), Output(items_id, "children")],
@@ -140,64 +169,61 @@ class ListableWidget(ContainerWidget):
              Input({"type": delete_type, "index": ALL}, "n_clicks"),
              Input("current-doc-id", "data")],
             State(store_id, "data"),
-            prevent_initial_call=True,
         )
         def _update_items(add_clicks, delete_clicks, doc_id, store_data):
-            if not ctx.triggered_id:
-                raise PreventUpdate
-
-            if ctx.triggered_id == "current-doc-id":
-                if not tater_app or not doc_id or doc_id not in tater_app.annotations:
-                    initial_data = self._initial_store_data()
-                    return initial_data, self._render_items(initial_data["indices"], tater_app, doc_id)
-
-                doc_annotations = tater_app.annotations[doc_id]
-                field_path = self.field_path
-
+            # None on initial page load — treat as doc-id load
+            if not ctx.triggered_id or ctx.triggered_id == "current-doc-id":
                 indices_set = set()
 
-                if isinstance(doc_annotations, BaseModel):
-                    try:
-                        list_field = getattr(doc_annotations, field_path, None)
-                        if isinstance(list_field, list):
-                            indices_set = set(range(len(list_field)))
-                    except AttributeError:
-                        pass
-                else:
-                    prefix = f"{field_path}."
-                    for key in doc_annotations.keys():
-                        if key.startswith(prefix):
-                            rest = key[len(prefix):]
-                            index_str = rest.split('.')[0]
-                            try:
-                                indices_set.add(int(index_str))
-                            except ValueError:
-                                pass
+                if tater_app and doc_id and doc_id in tater_app.annotations:
+                    doc_annotations = tater_app.annotations[doc_id]
+                    if isinstance(doc_annotations, BaseModel):
+                        try:
+                            list_field = getattr(doc_annotations, field_path, None)
+                            if isinstance(list_field, list):
+                                indices_set = set(range(len(list_field)))
+                        except AttributeError:
+                            pass
+                    else:
+                        prefix = f"{field_path}."
+                        for key in doc_annotations.keys():
+                            if key.startswith(prefix):
+                                rest = key[len(prefix):]
+                                index_str = rest.split('.')[0]
+                                try:
+                                    indices_set.add(int(index_str))
+                                except ValueError:
+                                    pass
 
-                if not indices_set:
-                    initial_data = self._initial_store_data()
-                    return initial_data, self._render_items(initial_data["indices"], tater_app, doc_id)
-
-                indices = sorted(list(indices_set))
-                next_index = max(indices) + 1 if indices else 0
-
-                store_data = {"indices": indices, "next_index": next_index}
+                indices = sorted(indices_set)
+                store_data = {"indices": indices, "next_index": len(indices)}
                 return store_data, self._render_items(indices, tater_app, doc_id)
 
+            # Guard against phantom pattern-matching fires (n_clicks=None on mount)
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                raise PreventUpdate
+
             if store_data is None:
-                store_data = self._initial_store_data()
+                store_data = self._empty_store_data()
 
             indices = list(store_data.get("indices", []))
-            next_index = store_data.get("next_index", 0)
 
             if ctx.triggered_id == add_id:
-                indices.append(next_index)
-                next_index += 1
+                # Use the current count as the new sequential position
+                new_index = len(indices)
+                indices = list(range(new_index + 1))
+                if tater_app and doc_id and doc_id in tater_app.annotations:
+                    _sync_annotation_add(doc_id, new_index)
             elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == delete_type:
                 delete_index = ctx.triggered_id.get("index")
-                indices = [i for i in indices if i != delete_index]
+                if delete_index in indices:
+                    del_position = indices.index(delete_index)
+                    if tater_app and doc_id and doc_id in tater_app.annotations:
+                        _sync_annotation_delete(doc_id, del_position)
+                    # Re-number remaining items sequentially
+                    indices = list(range(len(indices) - 1))
 
-            new_data = {"indices": indices, "next_index": next_index}
+            new_data = {"indices": indices, "next_index": len(indices)}
             return new_data, self._render_items(indices, tater_app, doc_id)
 
         if tater_app:

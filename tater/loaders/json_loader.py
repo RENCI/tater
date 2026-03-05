@@ -324,9 +324,7 @@ def _process_field(
             label=label,
             description=description,
             item_widgets=item_widgets,
-            add_label=widget_spec.get("add_label", "Add"),
-            delete_label=widget_spec.get("delete_label", "Delete"),
-            initial_count=widget_spec.get("initial_count", 1),
+            item_label=widget_spec.get("item_label", "Item"),
         )
 
     # --- Leaf field types ---
