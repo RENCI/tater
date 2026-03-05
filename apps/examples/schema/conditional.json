@@ -2,6 +2,7 @@
   "spec_version": "1.0",
   "title": "tater - conditional",
   "description": "Conditional fields with labels, descriptions, and widget hints.",
+  "instructions": "Toggle the checkboxes and switches to reveal conditional fields. Dependent fields only appear when their parent is enabled.",
   "data_schema": [
     {
       "id": "is_indoor",

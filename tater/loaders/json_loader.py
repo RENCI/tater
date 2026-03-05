@@ -477,4 +477,5 @@ def load_schema(path: str | Path) -> dict:
         "widgets": widgets,
         "title": data.get("title"),
         "description": data.get("description"),
+        "instructions": data.get("instructions"),
     }

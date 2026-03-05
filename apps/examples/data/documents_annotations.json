@@ -1,12 +1,14 @@
 {
   "doc_000": {
     "annotations": {
-      "pet_type": "fish",
-      "dog_breed": "",
-      "dog_temperament": null,
-      "cat_color": "",
-      "fish_tank_size": null,
-      "additional_notes": ""
+      "pets": [
+        {
+          "kind": "dog"
+        },
+        {
+          "kind": null
+        }
+      ]
     },
     "metadata": {
       "flagged": false,
@@ -18,12 +20,7 @@
   },
   "doc_001": {
     "annotations": {
-      "pet_type": null,
-      "dog_breed": "",
-      "dog_temperament": null,
-      "cat_color": "",
-      "fish_tank_size": null,
-      "additional_notes": ""
+      "pets": []
     },
     "metadata": {
       "flagged": false,
@@ -35,12 +32,7 @@
   },
   "doc_002": {
     "annotations": {
-      "pet_type": null,
-      "dog_breed": null,
-      "dog_temperament": null,
-      "cat_color": null,
-      "fish_tank_size": null,
-      "additional_notes": null
+      "pets": []
     },
     "metadata": {
       "flagged": false,

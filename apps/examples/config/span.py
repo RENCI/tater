@@ -14,6 +14,8 @@ class Schema(BaseModel):
 title = "tater - span annotation"
 description = "Tag named entities in pet-related text using the span annotation widget."
 
+instructions = "Highlight relevant text spans in the document, then click an entity type to label the span."
+
 widgets = [
     SpanAnnotationWidget(
         schema_field="entities",

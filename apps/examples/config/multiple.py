@@ -27,6 +27,8 @@ class Schema(BaseModel):
 title = "tater - multiple"
 description = "Showcases all available widget types in a single annotation schema."
 
+instructions = "This is a widget showcase. Fill in each field using the appropriate widget type: radio buttons, segmented controls, checkboxes, text inputs, sliders, and multi-select dropdowns."
+
 widgets = [
     RadioGroupWidget(
         schema_field="pet_type",

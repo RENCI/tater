@@ -24,6 +24,8 @@ class Schema(BaseModel):
 title = "tater - conditional"
 description = "Widgets that appear only when a parent boolean field is enabled."
 
+instructions = "Toggle the checkboxes and switches to reveal conditional fields. Dependent fields only appear when their parent is enabled."
+
 widgets = [
     SwitchWidget(
         schema_field="is_indoor",

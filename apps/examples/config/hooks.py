@@ -30,6 +30,8 @@ class Schema(BaseModel):
 title = "tater - hooks"
 description = "Demonstrates the on_save hook and escape-hatch Dash callback pattern."
 
+instructions = "Select the pet's mood. Checking 'Needs Attention' triggers an escape-hatch callback that clears the mood."
+
 pet_mood = SegmentedControlWidget(
     schema_field="pet_mood",
     label="Pet Mood",

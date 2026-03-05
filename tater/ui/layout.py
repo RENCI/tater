@@ -62,6 +62,16 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         ], span={"base": 12, "md": 5}),
     ], gutter="xl")
 
+    # Build help icon once if instructions exist
+    help_icon = (
+        dmc.ActionIcon(
+            DashIconify(icon="tabler:help-circle", width=20),
+            id="btn-open-instructions",
+            variant="subtle",
+            size="sm",
+        ) if has_instructions else None
+    )
+
     return dmc.MantineProvider(
         theme={"colorScheme": tater_app.theme},
         children=[
@@ -78,26 +88,14 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     dmc.Center(
                         dmc.Stack([
                             dmc.Title(tater_app.title, order=1, mt="xl"),
-                            dmc.Group(
+                            (dmc.Group(
                                 [
                                     dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center"),
-                                    dmc.ActionIcon(
-                                        DashIconify(icon="tabler:help-circle", width=16),
-                                        id="btn-open-instructions",
-                                        variant="subtle",
-                                        size="sm",
-                                    ) if has_instructions else None,
+                                    help_icon,
                                 ],
                                 gap="xs",
                                 justify="center",
-                            ) if tater_app.description else (
-                                dmc.ActionIcon(
-                                    DashIconify(icon="tabler:help-circle", width=16),
-                                    id="btn-open-instructions",
-                                    variant="subtle",
-                                    size="sm",
-                                ) if has_instructions else None
-                            ),
+                            ) if tater_app.description else help_icon) if has_instructions else None,
                         ], gap="xs", align="center")
                     ),
                     dmc.Stack([

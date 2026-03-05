@@ -24,6 +24,8 @@ class Schema(BaseModel):
 title = "tater - list (nested)"
 description = "List of structured items, each with multiple fields."
 
+instructions = "Add vet visit records. Each visit has date, reason, and notes. Click 'Add' to create new visits or delete to remove."
+
 widgets = [
     ListableWidget(
         schema_field="vet_visits",

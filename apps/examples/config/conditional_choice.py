@@ -23,6 +23,8 @@ class Schema(BaseModel):
 title = "tater - conditional (choice-based)"
 description = "Widgets that appear based on the selected pet type."
 
+instructions = "Select a pet type to reveal type-specific fields. Dogs show breed/temperament, cats show color, fish show tank size."
+
 widgets = [
     SelectWidget(
         schema_field="pet_type",

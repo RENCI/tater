@@ -10,3 +10,5 @@ class Schema(BaseModel):
 
 title = "tater - simple (defaults)"
 description = "All widgets are auto-generated from the schema."
+
+instructions = "Annotate the pet's mood and whether it needs attention. Widgets auto-generate from the schema."

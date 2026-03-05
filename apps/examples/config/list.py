@@ -16,6 +16,10 @@ class Schema(BaseModel):
 title = "tater - list"
 description = "Repeatable item list using ListableWidget — add or remove pet entries."
 
+instructions = """Click 'Add' to add pets, or delete individual entries by clicking the delete icon.
+Fill in each pet's type.
+"""
+
 widgets = [
     ListableWidget(
         schema_field="pets",

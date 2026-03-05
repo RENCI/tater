@@ -18,6 +18,8 @@ class Schema(BaseModel):
 title = "tater - simple (mixed)"
 description = "Explicitly specifies one widget; the remaining fields are auto-generated."
 
+instructions = "Select the pet's sentiment using the radio group explicitly. The 'Needs Attention' field auto-generates."
+
 widgets = [
     RadioGroupWidget(
         schema_field="pet_mood",

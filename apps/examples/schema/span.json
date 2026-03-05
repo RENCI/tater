@@ -2,6 +2,7 @@
   "spec_version": "1.0",
   "title": "tater - span annotation",
   "description": "Tag pet-related entities with explicit labels, descriptions, and entity types.",
+  "instructions": "Highlight relevant text spans in the document, then click an entity type to label the span.",
   "data_schema": [
     {
       "id": "entities",
