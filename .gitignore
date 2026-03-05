@@ -13,9 +13,8 @@ ENV/
 .uv/
 
 # Annotations output
-annotations/
-data/*_annotations.json
-data/*.jsonl
+apps/**/*_annotations.json
+apps/**/*.jsonl
 *.json.tmp
 *.json.backup.*
 

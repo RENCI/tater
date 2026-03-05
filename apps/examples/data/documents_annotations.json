@@ -1,34 +1,49 @@
 {
   "doc_000": {
     "annotations": {
-      "primary_breed": null,
-      "secondary_breed": "Miniature Pig"
+      "document_mood": "positive",
+      "address": {
+        "location": {
+          "location_mood": "cheerful"
+        },
+        "pet_type": "dog"
+      }
     },
     "metadata": {
       "flagged": false,
       "notes": "",
       "visited": true,
-      "annotation_seconds": 14.882177591323853,
+      "annotation_seconds": 87.94078254699707,
       "status": "complete"
     }
   },
   "doc_001": {
     "annotations": {
-      "primary_breed": null,
-      "secondary_breed": null
+      "document_mood": null,
+      "address": {
+        "location": {
+          "location_mood": null
+        },
+        "pet_type": null
+      }
     },
     "metadata": {
       "flagged": false,
       "notes": "",
       "visited": true,
-      "annotation_seconds": 18.294769525527954,
-      "status": "in_progress"
+      "annotation_seconds": 23.154891967773438,
+      "status": "complete"
     }
   },
   "doc_002": {
     "annotations": {
-      "primary_breed": null,
-      "secondary_breed": null
+      "document_mood": null,
+      "address": {
+        "location": {
+          "location_mood": null
+        },
+        "pet_type": null
+      }
     },
     "metadata": {
       "flagged": false,
