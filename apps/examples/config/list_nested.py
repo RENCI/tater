@@ -7,17 +7,18 @@ from tater.widgets import (
     SegmentedControlWidget,
     RadioGroupWidget,
     TextInputWidget,
+    TextAreaWidget,
 )
 
 
-class Medication(BaseModel):
-    name: Optional[str] = None
-    route: Optional[Literal["oral", "iv", "topical", "inhaled"]] = None
-    frequency: Optional[Literal["once daily", "twice daily", "as needed"]] = None
+class VetVisit(BaseModel):
+    date: Optional[str] = None
+    reason: Optional[Literal["checkup", "vaccination", "illness", "injury"]] = None
+    notes: Optional[str] = None
 
 
 class Schema(BaseModel):
-    medications: List[Medication] = Field(default_factory=list)
+    vet_visits: List[VetVisit] = Field(default_factory=list)
 
 
 title = "tater - list (nested)"
@@ -25,24 +26,25 @@ description = "List of structured items, each with multiple fields."
 
 widgets = [
     ListableWidget(
-        schema_field="medications",
-        label="Medications",
-        description="Add each medication entry with name, route, and frequency.",
-        item_label="Medication",
+        schema_field="vet_visits",
+        label="Vet Visits",
+        description="Add each veterinary visit with date, reason, and notes.",
+        item_label="Visit",
         item_widgets=[
             TextInputWidget(
-                schema_field="name",
-                label="Medication Name",
-                placeholder="e.g. Ibuprofen",
+                schema_field="date",
+                label="Visit Date",
+                placeholder="e.g. 2024-01-15",
             ),
             RadioGroupWidget(
-                schema_field="route",
-                label="Route",
+                schema_field="reason",
+                label="Visit Reason",
                 vertical=False,
             ),
-            SegmentedControlWidget(
-                schema_field="frequency",
-                label="Frequency",
+            TextAreaWidget(
+                schema_field="notes",
+                label="Visit Notes",
+                placeholder="Additional details about the visit...",
             ),
         ],
     ),

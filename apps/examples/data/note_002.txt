@@ -1,53 +1,66 @@
-PATIENT: Jane Smith
+PET: Max
 DATE: 2024-01-16
-MRN: 67890
+ID: 67890
 
-CHIEF COMPLAINT:
-Shortness of breath and wheezing.
+INTAKE TYPE:
+Stray pickup - found by animal control officer
 
-HISTORY OF PRESENT ILLNESS:
-45-year-old female with history of asthma presents with acute exacerbation. Patient reports 
-increased wheezing and shortness of breath for the past 3 days. Triggers include recent upper 
-respiratory infection. Patient has been using albuterol inhaler every 4 hours with minimal 
-relief. Denies fever, chest pain, or hemoptysis. Some productive cough with clear sputum.
+BACKGROUND:
+2-year-old male Labrador Retriever mix found wandering near Main Street Park. No collar 
+or microchip detected on initial scan. Dog appeared friendly but anxious. Animal control 
+officer reports dog was limping slightly on right front leg when picked up. Has been 
+housed in shelter for 72 hours; no owner has come forward to claim. Mandatory hold 
+period will end in 4 days.
 
-PAST MEDICAL HISTORY:
-- Asthma (childhood onset)
-- Seasonal allergies
-- GERD
+PREVIOUS HISTORY:
+Unknown - appears to have been socialized and housetrained, suggesting prior home 
+experience. Shows signs of basic training (responds to "sit" command).
 
-CURRENT MEDICATIONS:
-- Albuterol HFA inhaler PRN
-- Fluticasone/Salmeterol 250/50 BID
-- Omeprazole 20mg daily
+CURRENT DIET:
+- Purina Dog Chow (2 cups twice daily)
+- Adequate water intake
+- Good appetite noted
 
-ALLERGIES:
-Penicillin (rash)
+BEHAVIORAL OBSERVATIONS:
+General: Energetic and playful, shows some anxiety in kennel
+Activity Level: High - needs regular exercise and mental stimulation
+Socialization: Very friendly with people, submissive body language
+Dog Interaction: Mixed - playful with some dogs, reactive to larger dominant males
+Training: Knows basic commands (sit, down), walks reasonably well on leash with pulling
+Anxiety Indicators: Pacing in kennel, whining when alone, settles with human presence
+Play Style: Fetch-motivated, loves tennis balls and rope toys
 
-PHYSICAL EXAMINATION:
-Vitals: BP 118/76, HR 88, RR 22, Temp 98.2F, O2 Sat 94% on room air
-General: Mild respiratory distress, able to speak in full sentences
-HEENT: Normal
-Cardiovascular: Tachycardic, regular rhythm
-Respiratory: Bilateral expiratory wheezing, decreased air movement in lower lobes
-Abdomen: Soft, non-tender
+SHELTER NOTES:
+Max has been a staff favorite due to his friendly personality. Shows no aggression 
+toward handlers. Does pull on leash during walks due to excitement. Would benefit 
+from continued training and an active family. May have separation anxiety based on 
+vocalization patterns when left alone. Settles well with a Kong toy or bully stick.
 
-ASSESSMENT AND PLAN:
-1. Asthma exacerbation - moderate severity
-   - Start prednisone 40mg daily x 5 days
-   - Continue fluticasone/salmeterol
-   - Increase albuterol to Q4H scheduled
-   - Patient education on proper inhaler technique
-   - Peak flow meter provided
+MEDICAL EXAMINATION:
+Vitals: Temp 101.8F (normal), Weight 52 lbs (slightly underweight)
+Body Condition: Thin but not emaciated, ribs slightly visible
+Coat: Short brown coat with black markings, some matting and dirt noted
+Eyes: Clear and bright
+Ears: Clean, no infection
+Teeth: Young adult dentition, mild tartar, no broken teeth
+Musculoskeletal: Mild lameness right front leg, no swelling or obvious injury noted
+Heart/Lungs: Normal
+Skin: Minor scratches and abrasions consistent with outdoor living
 
-2. Upper respiratory infection - likely viral
-   - Supportive care
-   - Increase fluid intake
-   - Rest
+VETERINARY TREATMENT:
+- Neutering scheduled for tomorrow (required before adoption)
+- Vaccinations administered: DAPP, Bordetella, Rabies
+- Deworming treatment given
+- Flea/tick prevention applied
+- Right leg lameness - appears to be resolving, likely soft tissue strain
+- Recommend recheck in 1 week if limping persists
 
-3. GERD - stable
-   - Continue omeprazole
+ASSESSMENT:
+Young adult Labrador mix with friendly temperament and high energy. Needs active home 
+with yard and patient owner willing to continue training. Good candidate for first-time 
+dog owner with time to dedicate to exercise needs. Separation anxiety may improve 
+with routine and proper introduction to being alone.
 
-Patient instructed to return immediately if worsening symptoms, chest pain, or difficulty breathing.
+ADOPTION STATUS: Available after neutering (2 days)
+RECOMMENDED HOME: Active household, fenced yard preferred, older children okay
 
-FOLLOW-UP: 1 week or sooner PRN.

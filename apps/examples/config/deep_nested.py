@@ -6,7 +6,7 @@ from tater.widgets import SegmentedControlWidget, RadioGroupWidget, GroupWidget
 
 
 class Location(BaseModel):
-    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    location_mood: Optional[Literal["cheerful", "stressful", "peaceful"]] = None
 
 
 class Address(BaseModel):
@@ -15,7 +15,7 @@ class Address(BaseModel):
 
 
 class Schema(BaseModel):
-    document_sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    document_mood: Optional[Literal["positive", "negative", "neutral"]] = None
     address: Address = Field(default_factory=Address)
 
 
@@ -24,8 +24,8 @@ description = "Two levels of GroupWidget nesting demonstrating deep schema paths
 
 widgets = [
     SegmentedControlWidget(
-        schema_field="document_sentiment",
-        label="Document Sentiment",
+        schema_field="document_mood",
+        label="Document Mood",
         description="Top-level field",
     ),
     GroupWidget(
@@ -44,8 +44,8 @@ widgets = [
                 description="Second level of nesting",
                 children=[
                     SegmentedControlWidget(
-                        schema_field="sentiment",
-                        label="Location Sentiment",
+                        schema_field="location_mood",
+                        label="Location Atmosphere",
                         description="Three levels deep!",
                     ),
                 ],

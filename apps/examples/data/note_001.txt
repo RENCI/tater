@@ -1,48 +1,56 @@
-PATIENT: John Doe
+PET: Whiskers
 DATE: 2024-01-15
-MRN: 12345
+ID: 12345
 
-CHIEF COMPLAINT:
-Patient presents with elevated blood sugar levels and fatigue.
+INTAKE TYPE:
+Pet surrender - owner moving overseas
 
-HISTORY OF PRESENT ILLNESS:
-62-year-old male with a history of type 2 diabetes mellitus presents for routine follow-up. 
-Patient reports good compliance with metformin 1000mg twice daily. Recent home glucose 
-monitoring shows fasting levels between 110-130 mg/dL. Patient denies polyuria, polydipsia, 
-or polyphagia. Reports mild fatigue in afternoons.
+BACKGROUND:
+3-year-old orange tabby cat brought to shelter by owner. Previously indoor-only pet 
+with complete vaccination history. Owner reports cat is generally healthy and well-behaved. 
+Whiskers has been with the family since adoption as a kitten from this same shelter. 
+No history of aggression or destructive behavior. Good with children and other cats, 
+but no exposure to dogs.
 
-PAST MEDICAL HISTORY:
-- Type 2 Diabetes Mellitus (diagnosed 2018)
-- Hypertension (controlled)
-- Hyperlipidemia
+PREVIOUS CARE HISTORY:
+- Spayed at 6 months
+- Up-to-date on all vaccines (rabies, FVRCP)
+- Annual vet checkups (last visit 2 months ago)
+- No chronic health issues
 
-CURRENT MEDICATIONS:
-- Metformin 1000mg PO BID
-- Lisinopril 10mg PO daily
-- Atorvastatin 20mg PO QPM
+CURRENT DIET:
+- Dry food: Hill's Science Diet Adult Indoor Cat
+- Wet food: Fancy Feast (twice weekly as treat)
+- Always has access to fresh water
 
-PHYSICAL EXAMINATION:
-Vitals: BP 128/82, HR 76, Temp 98.6F
-General: Alert and oriented, no acute distress
-HEENT: Normal
-Cardiovascular: Regular rate and rhythm, no murmurs
-Respiratory: Clear to auscultation bilaterally
+BEHAVIORAL OBSERVATIONS:
+General: Alert and friendly, responsive to humans
+Activity Level: Moderate - enjoys playing with feather toys and laser pointers
+Socialization: Seeks human attention, purrs readily when petted
+Litter Box: Well-trained, uses covered litter box consistently, prefers unscented litter
+Sleep Pattern: Typical cat behavior - sleeps 14-16 hours daily, most active at dawn/dusk
+Vocalizations: Quiet, occasional meowing for food or attention
+
+SHELTER NOTES:
+Whiskers adjusted well to the shelter environment within 24 hours. Shows good appetite 
+and normal grooming behavior. Friendly with staff and other cats in the viewing room. 
+Would do well in a quiet home or with an experienced cat owner. May need gradual 
+introduction to children or other pets.
+
+MEDICAL EXAMINATION:
+Vitals: Temp 101.5F (normal), Weight 10.2 lbs (ideal)
+Body Condition: Good, appropriate weight for frame
+Coat: Clean and well-groomed, shiny orange tabby pattern
+Eyes: Clear, no discharge
+Ears: Clean, no mites or infection
+Teeth: Minor tartar buildup, otherwise healthy
+Heart/Lungs: Normal
 Abdomen: Soft, non-tender
 
-ASSESSMENT AND PLAN:
-1. Type 2 Diabetes Mellitus - well controlled on current regimen
-   - Continue metformin 1000mg BID
-   - HbA1c ordered
-   - Follow up in 3 months
+ASSESSMENT:
+Healthy adult cat ready for adoption. Would thrive in calm household. Recommend 
+continued annual vet visits and dental cleaning within 6 months. Owner expressed 
+strong emotional attachment and asked to be contacted if issues arise.
 
-2. Hypertension - well controlled
-   - Continue lisinopril
-   - Monitor BP at home
-
-3. Hyperlipidemia
-   - Continue atorvastatin
-   - Lipid panel ordered
-
-Patient counseled on diet and exercise. Encouraged to continue home glucose monitoring.
-
-FOLLOW-UP: 3 months or sooner if symptoms worsen.
+ADOPTION STATUS: Available
+RECOMMENDED HOME: Indoor only, adults or families with older children

@@ -1,22 +1,22 @@
 {
   "spec_version": "1.0",
   "title": "tater - simple (mixed)",
-  "description": "Sentiment shown as a vertical radio group; relevance uses the default widget.",
+  "description": "Pet mood shown as a vertical radio group; attention uses the default widget.",
   "data_schema": [
     {
-      "id": "sentiment",
+      "id": "pet_mood",
       "type": "choice",
-      "options": ["positive", "negative", "neutral"],
+      "options": ["happy", "anxious", "calm"],
       "required": true,
-      "label": "Sentiment",
-      "description": "Overall sentiment of the document",
+      "label": "Pet Mood",
+      "description": "Overall mood of the pet in this record",
       "widget": {"type": "radio_group", "orientation": "vertical"}
     },
     {
-      "id": "is_relevant",
+      "id": "needs_attention",
       "type": "boolean",
-      "label": "Relevant?",
-      "description": "Is this document relevant?"
+      "label": "Needs Attention?",
+      "description": "Does this pet require immediate attention?"
     }
   ]
 }

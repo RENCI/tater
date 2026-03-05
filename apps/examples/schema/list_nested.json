@@ -4,32 +4,33 @@
   "description": "List of structured items, each with multiple fields.",
   "data_schema": [
     {
-      "id": "medications",
+      "id": "vet_visits",
       "type": "listable",
-      "label": "Medications",
-      "description": "Add each medication entry with name, route, and frequency.",
+      "label": "Vet Visits",
+      "description": "Add each veterinary visit with date, reason, and notes.",
       "widget": {
-        "item_label": "Medication"
+        "item_label": "Visit"
       },
       "item_fields": [
         {
-          "id": "name",
+          "id": "date",
           "type": "text",
-          "label": "Medication Name",
-          "placeholder": "e.g. Ibuprofen"
+          "label": "Visit Date",
+          "placeholder": "e.g. 2024-01-15"
         },
         {
-          "id": "route",
+          "id": "reason",
           "type": "choice",
-          "options": ["oral", "iv", "topical", "inhaled"],
-          "label": "Route",
+          "options": ["checkup", "vaccination", "illness", "injury"],
+          "label": "Visit Reason",
           "widget": {"type": "radio_group", "orientation": "horizontal"}
         },
         {
-          "id": "frequency",
-          "type": "choice",
-          "options": ["once daily", "twice daily", "as needed"],
-          "label": "Frequency"
+          "id": "notes",
+          "type": "text",
+          "label": "Visit Notes",
+          "placeholder": "Additional details about the visit...",
+          "widget": {"type": "text_area"}
         }
       ]
     }

@@ -1,38 +1,41 @@
 {
   "doc_000": {
     "annotations": {
-      "pets": []
+      "primary_breed": "Sulcata Tortoise",
+      "secondary_breed": null
     },
     "metadata": {
       "flagged": false,
       "notes": "",
       "visited": true,
-      "annotation_seconds": 0.0,
+      "annotation_seconds": 14.882177591323853,
       "status": "complete"
     }
   },
   "doc_001": {
     "annotations": {
-      "pets": []
+      "primary_breed": null,
+      "secondary_breed": null
     },
     "metadata": {
       "flagged": false,
       "notes": "",
-      "visited": false,
-      "annotation_seconds": 0.0,
-      "status": "not_started"
+      "visited": true,
+      "annotation_seconds": 18.294769525527954,
+      "status": "in_progress"
     }
   },
   "doc_002": {
     "annotations": {
-      "pets": []
+      "primary_breed": null,
+      "secondary_breed": null
     },
     "metadata": {
       "flagged": false,
       "notes": "",
-      "visited": false,
-      "annotation_seconds": 0.0,
-      "status": "not_started"
+      "visited": true,
+      "annotation_seconds": 39.79374551773071,
+      "status": "in_progress"
     }
   }
 }

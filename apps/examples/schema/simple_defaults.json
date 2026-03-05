@@ -4,13 +4,13 @@
   "description": "All widgets are auto-generated from the schema.",
   "data_schema": [
     {
-      "id": "sentiment",
+      "id": "pet_mood",
       "type": "choice",
-      "options": ["positive", "negative", "neutral"],
+      "options": ["happy", "anxious", "calm"],
       "required": true
     },
     {
-      "id": "is_relevant",
+      "id": "needs_attention",
       "type": "boolean"
     }
   ]

@@ -4,11 +4,11 @@
   "description": "Single-level grouped fields with labels, descriptions, and widget hints.",
   "data_schema": [
     {
-      "id": "document_sentiment",
+      "id": "document_mood",
       "type": "choice",
       "options": ["positive", "negative", "neutral"],
-      "label": "Document Sentiment",
-      "description": "Overall sentiment of the entire document"
+      "label": "Document Mood",
+      "description": "Overall tone of the entire document"
     },
     {
       "id": "owner",
@@ -17,10 +17,10 @@
       "description": "Information about the pet owner",
       "fields": [
         {
-          "id": "sentiment",
+          "id": "owner_mood",
           "type": "choice",
-          "options": ["positive", "negative", "neutral"],
-          "label": "Owner Sentiment"
+          "options": ["happy", "anxious", "calm"],
+          "label": "Owner Mood"
         },
         {
           "id": "pet_type",

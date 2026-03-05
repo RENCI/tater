@@ -1,60 +1,90 @@
-PATIENT: Robert Johnson
+PET: Luna
 DATE: 2024-01-17
-MRN: 11223
+ID: 11223
 
-CHIEF COMPLAINT:
-Chest pain and palpitations.
+INTAKE TYPE:
+Foster care return - long-term behavioral evaluation
 
-HISTORY OF PRESENT ILLNESS:
-58-year-old male presents to clinic with complaints of intermittent chest discomfort and 
-palpitations over the past week. Pain described as pressure-like, non-radiating, lasting 
-5-10 minutes. Associated with mild dyspnea on exertion. Patient has history of CAD with 
-prior MI in 2020, status post PCI with stent to LAD. Denies orthopnea, PND, or lower 
-extremity edema. No syncope or pre-syncope.
+BACKGROUND:
+5-year-old female Australian Shepherd mix returning from 8-week foster placement. Luna 
+was originally surrendered by owner due to "destructive behavior and excessive energy." 
+Foster family reports significant improvement with structured routine and daily exercise. 
+Dog was placed in experienced foster home specializing in high-energy breeds. Foster 
+reports indicate Luna thrives with clear boundaries and mental stimulation activities.
 
-PAST MEDICAL HISTORY:
-- Coronary Artery Disease
-- Prior Myocardial Infarction (2020)
-- Hypertension
-- Type 2 Diabetes Mellitus
-- Hyperlipidemia
+PREVIOUS HISTORY:
+- Adopted as puppy from shelter in 2020
+- Returned to shelter in 2023 due to behavioral issues
+- Had two previous homes before current surrender
+- Owner-reported issues: chewing furniture, excessive barking, escaping from yard
+- No formal training classes attended
 
-CURRENT MEDICATIONS:
-- Aspirin 81mg daily
-- Clopidogrel 75mg daily
-- Metoprolol succinate 50mg daily
-- Atorvastatin 80mg QPM
-- Lisinopril 20mg daily
-- Metformin 1000mg BID
+FOSTER CARE REPORT:
+Foster family provided detailed daily logs. Key findings:
+- Destructive behavior significantly reduced with adequate exercise (60+ minutes daily)
+- Chewing redirected to appropriate toys (Kongs, bully sticks, puzzle toys)
+- Responds well to positive reinforcement training
+- Learned "place" command and crate training
+- No escape attempts when physical and mental needs met
+- Occasional leash reactivity toward small dogs, manageable with redirection
 
-SOCIAL HISTORY:
-Former smoker (quit 2020), denies alcohol or drug use.
+CURRENT DIET:
+- Blue Buffalo Large Breed (3 cups daily, split between meals)
+- Training treats: small pieces of chicken, cheese
+- No food allergies noted
 
-PHYSICAL EXAMINATION:
-Vitals: BP 142/88, HR 82 irregular, RR 16, Temp 98.4F
-General: Anxious appearing, no acute distress
-Cardiovascular: Irregularly irregular rhythm, no murmurs or gallops
-Respiratory: Clear to auscultation
-Abdomen: Soft, non-tender
-Extremities: No edema, pulses 2+ bilaterally
+BEHAVIORAL OBSERVATIONS:
+General: High-energy working breed with strong herding instincts
+Activity Level: Very high - requires minimum 2 hours exercise daily
+Intelligence: Highly intelligent, learns quickly, needs mental challenges
+Socialization: Good with dog-savvy people, wary of fast-moving children
+Dog Interaction: Selective - good with calm dogs, may try to "herd" smaller dogs
+Cat Compatible: Unknown - shows high prey drive toward squirrels
+Training Progress: Knows sit, down, stay, place, leave it, drop it
+Anxiety Indicators: Can become anxious if under-exercised, paces and whines
+Best Activities: Hiking, fetch, agility-style obstacles, snuffle mat, puzzle toys
 
-ASSESSMENT AND PLAN:
-1. Atypical chest pain with irregular heart rhythm
-   - Concerning for arrhythmia
-   - EKG performed showing atrial fibrillation with RVR
-   - Started on diltiazem 30mg QID
-   - Cardiology referral placed - urgent
-   - Consider anticoagulation pending cardiology evaluation
+SHELTER OBSERVATION NOTES (POST-FOSTER):
+Luna has maintained good behavior in shelter despite stressful environment. Staff 
+notes she settles quickly after exercise. Shows clear preference for interactive 
+play over solo activities. Herding instinct apparent when in play yard - tries to 
+gather and manage other dogs. Would do best as only pet or with larger, calm dogs.
 
-2. Hypertension - suboptimal control
-   - Increase lisinopril to 40mg daily
-   - Home BP monitoring
+MEDICAL EXAMINATION:
+Vitals: Temp 101.2F (normal), Weight 48 lbs (ideal for breed)
+Body Condition: Excellent, well-muscled and lean
+Coat: Thick blue merle coat with white markings, well-groomed
+Eyes: Bright, one blue eye, one brown (common in breed)
+Ears: Clean, no infection
+Teeth: Excellent condition, adult dentition
+Heart/Lungs: Normal
+Musculoskeletal: Strong and athletic build
+Spay Status: Spayed (prior to first surrender)
 
-3. Type 2 Diabetes Mellitus
-   - Continue current regimen
-   - HbA1c pending
+VETERINARY NOTES:
+- All vaccinations current
+- Monthly heartworm prevention
+- No chronic health issues
+- Recommend continued high-quality diet
+- Joint supplements recommended for active breed aging prevention
 
-Patient counseled extensively on symptoms requiring immediate ED evaluation including 
-severe chest pain, severe shortness of breath, or altered mental status.
+ASSESSMENT:
+Intelligent, high-energy Australian Shepherd mix who requires experienced owner 
+committed to providing adequate physical exercise and mental stimulation. Not 
+suitable for apartment living or sedentary households. With proper outlets for 
+energy and clear structure, Luna is a loyal and well-behaved companion. Previous 
+behavioral issues were management problems, not temperament flaws.
 
-FOLLOW-UP: Cardiology within 1 week, PCP in 2 weeks.
+ADOPTION STATUS: Available for special placement
+RECOMMENDED HOME: 
+- Experienced dog owner familiar with herding breeds
+- Active lifestyle (runners, hikers preferred)
+- Fenced yard required
+- Adults only or families with older children (12+)
+- No cats or small pets
+- Commitment to continued training and daily exercise
+- Ideal for someone wanting a jogging/adventure partner
+
+SPECIAL NOTES:
+Adoption contract will require proof of adequate fencing and commitment to minimum 
+exercise requirements. Follow-up home visit recommended at 30 days.

@@ -1,25 +1,25 @@
 {
   "spec_version": "1.0",
   "title": "tater - hierarchical",
-  "description": "Breast pathology ontology with compact and full hierarchical label widgets.",
+  "description": "Pet/animal ontology with compact and full hierarchical label widgets.",
   "hierarchies": {
-    "ontology": "../../data/breast_fdx_ontology.yaml"
+    "ontology": "../../data/pet_ontology.yaml"
   },
   "data_schema": [
     {
-      "id": "diagnosis",
+      "id": "primary_breed",
       "type": "hierarchical_label",
       "hierarchy_ref": "ontology",
-      "label": "Diagnosis",
-      "description": "Navigate the ontology to select a diagnosis.",
+      "label": "Primary Breed",
+      "description": "Navigate the ontology to select a breed or type.",
       "widget": {"type": "compact", "searchable": true}
     },
     {
-      "id": "secondary_diagnosis",
+      "id": "secondary_breed",
       "type": "hierarchical_label",
       "hierarchy_ref": "ontology",
-      "label": "Secondary Diagnosis",
-      "description": "Navigate the ontology to select a secondary diagnosis.",
+      "label": "Secondary Breed (Mixed)",
+      "description": "Select a secondary breed if the pet is a mix.",
       "widget": {"type": "hierarchical_label_full", "searchable": true}
     }
   ]

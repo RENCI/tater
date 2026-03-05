@@ -4,18 +4,18 @@
   "description": "All widgets specified explicitly.",
   "data_schema": [
     {
-      "id": "sentiment",
+      "id": "pet_mood",
       "type": "choice",
-      "options": ["positive", "negative", "neutral"],
+      "options": ["happy", "anxious", "calm"],
       "required": true,
-      "label": "Sentiment",
-      "description": "Overall sentiment of the document"
+      "label": "Pet Mood",
+      "description": "Overall mood of the pet in this record"
     },
     {
-      "id": "is_relevant",
+      "id": "needs_attention",
       "type": "boolean",
-      "label": "Relevant?",
-      "description": "Is this document relevant?"
+      "label": "Needs Attention?",
+      "description": "Does this pet require immediate attention?"
     }
   ]
 }
