@@ -554,7 +554,7 @@ def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
             dmc.MenuItem(
                 dmc.Group(
                     [
-                        dmc.Text(f"{i + 1}. {doc.file_path.split('/')[-1]}", size="sm"),
+                        dmc.Text(f"{i + 1}. {doc.display_name()}", size="sm"),
                         dmc.Group(right_children, gap="xs"),
                     ],
                     gap="xs",
