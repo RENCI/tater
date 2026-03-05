@@ -1,8 +1,8 @@
 {
   "doc_000": {
     "annotations": {
-      "primary_breed": "Sulcata Tortoise",
-      "secondary_breed": null
+      "primary_breed": null,
+      "secondary_breed": "Miniature Pig"
     },
     "metadata": {
       "flagged": false,
