@@ -11,11 +11,8 @@ class SwitchWidget(BooleanWidget):
 
     default: bool = False
 
-    def component(self) -> dmc.Stack:
-        parts = [dmc.Switch(id=self.component_id, label=self.label, checked=self.default)]
-        if self.description:
-            parts.append(dmc.Text(self.description, size="xs", c="dimmed"))
-        return dmc.Stack(parts, gap="xs", mt="md")
+    def component(self) -> dmc.Switch:
+        return dmc.Switch(id=self.component_id, label=self.label, checked=self.default)
 
     @property
     def renders_own_label(self) -> bool:

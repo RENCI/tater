@@ -5,7 +5,7 @@ from dataclasses import dataclass, field as dc_field
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from dash import dcc, Input, Output, State, ALL, no_update, ctx
+from dash import dcc, Input, Output, State, ALL, MATCH, no_update, ctx
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
@@ -199,6 +199,11 @@ class HierarchicalLabelWidget(TaterWidget):
     ) -> list:
         raise NotImplementedError
 
+    def _render_sections_in_list(
+        self, path: list[str], ld: str, li: int, selected_value: Optional[str]
+    ) -> list:
+        raise NotImplementedError
+
     # ------------------------------------------------------------------
     # Component + callbacks
     # ------------------------------------------------------------------
@@ -386,6 +391,192 @@ class HierarchicalLabelWidget(TaterWidget):
 
             return render_sections(path, cid, selected_value), breadcrumb
 
+    def component_in_list(self, ld: str, li: int) -> Any:
+        """Render this widget for use inside a ListableWidget item at list-index ``li``.
+
+        Uses MATCH-compatible dict IDs keyed by ``ld`` (list discriminator) and ``li``
+        (list index) so that a single set of registered callbacks handles all indices.
+        """
+        initial_sections = self._render_sections_in_list([], ld, li, None)
+        return dmc.Stack(
+            [
+                dmc.TextInput(
+                    id={"type": "hier-search-list", "ld": ld, "li": li},
+                    placeholder="Search…",
+                    size="xs",
+                    style={} if self.searchable else {"display": "none"},
+                    rightSection=dmc.ActionIcon(
+                        "×",
+                        id={"type": "hier-search-clear-list", "ld": ld, "li": li},
+                        size="xs",
+                        variant="transparent",
+                        c="dimmed",
+                        style={"display": "none"},
+                    ),
+                    rightSectionPointerEvents="all",
+                ),
+                dmc.Text(
+                    "",
+                    id={"type": "hier-breadcrumb-list", "ld": ld, "li": li},
+                    size="xs",
+                    fw=600,
+                    style={} if self._show_breadcrumb else {"display": "none"},
+                ),
+                dmc.Stack(
+                    initial_sections,
+                    id={"type": "hier-sections-list", "ld": ld, "li": li},
+                    gap="sm",
+                ),
+                dcc.Store(id={"type": "hier-nav-list", "ld": ld, "li": li}, data=[]),
+            ],
+            gap="xs",
+        )
+
+    def register_list_callbacks(self, app: Any, ld: str, list_field: str, item_field: str) -> None:
+        """Register MATCH-based callbacks for list-embedded instances of this widget.
+
+        A single call handles all list indices via Dash MATCH on ``li``.
+        ``ld`` is the list discriminator (e.g. "findings-diagnosis"); ``list_field``
+        and ``item_field`` are used to construct the annotation field path at runtime.
+        """
+        from tater.ui import value_helpers
+
+        root = self.root
+        render_sections_in_list = self._render_sections_in_list  # bound method
+
+        def node_at(path: list[str]) -> Node:
+            node = root
+            for name in path:
+                child = node.find(name)
+                if child is None:
+                    return root
+                node = child
+            return node
+
+        def field_path_for(li: int) -> str:
+            return f"{list_field}.{li}.{item_field}"
+
+        # ---- 1a. Show/hide clear button ----
+        @app.callback(
+            Output({"type": "hier-search-clear-list", "ld": ld, "li": MATCH}, "style"),
+            Input({"type": "hier-search-list", "ld": ld, "li": MATCH}, "value"),
+            prevent_initial_call=False,
+        )
+        def toggle_clear(value):
+            return {} if value else {"display": "none"}
+
+        # ---- 1b. Clear search on button click ----
+        @app.callback(
+            Output({"type": "hier-search-list", "ld": ld, "li": MATCH}, "value", allow_duplicate=True),
+            Input({"type": "hier-search-clear-list", "ld": ld, "li": MATCH}, "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def clear_search(_):
+            return ""
+
+        # ---- 2. Reset all nav stores when document changes ----
+        @app.callback(
+            Output({"type": "hier-nav-list", "ld": ld, "li": ALL}, "data"),
+            Input("current-doc-id", "data"),
+            prevent_initial_call=True,
+        )
+        def reset_nav(_doc_id):
+            return [[] for _ in ctx.outputs_list]
+
+        # ---- 3. Handle node button click ----
+        @app.callback(
+            Output({"type": "hier-nav-list", "ld": ld, "li": MATCH}, "data", allow_duplicate=True),
+            Output({"type": "hier-search-list", "ld": ld, "li": MATCH}, "value", allow_duplicate=True),
+            Input({"type": "hier-node-btn-list", "ld": ld, "li": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
+            State({"type": "hier-nav-list", "ld": ld, "li": MATCH}, "data"),
+            State("current-doc-id", "data"),
+            prevent_initial_call=True,
+        )
+        def handle_click(node_clicks, current_path, doc_id):
+            if not ctx.triggered_id:
+                return no_update, no_update
+            triggered = ctx.triggered_id
+            if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn-list":
+                return no_update, no_update
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                return no_update, no_update
+
+            li = triggered["li"]
+            depth = triggered["depth"]
+            node_name = triggered["name"]
+            path = list(current_path or [])
+            fp = field_path_for(li)
+
+            parent = node_at(path[:depth])
+            clicked = parent.find(node_name)
+            is_search_result = False
+            if clicked is None:
+                clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
+                if clicked is None:
+                    return no_update, no_update
+                is_search_result = True
+
+            tater_app = app._tater_app
+
+            if clicked.is_leaf:
+                current_value = None
+                annotation = None
+                if doc_id and tater_app:
+                    annotation = tater_app.annotations.get(doc_id)
+                    if annotation is not None:
+                        current_value = value_helpers.get_model_value(annotation, fp)
+
+                if is_search_result:
+                    full_path = _find_path(root, node_name)
+                    new_path = full_path[:-1]
+                else:
+                    new_path = path[:depth]
+
+                if current_value == node_name:
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, fp, None)
+                        tater_app._save_annotations_to_file()
+                else:
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, fp, node_name)
+                        tater_app._save_annotations_to_file()
+
+                return new_path, ("" if is_search_result else no_update)
+            else:
+                if depth < len(path) and path[depth] == node_name:
+                    return path[:depth], no_update
+                return path[:depth] + [node_name], no_update
+
+        # ---- 4. Rebuild sections ----
+        @app.callback(
+            Output({"type": "hier-sections-list", "ld": ld, "li": MATCH}, "children"),
+            Output({"type": "hier-breadcrumb-list", "ld": ld, "li": MATCH}, "children"),
+            Input({"type": "hier-nav-list", "ld": ld, "li": MATCH}, "data"),
+            Input({"type": "hier-search-list", "ld": ld, "li": MATCH}, "value"),
+            Input("current-doc-id", "data"),
+            prevent_initial_call=False,
+        )
+        def update_display(current_path, search_query, doc_id):
+            li = ctx.outputs_list[0]["id"]["li"]
+            fp = field_path_for(li)
+            path = list(current_path or [])
+            tater_app = app._tater_app
+
+            selected_value = None
+            if doc_id and tater_app:
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation is not None:
+                    selected_value = value_helpers.get_model_value(annotation, fp)
+
+            breadcrumb = " → ".join(path) if path else "None selected"
+
+            if search_query and search_query.strip():
+                q = search_query.strip().lower()
+                matches = [n for n in root.all_leaves() if q in n.name.lower()]
+                return [_section("Search results", _make_buttons_list(matches, ld, li, 0, selected_value))], breadcrumb
+
+            return render_sections_in_list(path, ld, li, selected_value), breadcrumb
+
 
 # ---------------------------------------------------------------------------
 # Concrete widgets
@@ -409,6 +600,11 @@ class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
     ) -> list:
         return _build_sections_full(self.root, path, cid, selected_value=selected_value)
 
+    def _render_sections_in_list(
+        self, path: list[str], ld: str, li: int, selected_value: Optional[str]
+    ) -> list:
+        return _build_sections_full_list(self.root, path, ld, li, selected_value=selected_value)
+
 
 @dataclass(eq=False)
 class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
@@ -423,6 +619,12 @@ class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
         self, path: list[str], cid: str, selected_value: Optional[str]
     ) -> list:
         items = _build_sections_compact(self.root, path, cid, selected_value=selected_value)
+        return [dmc.Stack(items, gap=2)]
+
+    def _render_sections_in_list(
+        self, path: list[str], ld: str, li: int, selected_value: Optional[str]
+    ) -> list:
+        items = _build_sections_compact_list(self.root, path, ld, li, selected_value=selected_value)
         return [dmc.Stack(items, gap=2)]
 
 
@@ -446,14 +648,33 @@ def _make_buttons(
     idx: int,
     selected_name: Optional[str] = None,
 ) -> list:
+    def btn_id(node, depth):
+        return {"type": "hier-node-btn", "field": field, "idx": depth, "name": node.name}
+    return _make_buttons_impl(nodes, idx, selected_name, btn_id)
+
+
+def _make_buttons_list(
+    nodes: list[Node],
+    ld: str,
+    li: int,
+    depth: int,
+    selected_name: Optional[str] = None,
+) -> list:
+    def btn_id(node, d):
+        return {"type": "hier-node-btn-list", "ld": ld, "li": li, "depth": d, "name": node.name}
+    return _make_buttons_impl(nodes, depth, selected_name, btn_id)
+
+
+def _make_buttons_impl(
+    nodes: list[Node],
+    depth: int,
+    selected_name: Optional[str],
+    btn_id_fn,
+) -> list:
     buttons = []
     for node in nodes:
-        if node.is_leaf:
-            left_section = None
-            right_section = None
-        else:
-            left_section = None
-            right_section = dmc.Badge(
+        right_section = (
+            dmc.Badge(
                 dmc.Group(
                     [
                         dmc.Text(str(len(node.children)), size="xs", lh=1),
@@ -464,14 +685,15 @@ def _make_buttons(
                 size="sm", color="gray", variant="light",
                 style={"pointerEvents": "none"},
             )
+            if not node.is_leaf else None
+        )
         buttons.append(
             dmc.Button(
                 node.name,
-                id={"type": "hier-node-btn", "field": field, "idx": idx, "name": node.name},
+                id=btn_id_fn(node, depth),
                 size="xs",
                 variant="light" if node.name == selected_name else "default",
                 n_clicks=0,
-                leftSection=left_section,
                 rightSection=right_section,
             )
         )
@@ -485,13 +707,32 @@ def _build_sections_full(
     selected_value: Optional[str] = None,
 ) -> list:
     """Full mode: show all sibling nodes at every revealed level."""
-    sections = []
+    def make_btns(nodes, depth, sel):
+        return _make_buttons(nodes, cid, depth, sel)
+    return _build_sections_full_impl(root, path, selected_value, make_btns)
 
+
+def _build_sections_full_list(
+    root: Node,
+    path: list[str],
+    ld: str,
+    li: int,
+    selected_value: Optional[str] = None,
+) -> list:
+    def make_btns(nodes, depth, sel):
+        return _make_buttons_list(nodes, ld, li, depth, sel)
+    return _build_sections_full_impl(root, path, selected_value, make_btns)
+
+
+def _build_sections_full_impl(
+    root: Node,
+    path: list[str],
+    selected_value: Optional[str],
+    make_btns_fn,
+) -> list:
+    sections = []
     selected_at = path[0] if path else None
-    buttons = _make_buttons(
-        root.children, cid, idx=0, selected_name=selected_at or selected_value
-    )
-    sections.append(_section("Top level categories", buttons))
+    sections.append(_section("Top level categories", make_btns_fn(root.children, 0, selected_at or selected_value)))
 
     current_node = root
     for depth, name in enumerate(path):
@@ -500,13 +741,7 @@ def _build_sections_full(
             break
         current_node = child
         selected_at = path[depth + 1] if depth + 1 < len(path) else None
-        buttons = _make_buttons(
-            current_node.children,
-            cid,
-            idx=depth + 1,
-            selected_name=selected_at or selected_value,
-        )
-        sections.append(_section(current_node.name, buttons))
+        sections.append(_section(current_node.name, make_btns_fn(current_node.children, depth + 1, selected_at or selected_value)))
 
     return sections
 
@@ -518,10 +753,33 @@ def _build_sections_compact(
     selected_value: Optional[str] = None,
 ) -> list:
     """Compact mode: collapse navigated levels to a single button each."""
+    def make_btns(nodes, depth, sel):
+        return _make_buttons(nodes, cid, depth, sel)
+    return _build_sections_compact_impl(root, path, selected_value, make_btns)
+
+
+def _build_sections_compact_list(
+    root: Node,
+    path: list[str],
+    ld: str,
+    li: int,
+    selected_value: Optional[str] = None,
+) -> list:
+    def make_btns(nodes, depth, sel):
+        return _make_buttons_list(nodes, ld, li, depth, sel)
+    return _build_sections_compact_impl(root, path, selected_value, make_btns)
+
+
+def _build_sections_compact_impl(
+    root: Node,
+    path: list[str],
+    selected_value: Optional[str],
+    make_btns_fn,
+) -> list:
+    """Compact mode: collapse navigated levels to a single button each."""
     sections = []
     current_node = root
 
-    # If there's a selected value but no navigation path, find the path to it
     if selected_value and not path:
         computed_path = _find_path(root, selected_value)
         if computed_path:
@@ -534,28 +792,20 @@ def _build_sections_compact(
 
     for depth, name in enumerate(path):
         child = current_node.find(name)
-
         if child is not None and child.is_leaf:
-            # Show only the selected leaf node
-            _add(_make_buttons([child], cid, idx=depth, selected_name=name))
+            _add(make_btns_fn([child], depth, name))
             return sections
-
-        # Intermediate: collapse to just the selected button
-        _add(_make_buttons([child] if child else [], cid, idx=depth, selected_name=name))
-
+        _add(make_btns_fn([child] if child else [], depth, name))
         if child is None:
             return sections
         current_node = child
 
-    # Active level: if there's a selected leaf value in current children, show only that
-    # Otherwise show all children for selection
     depth = len(path)
     if selected_value:
         selected_child = current_node.find(selected_value)
         if selected_child and selected_child.is_leaf:
-            _add(_make_buttons([selected_child], cid, idx=depth, selected_name=selected_value))
+            _add(make_btns_fn([selected_child], depth, selected_value))
             return sections
-    
-    _add(_make_buttons(current_node.children, cid, idx=depth, selected_name=selected_value))
 
+    _add(make_btns_fn(current_node.children, depth, selected_value))
     return sections

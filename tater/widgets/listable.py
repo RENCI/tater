@@ -39,6 +39,7 @@ class ListableWidget(ContainerWidget):
 
     def _render_item_widgets(self, index: int, tater_app: Optional[Any] = None, doc_id: Optional[str] = None) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
+        from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         rendered = []
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
@@ -51,6 +52,18 @@ class ListableWidget(ContainerWidget):
                 value = tater_app._get_model_value(annotation, field_path)
                 if value is not None:
                     widget.default = value
+
+            # HierarchicalLabel uses list-mode rendering with MATCH-based dict IDs
+            if isinstance(template, HierarchicalLabelWidget):
+                ld = f"{self.field_path}-{template.schema_field}"
+                items = []
+                if not widget.renders_own_label:
+                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
+                items.append(widget.component_in_list(ld, index))
+                if widget.description:
+                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
+                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+                continue
 
             # Override the widget's component to use a dictionary ID for pattern-matching
             original_component = widget.component
@@ -69,13 +82,13 @@ class ListableWidget(ContainerWidget):
             # Replace the component method
             widget.component = lambda w=widget, pt=pattern_type: make_pattern_component(w, pt)
 
-            rendered.append(
-                dmc.Stack([
-                    dmc.Text(widget.label, fw=500, size="sm"),
-                    widget.component(),
-                    dmc.Text(widget.description or "", size="xs", c="dimmed") if widget.description else None,
-                ], gap="xs", mt="sm")
-            )
+            items = []
+            if not widget.renders_own_label:
+                items.append(dmc.Text(widget.label, fw=500, size="sm"))
+            items.append(widget.component())
+            if widget.description:
+                items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
+            rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
         return rendered
 
     def _render_items(self, indices: list[int], tater_app: Optional[Any] = None, doc_id: Optional[str] = None) -> list[Any]:
@@ -227,11 +240,15 @@ class ListableWidget(ContainerWidget):
             return new_data, self._render_items(indices, tater_app, doc_id)
 
         if tater_app:
+            from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             for item_widget_template in self.item_widgets:
-                # Only register pattern callbacks for ControlWidget instances (which have value_prop)
-                # Skip container widgets like SpanAnnotationWidget
                 if isinstance(item_widget_template, ControlWidget):
                     self._register_item_pattern_callback(item_widget_template, app, tater_app)
+                elif isinstance(item_widget_template, HierarchicalLabelWidget):
+                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
+                    item_widget_template.register_list_callbacks(
+                        app, ld, self.field_path, item_widget_template.schema_field
+                    )
 
     def _register_item_pattern_callback(self, item_widget_template: TaterWidget, app: Any, tater_app: Any) -> None:
         """Register a single pattern-matching callback that handles all items for this widget type."""
