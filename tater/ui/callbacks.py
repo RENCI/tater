@@ -403,16 +403,16 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
     Recursively collect all widgets that capture values (non-containers).
 
     Skips GroupWidget children (processes them recursively instead).
-    Skips ListableWidget item widgets - ListableWidget handles its own value capture.
+    Skips RepeaterWidget subclasses — they manage their own value capture.
     """
     from tater.widgets.base import ControlWidget
     from tater.widgets.group import GroupWidget
-    from tater.widgets.listable import ListableWidget
+    from tater.widgets.repeater import RepeaterWidget
 
     captured = []
     for widget in widgets:
-        if isinstance(widget, ListableWidget):
-            # Skip ListableWidget items - it manages its own value capture
+        if isinstance(widget, RepeaterWidget):
+            # Skip RepeaterWidget subclasses — they manage their own value capture
             continue
         elif isinstance(widget, GroupWidget):
             # Recursively process GroupWidget children

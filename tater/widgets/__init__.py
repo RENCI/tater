@@ -15,7 +15,7 @@ from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.text_input import TextInputWidget
 
 from tater.widgets.group import GroupWidget
-from tater.widgets.listable import ListableWidget
+from tater.widgets.repeater import RepeaterWidget, ListableWidget, TabsWidget
 from tater.widgets.multiselect import MultiSelectWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.chip_group import ChipGroupWidget
@@ -48,7 +48,9 @@ __all__ = [
     "CheckboxWidget",
     "TextInputWidget",
     "GroupWidget",
+    "RepeaterWidget",
     "ListableWidget",
+    "TabsWidget",
     "MultiSelectWidget",
     "NumberInputWidget",
     "ChipGroupWidget",
