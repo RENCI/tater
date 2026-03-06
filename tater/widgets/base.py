@@ -109,14 +109,17 @@ class TaterWidget:
     def _build_field_content(self, mt: str = "md") -> Any:
         required = getattr(self, "required", False)
         if self.renders_own_label:
+            comp = self.component()
             if required:
-                return dmc.Group(
-                    [dmc.Text("*", size="sm", c="red"), self.component()],
-                    gap=4,
-                    align="self-start",
-                    mt=mt,
-                )
-            return self.component()
+                row = dmc.Group([dmc.Text("*", size="sm", c="red"), comp], gap=4, align="self-start")
+                items = [row]
+            else:
+                items = [comp]
+            # ContainerWidget subclasses render their own description inside component();
+            # only leaf (ControlWidget) widgets need it appended here.
+            if self.description and not isinstance(self, ContainerWidget):
+                items.append(dmc.Text(self.description, size="xs", c="dimmed"))
+            return dmc.Stack(items, gap="xs", mt=mt)
         else:
             label_row = dmc.Group(
                 [

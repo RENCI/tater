@@ -91,25 +91,30 @@ def create_list_item(navigation_stack: list) -> Any:
     """
     Determine what type of object should be appended to a list.
 
-    Infers from parent model's field annotations if possible.
+    Walks the navigation stack in reverse to find the nearest list-typed field
+    so that nested lists (e.g. findings.0.evidence.0) resolve the correct item
+    type at each level rather than always using the outermost field.
     """
-    if not navigation_stack or not isinstance(navigation_stack[0][0], BaseModel):
-        return {}  # Default to dict
-
-    # Walk back to find the field that defines this list type
-    root_model, first_key = navigation_stack[0]
-
-    if hasattr(root_model, "model_fields"):
-        field_info = root_model.model_fields.get(first_key)
-        if field_info and hasattr(field_info.annotation, "__args__"):
-            # Get the inner type from List[ItemType]
-            item_type = field_info.annotation.__args__[0]
+    for model, key in reversed(navigation_stack):
+        if not isinstance(model, BaseModel) or not hasattr(model, "model_fields"):
+            continue
+        field_info = model.model_fields.get(key)
+        if field_info is None:
+            continue
+        ann = field_info.annotation
+        # Unwrap Optional[X]
+        origin = typing.get_origin(ann)
+        if origin is typing.Union:
+            args = [a for a in typing.get_args(ann) if a is not type(None)]
+            if len(args) == 1:
+                ann = args[0]
+        if typing.get_origin(ann) is list:
+            item_type = typing.get_args(ann)[0]
             if isinstance(item_type, type) and issubclass(item_type, BaseModel):
                 try:
                     return item_type()
                 except Exception:
                     return {}
-
     return {}  # Fallback to dict
 
 
