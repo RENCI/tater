@@ -1,11 +1,8 @@
-"""List-of-lists example — demonstrates nested ListableWidget (currently partial support).
+"""List-of-lists example — nested ListableWidget.
 
-Each "finding" in a clinical note has a type, a severity, and a list of supporting evidence
-snippets. The outer ListableWidget (findings) works fully. The inner ListableWidget (evidence)
-renders its items correctly on load but its Add/Delete buttons are inert because
-register_callbacks is only called on top-level widgets — nested container widgets are skipped.
-
-This config exists to drive implementation of nested list callback registration.
+Each "finding" in a clinical note has a category, a severity, and a list of supporting evidence
+snippets.  The outer ListableWidget (findings) and the inner ListableWidget (evidence) are both
+fully wired: Add / Delete and value capture work at both levels.
 """
 from typing import Optional, Literal, List
 from pydantic import BaseModel, Field
@@ -37,15 +34,13 @@ class Schema(BaseModel):
 title = "tater - list of lists"
 description = "Each finding contains a nested list of supporting evidence items."
 
-instructions = """## Instructions
+instructions = """## Steps
 
 1. Click **Add Finding** to create a new finding entry
-2. Select the finding **category** and **severity**
+2. Select the finding **Category** and **Severity**
 3. Within each finding, click **Add Evidence** to attach supporting quotes
 4. For each evidence item, paste the quote and select where in the document it appears
-
-> **Note:** The inner evidence list renders correctly on load but Add/Delete buttons
-> are not yet wired up (nested ListableWidget callbacks not implemented).
+5. Delete entries at either level by clicking the × icon
 """
 
 widgets = [
