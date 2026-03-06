@@ -144,8 +144,10 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         btn.className = 'tater-tooltip-delete';
         btn.textContent = 'x';
         btn.addEventListener('click', function () {
+            var indexAttr = mark.getAttribute('data-index');
             window._taterDeletePending = {
                 field: field,
+                index: indexAttr !== null ? parseInt(indexAttr, 10) : -1,
                 start: parseInt(start, 10),
                 end:   parseInt(end,   10),
                 ts:    Date.now()

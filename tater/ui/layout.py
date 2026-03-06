@@ -25,18 +25,35 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
     # Stores + hidden proxy button per SpanAnnotationWidget
     span_stores = []
+    seen_span_cids: set[str] = set()
+
+    def _add_span_stores(cid: str) -> None:
+        """Add selection/trigger/delete stores and proxy button for a span widget cid."""
+        if cid in seen_span_cids:
+            return
+        seen_span_cids.add(cid)
+        span_stores.append(dcc.Store(id=f"span-selection-{cid}", data=None))
+        span_stores.append(dcc.Store(id=f"span-trigger-{cid}", data=0))
+        span_stores.append(dcc.Store(id=f"span-delete-{cid}", data=None))
+        span_stores.append(html.Button(
+            id=f"span-delete-proxy-{cid}",
+            n_clicks=0,
+            style={"display": "none"},
+        ))
+
+    from tater.widgets.repeater import RepeaterWidget
+
     for w in tater_app.widgets:
         if isinstance(w, SpanAnnotationWidget):
-            span_stores.append(dcc.Store(id=f"span-selection-{w.component_id}", data=None))
-            span_stores.append(dcc.Store(id=f"span-trigger-{w.component_id}", data=0))
-            span_stores.append(dcc.Store(id=f"span-delete-{w.component_id}", data=None))
-            # Hidden button: clicked programmatically by the JS tooltip's delete button,
-            # triggering the clientside captureDelete callback.
-            span_stores.append(html.Button(
-                id=f"span-delete-proxy-{w.component_id}",
-                n_clicks=0,
-                style={"display": "none"},
-            ))
+            _add_span_stores(w.component_id)
+        elif isinstance(w, RepeaterWidget):
+            for item_w in w.item_widgets:
+                if isinstance(item_w, SpanAnnotationWidget):
+                    _add_span_stores(item_w.component_id)
+                    # Global list-trigger store for document viewer refresh
+                    ld = f"{w.field_path}-{item_w.schema_field}"
+                    list_trigger_id = f"span-list-trigger-{item_w.component_id}-{ld}"
+                    span_stores.append(dcc.Store(id=list_trigger_id, data=0))
 
     content_grid = dmc.Grid([
         dmc.GridCol([

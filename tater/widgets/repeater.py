@@ -72,6 +72,7 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+        from tater.widgets.span import SpanAnnotationWidget
         rendered = []
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
@@ -96,6 +97,18 @@ class RepeaterWidget(ContainerWidget):
                 ld = f"{self.field_path}-{template.schema_field}"
                 items = []
                 if not widget.renders_own_label:
+                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
+                items.append(widget.component_in_list(ld, index))
+                if widget.description:
+                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
+                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+                continue
+
+            # SpanAnnotationWidget uses MATCH-based dict IDs
+            if isinstance(template, SpanAnnotationWidget):
+                ld = f"{self.field_path}-{template.schema_field}"
+                items = []
+                if widget.label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
                 items.append(widget.component_in_list(ld, index))
                 if widget.description:
@@ -284,10 +297,16 @@ class RepeaterWidget(ContainerWidget):
 
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+            from tater.widgets.span import SpanAnnotationWidget
             for item_widget_template in self.item_widgets:
                 if isinstance(item_widget_template, ControlWidget):
                     self._register_item_pattern_callback(item_widget_template, app, tater_app)
                 elif isinstance(item_widget_template, HierarchicalLabelWidget):
+                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
+                    item_widget_template.register_list_callbacks(
+                        app, ld, self.field_path, item_widget_template.schema_field
+                    )
+                elif isinstance(item_widget_template, SpanAnnotationWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
                     item_widget_template.register_list_callbacks(
                         app, ld, self.field_path, item_widget_template.schema_field

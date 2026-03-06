@@ -121,12 +121,46 @@ class SpanAnnotationWidget(TaterWidget):
             children=self._make_buttons({}),
         )
 
+    def component_in_list(self, ld: str, index: int) -> Any:
+        """Render entity buttons + per-item stores for use inside a RepeaterWidget."""
+        from dash import html, dcc
+        return html.Div([
+            html.Div(
+                id={"type": "span-entity-buttons-list", "ld": ld, "index": index},
+                children=self._make_buttons_list(ld, index, {}),
+            ),
+            dcc.Store(id={"type": "span-selection-list", "ld": ld, "index": index}, data=None),
+            dcc.Store(id={"type": "span-trigger-list", "ld": ld, "index": index}, data=0),
+        ])
+
     def _make_buttons(self, counts: dict) -> Any:
         """Build the entity-type button group with per-entity span counts."""
         buttons = [
             dmc.Button(
                 et.name,
                 id={"type": "span-add-btn", "field": self.component_id, "tag": et.name},
+                size="xs",
+                variant="outline",
+                fw=600,
+                style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
+                       "color": "var(--mantine-color-gray-9)"},
+                rightSection=dmc.Badge(
+                    str(counts.get(et.name, 0)),
+                    size="sm",
+                    variant="filled",
+                    style={"backgroundColor": _lighten_hex(et.color, 0.7), "color": "var(--mantine-color-gray-9)", "lineHeight": "1"},
+                ),
+            )
+            for et in self.entity_types
+        ]
+        return dmc.Group(buttons, gap="xs", wrap="wrap")
+
+    def _make_buttons_list(self, ld: str, index: int, counts: dict) -> Any:
+        """Build entity buttons with list-mode dict IDs (ld + index discriminators)."""
+        buttons = [
+            dmc.Button(
+                et.name,
+                id={"type": "span-add-btn-list", "ld": ld, "tag": et.name, "index": index},
                 size="xs",
                 variant="outline",
                 fw=600,
@@ -280,6 +314,10 @@ class SpanAnnotationWidget(TaterWidget):
             if not delete_data or not doc_id:
                 return no_update
 
+            # List-mode deletes (index >= 0) are handled by register_list_callbacks
+            if delete_data.get("index", -1) >= 0:
+                return no_update
+
             del_start = delete_data.get("start")
             del_end = delete_data.get("end")
             if del_start is None or del_end is None:
@@ -293,5 +331,153 @@ class SpanAnnotationWidget(TaterWidget):
             tater_app._save_annotations_to_file(doc_id=doc_id)
 
             return (trigger_count or 0) + 1
+
+    def register_list_callbacks(
+        self, app: Any, ld: str, outer_list_field: str, span_field: str
+    ) -> None:
+        """Register MATCH-based callbacks for this span widget inside a RepeaterWidget.
+
+        ``ld`` is a discriminator string scoping all pattern-matching IDs to this
+        particular (outer repeater, span field) combination.
+        ``outer_list_field`` is the field path of the outer list (e.g. "findings").
+        ``span_field`` is the schema_field of this widget (e.g. "spans").
+        """
+        from dash import Input, Output, State, ALL, MATCH, ctx, no_update
+        from tater.models.span import SpanAnnotation
+        from tater.ui import value_helpers
+
+        cid = self.component_id
+        delete_store_id = f"span-delete-{cid}"
+        list_trigger_id = f"span-list-trigger-{cid}-{ld}"
+        _make_buttons_list = self._make_buttons_list
+
+        # ---- Clientside: capture text selection for list-mode entity buttons ----
+        # Reuses the same captureSelection JS function; it reads .tag from the dict ID.
+        app.clientside_callback(
+            "window.dash_clientside.tater.captureSelection",
+            Output({"type": "span-selection-list", "ld": ld, "index": MATCH}, "data"),
+            Input({"type": "span-add-btn-list", "ld": ld, "tag": ALL, "index": MATCH}, "n_clicks"),
+            prevent_initial_call=True,
+        )
+
+        # ---- Server: add span to the correct list item ----
+        @app.callback(
+            Output({"type": "span-trigger-list", "ld": ld, "index": MATCH}, "data"),
+            Input({"type": "span-selection-list", "ld": ld, "index": MATCH}, "data"),
+            State("current-doc-id", "data"),
+            State({"type": "span-trigger-list", "ld": ld, "index": MATCH}, "data"),
+            prevent_initial_call=True,
+        )
+        def add_span_list(selection, doc_id, trigger_count):
+            if not selection or not doc_id:
+                return no_update
+
+            item_index = ctx.outputs_list[0]["id"]["index"]
+            start_js = selection.get("start")
+            end_js = selection.get("end")
+            tag = selection.get("tag")
+
+            if start_js is None or end_js is None or not tag:
+                return no_update
+
+            tater_app = app._tater_app
+            doc = next((d for d in tater_app.documents if d.id == doc_id), None)
+            if not doc:
+                return no_update
+
+            full_text = doc.load_content()
+            if not (0 <= start_js < end_js <= len(full_text)):
+                return no_update
+
+            raw_slice = full_text[start_js:end_js]
+            text = raw_slice.strip()
+            if not text:
+                return no_update
+
+            trim_start = raw_slice.find(text)
+            start = start_js + trim_start
+            end = start + len(text)
+
+            item_field_path = f"{outer_list_field}.{item_index}.{span_field}"
+            annotation = tater_app.annotations[doc_id]
+            current_spans = value_helpers.get_model_value(annotation, item_field_path) or []
+
+            for existing in current_spans:
+                if start < existing.end and end > existing.start:
+                    return no_update
+
+            new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
+            new_spans = list(current_spans) + [new_span]
+            value_helpers.set_model_value(annotation, item_field_path, new_spans)
+            tater_app._save_annotations_to_file(doc_id=doc_id)
+
+            return (trigger_count or 0) + 1
+
+        # ---- Server: relay per-item trigger → global list trigger (for doc viewer) ----
+        # Cannot mix MATCH and static outputs in one callback, so we relay here.
+        @app.callback(
+            Output(list_trigger_id, "data", allow_duplicate=True),
+            Input({"type": "span-trigger-list", "ld": ld, "index": ALL}, "data"),
+            State(list_trigger_id, "data"),
+            prevent_initial_call=True,
+        )
+        def relay_list_trigger(all_triggers, global_trigger):
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                return no_update
+            return (global_trigger or 0) + 1
+
+        # ---- Server: delete span from list item (first writer of list_trigger_id) ----
+        @app.callback(
+            Output(list_trigger_id, "data"),
+            Input(delete_store_id, "data"),
+            State("current-doc-id", "data"),
+            State(list_trigger_id, "data"),
+            prevent_initial_call=True,
+        )
+        def delete_span_list(delete_data, doc_id, trigger_count):
+            if not delete_data or not doc_id:
+                return no_update
+
+            del_index = delete_data.get("index", -1)
+            if del_index < 0:
+                return no_update  # Non-list delete; handled by register_callbacks
+
+            del_start = delete_data.get("start")
+            del_end = delete_data.get("end")
+            if del_start is None or del_end is None:
+                return no_update
+
+            tater_app = app._tater_app
+            annotation = tater_app.annotations.get(doc_id)
+            if not annotation:
+                return no_update
+
+            item_field_path = f"{outer_list_field}.{del_index}.{span_field}"
+            current_spans = value_helpers.get_model_value(annotation, item_field_path) or []
+            new_spans = [s for s in current_spans if not (s.start == del_start and s.end == del_end)]
+            value_helpers.set_model_value(annotation, item_field_path, new_spans)
+            tater_app._save_annotations_to_file(doc_id=doc_id)
+
+            return (trigger_count or 0) + 1
+
+        # ---- Server: refresh entity-button counts on add, delete, or doc change ----
+        @app.callback(
+            Output({"type": "span-entity-buttons-list", "ld": ld, "index": MATCH}, "children"),
+            Input({"type": "span-trigger-list", "ld": ld, "index": MATCH}, "data"),
+            Input(list_trigger_id, "data"),
+            Input("current-doc-id", "data"),
+        )
+        def update_entity_counts_list(trigger, global_trigger, doc_id):
+            item_index = ctx.outputs_list[0]["id"]["index"]
+            counts = {}
+            if doc_id:
+                tater_app = app._tater_app
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation:
+                    item_field_path = f"{outer_list_field}.{item_index}.{span_field}"
+                    spans = value_helpers.get_model_value(annotation, item_field_path) or []
+                    for span in spans:
+                        counts[span.tag] = counts.get(span.tag, 0) + 1
+            return _make_buttons_list(ld, item_index, counts)
 
 
