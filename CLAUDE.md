@@ -6,7 +6,7 @@ Tater is a Python library for building document annotation UIs. Users provide a 
 (Python or JSON) defining a Pydantic schema and optional widget overrides, then run the `tater`
 CLI to launch a Dash web app.
 
-Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v0.14 / Mantine v7**, Pydantic v2.
+Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v2.6 / Mantine v7**, Pydantic v2.
 
 ## Directory layout
 
@@ -56,10 +56,10 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
 
 ## DMC version constraints
 
-DMC is pinned near **v0.14 (Mantine v7)**. Before using a DMC component, verify it exists in
+DMC is pinned at **v2.6 (Mantine v7)**. Before using a DMC component, verify it exists in
 this version:
 
-- `dmc.CloseButton` does **not** exist — use `dmc.ActionIcon` instead.
+- `dmc.TabsTab` is the tab trigger (v2.x API) — `dmc.Tab` does not exist.
 - `dmc.Badge(circle=True)` clips double-digit numbers — avoid `circle=True`.
 - Component prop names follow Mantine v7 conventions (e.g. `leftSection`/`rightSection`, not
   `icon`).
