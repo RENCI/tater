@@ -32,6 +32,9 @@
         '  outline: 2px solid var(--tater-mark-color, #888);' +
         '  outline-offset: -1px;' +
         '  border-radius: 2px;' +
+        '}' +
+        '[data-tater-field].tater-widget-outlined button {' +
+        '  background-color: transparent !important;' +
         '}';
     document.head.appendChild(s);
 })();
@@ -54,13 +57,13 @@ window._taterActiveWidget = window._taterActiveWidget || null;
  */
 function applySpanStyles() {
     var active = window._taterActiveWidget;
+
     var marks = document.querySelectorAll('mark[data-start]');
     for (var i = 0; i < marks.length; i++) {
         var mark      = marks[i];
         var field     = mark.getAttribute('data-field');
         var indexAttr = mark.getAttribute('data-index');
         var color     = mark.getAttribute('data-color') || '#ffe066';
-        // List marks are keyed by field|index; non-list marks by field alone.
         var key = indexAttr !== null ? field + '|' + indexAttr : field;
 
         if (!active || key === active) {
@@ -68,6 +71,20 @@ function applySpanStyles() {
         } else {
             mark.style.setProperty('--tater-mark-color', color);
             mark.classList.add('tater-span-outlined');
+        }
+    }
+
+    var containers = document.querySelectorAll('[data-tater-field]');
+    for (var j = 0; j < containers.length; j++) {
+        var c  = containers[j];
+        var cf = c.getAttribute('data-tater-field');
+        var ci = c.getAttribute('data-tater-index');
+        var ck = ci !== null ? cf + '|' + ci : cf;
+
+        if (!active || ck === active) {
+            c.classList.remove('tater-widget-outlined');
+        } else {
+            c.classList.add('tater-widget-outlined');
         }
     }
 }
