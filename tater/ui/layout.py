@@ -193,6 +193,7 @@ def _build_document_viewer() -> dmc.Paper:
                 "fontSize": "0.9rem",
                 "lineHeight": "1.5",
                 "margin": 0,
+                "padding": "0 3px",
                 "height": "500px",
                 "overflowY": "auto",
             }
