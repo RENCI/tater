@@ -372,7 +372,8 @@ class SpanAnnotationWidget(TaterWidget):
             if not selection or not doc_id:
                 return no_update
 
-            item_index = ctx.outputs_list[0]["id"]["index"]
+            # triggered_id is the MATCH selection-store dict; read index from it
+            item_index = ctx.triggered_id["index"]
             start_js = selection.get("start")
             end_js = selection.get("end")
             tag = selection.get("tag")
@@ -468,7 +469,8 @@ class SpanAnnotationWidget(TaterWidget):
             Input("current-doc-id", "data"),
         )
         def update_entity_counts_list(trigger, global_trigger, doc_id):
-            item_index = ctx.outputs_list[0]["id"]["index"]
+            # Single MATCH output → ctx.outputs_list is a dict, not a list
+            item_index = ctx.outputs_list["id"]["index"]
             counts = {}
             if doc_id:
                 tater_app = app._tater_app
