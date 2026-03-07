@@ -72,6 +72,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     ] + ([dmc.Text("* Required", size="xs", c="red")] if has_required else []),
                     gap="md",
                 ),
+                id="tater-annotation-panel",
                 p="md",
                 withBorder=True,
                 shadow="sm"

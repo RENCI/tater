@@ -123,24 +123,32 @@ function applySpanStyles() {
         applySpanStyles();
     }
 
+    function watchAnnotationPanel() {
+        var panel = document.getElementById('tater-annotation-panel');
+        if (!panel) { setTimeout(watchAnnotationPanel, 200); return; }
+        new MutationObserver(function (mutations) {
+            for (var m = 0; m < mutations.length; m++) {
+                var added = mutations[m].addedNodes;
+                for (var n = 0; n < added.length; n++) {
+                    var node = added[n];
+                    if (node.nodeType === 1 && node.querySelector &&
+                            node.querySelector('[data-tater-field]')) {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(applySpanStyles, 50);
+                        return;
+                    }
+                }
+            }
+        }).observe(panel, { childList: true, subtree: true });
+    }
+
     function tryInit() {
         if (document.querySelector('[data-tater-field]')) {
             activate();
-            // Watch for future additions (new list items, etc.)
-            new MutationObserver(function (mutations) {
-                for (var m = 0; m < mutations.length; m++) {
-                    var added = mutations[m].addedNodes;
-                    for (var n = 0; n < added.length; n++) {
-                        var node = added[n];
-                        if (node.nodeType === 1 && node.querySelector &&
-                                node.querySelector('[data-tater-field]')) {
-                            clearTimeout(debounceTimer);
-                            debounceTimer = setTimeout(applySpanStyles, 50);
-                            return;
-                        }
-                    }
-                }
-            }).observe(document.body, { childList: true, subtree: true });
+            // Watch for future additions (new list items, etc.) — scoped to
+            // the annotation panel only to avoid interfering with Dash's
+            // own DOM operations elsewhere on the page.
+            watchAnnotationPanel();
         } else {
             setTimeout(tryInit, 200);
         }

@@ -362,6 +362,7 @@ class SpanAnnotationWidget(TaterWidget):
 
         cid = self.component_id
         delete_store_id = f"span-delete-{cid}"
+        delete_proxy_id = f"span-delete-proxy-{cid}"
         list_trigger_id = f"span-list-trigger-{cid}-{ld}"
         _make_buttons_list = self._make_buttons_list
 
@@ -371,6 +372,15 @@ class SpanAnnotationWidget(TaterWidget):
             "window.dash_clientside.tater.captureSelection",
             Output({"type": "span-selection-list", "ld": ld, "index": MATCH}, "data"),
             Input({"type": "span-add-btn-list", "ld": ld, "cid": cid, "tag": ALL, "index": MATCH}, "n_clicks"),
+            prevent_initial_call=True,
+        )
+
+        # ---- Clientside: relay pending delete from global to delete store (list mode) ----
+        # register_callbacks is not called for list-mode widgets, so we register this here.
+        app.clientside_callback(
+            "window.dash_clientside.tater.captureDelete",
+            Output(delete_store_id, "data"),
+            Input(delete_proxy_id, "n_clicks"),
             prevent_initial_call=True,
         )
 
