@@ -135,6 +135,7 @@ class SpanAnnotationWidget(TaterWidget):
 
     def _make_buttons(self, counts: dict) -> Any:
         """Build the entity-type button group with per-entity span counts."""
+        from dash import html
         buttons = [
             dmc.Button(
                 et.name,
@@ -153,14 +154,23 @@ class SpanAnnotationWidget(TaterWidget):
             )
             for et in self.entity_types
         ]
-        return dmc.Group(buttons, gap="xs", wrap="wrap")
+        return html.Div(
+            dmc.Group(buttons, gap="xs", wrap="wrap"),
+            **{"data-tater-field": self.component_id},
+        )
 
     def _make_buttons_list(self, ld: str, index: int, counts: dict) -> Any:
-        """Build entity buttons with list-mode dict IDs (ld + index discriminators)."""
+        """Build entity buttons with list-mode dict IDs (ld + index discriminators).
+
+        ``cid`` is included in the ID so the JS captureSelection handler can
+        map button clicks to the same key used on ``data-field`` of ``<mark>``
+        elements (which equals component_id for both list and non-list spans).
+        """
+        cid = self.component_id
         buttons = [
             dmc.Button(
                 et.name,
-                id={"type": "span-add-btn-list", "ld": ld, "tag": et.name, "index": index},
+                id={"type": "span-add-btn-list", "ld": ld, "cid": cid, "tag": et.name, "index": index},
                 size="xs",
                 variant="outline",
                 fw=600,
@@ -175,7 +185,11 @@ class SpanAnnotationWidget(TaterWidget):
             )
             for et in self.entity_types
         ]
-        return dmc.Group(buttons, gap="xs", wrap="wrap")
+        from dash import html
+        return html.Div(
+            dmc.Group(buttons, gap="xs", wrap="wrap"),
+            **{"data-tater-field": cid, "data-tater-index": str(index)},
+        )
 
     def to_python_type(self) -> type:
         return list
@@ -352,11 +366,11 @@ class SpanAnnotationWidget(TaterWidget):
         _make_buttons_list = self._make_buttons_list
 
         # ---- Clientside: capture text selection for list-mode entity buttons ----
-        # Reuses the same captureSelection JS function; it reads .tag from the dict ID.
+        # Reuses the same captureSelection JS function; it reads .tag and .cid from the dict ID.
         app.clientside_callback(
             "window.dash_clientside.tater.captureSelection",
             Output({"type": "span-selection-list", "ld": ld, "index": MATCH}, "data"),
-            Input({"type": "span-add-btn-list", "ld": ld, "tag": ALL, "index": MATCH}, "n_clicks"),
+            Input({"type": "span-add-btn-list", "ld": ld, "cid": cid, "tag": ALL, "index": MATCH}, "n_clicks"),
             prevent_initial_call=True,
         )
 

@@ -676,6 +676,7 @@ def _render_document_content(
             "data-start": str(span.start),
             "data-end": str(span.end),
             "data-field": widget_cid,
+            "data-color": color,
         }
         if item_index >= 0:
             mark_props["data-index"] = str(item_index)
