@@ -58,6 +58,23 @@ window._taterActiveWidget = window._taterActiveWidget || null;
 function applySpanStyles() {
     var active = window._taterActiveWidget;
 
+    // Collect all button containers and build their keys.
+    var containers = document.querySelectorAll('[data-tater-field]');
+    var containerKeys = [];
+    for (var j = 0; j < containers.length; j++) {
+        var c  = containers[j];
+        var cf = c.getAttribute('data-tater-field');
+        var ci = c.getAttribute('data-tater-index');
+        containerKeys.push(ci !== null ? cf + '|' + ci : cf);
+    }
+
+    // If the active key no longer exists (e.g. after navigating to a document
+    // with fewer list items), reset to the first available container.
+    if (active && containerKeys.length > 0 && containerKeys.indexOf(active) === -1) {
+        active = containerKeys[0];
+        window._taterActiveWidget = active;
+    }
+
     var marks = document.querySelectorAll('mark[data-start]');
     for (var i = 0; i < marks.length; i++) {
         var mark      = marks[i];
@@ -74,20 +91,62 @@ function applySpanStyles() {
         }
     }
 
-    var containers = document.querySelectorAll('[data-tater-field]');
-    for (var j = 0; j < containers.length; j++) {
-        var c  = containers[j];
-        var cf = c.getAttribute('data-tater-field');
-        var ci = c.getAttribute('data-tater-index');
-        var ck = ci !== null ? cf + '|' + ci : cf;
-
-        if (!active || ck === active) {
-            c.classList.remove('tater-widget-outlined');
+    for (var k = 0; k < containers.length; k++) {
+        if (!active || containerKeys[k] === active) {
+            containers[k].classList.remove('tater-widget-outlined');
         } else {
-            c.classList.add('tater-widget-outlined');
+            containers[k].classList.add('tater-widget-outlined');
         }
     }
 }
+
+
+// ---------- initialise active widget on page load + watch for new ones ----------
+// On page load: poll until the first [data-tater-field] button container is in
+// the DOM, then activate it.
+// After that: a body-level MutationObserver fires applySpanStyles() whenever a
+// new [data-tater-field] element is added (e.g. a new list item), so newly
+// rendered button groups get the correct outlined/filled state immediately.
+
+(function () {
+    var debounceTimer = null;
+
+    function activate() {
+        if (!window._taterActiveWidget) {
+            var first = document.querySelector('[data-tater-field]');
+            if (first) {
+                var f = first.getAttribute('data-tater-field');
+                var i = first.getAttribute('data-tater-index');
+                window._taterActiveWidget = i !== null ? f + '|' + i : f;
+            }
+        }
+        applySpanStyles();
+    }
+
+    function tryInit() {
+        if (document.querySelector('[data-tater-field]')) {
+            activate();
+            // Watch for future additions (new list items, etc.)
+            new MutationObserver(function (mutations) {
+                for (var m = 0; m < mutations.length; m++) {
+                    var added = mutations[m].addedNodes;
+                    for (var n = 0; n < added.length; n++) {
+                        var node = added[n];
+                        if (node.nodeType === 1 && node.querySelector &&
+                                node.querySelector('[data-tater-field]')) {
+                            clearTimeout(debounceTimer);
+                            debounceTimer = setTimeout(applySpanStyles, 50);
+                            return;
+                        }
+                    }
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        } else {
+            setTimeout(tryInit, 200);
+        }
+    }
+    tryInit();
+})();
 
 
 // ---------- click listener for entity buttons ----------
