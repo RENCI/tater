@@ -20,21 +20,18 @@
  */
 
 
-// ---------- inject CSS for outlined (inactive) spans ----------
-// Using a CSS class with !important ensures the outline state survives React
+// ---------- inject CSS for faded (inactive) spans ----------
+// Using a CSS class with !important ensures the faded state survives React
 // reconciliation, which sets inline background-color on <mark> elements.
 
 (function () {
     var s = document.createElement('style');
     s.textContent =
         'mark[data-start].tater-span-outlined {' +
-        '  background-color: transparent !important;' +
-        '  outline: 2px solid var(--tater-mark-color, #888);' +
-        '  outline-offset: -1px;' +
-        '  border-radius: 2px;' +
+        '  background-color: var(--tater-mark-faded, rgba(200,200,200,0.25)) !important;' +
         '}' +
         '[data-tater-field].tater-widget-outlined button {' +
-        '  background-color: transparent !important;' +
+        '  opacity: 0.35 !important;' +
         '}';
     document.head.appendChild(s);
 })();
@@ -45,15 +42,24 @@
 
 window._taterActiveWidget = window._taterActiveWidget || null;
 
+/** Convert a 6-digit hex color to rgba with the given alpha (0–1). */
+function hexToRgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
 /**
- * Apply filled or outlined styling to every <mark data-start> in the document.
+ * Apply filled or faded styling to every <mark data-start> in the document.
  *
  * For each mark:
- *   - If no active entity is recorded for its widget, OR its tag matches the
- *     active entity → filled (remove class).
- *   - Otherwise → outlined (add class + set --tater-mark-color).
+ *   - If no active widget is recorded, OR its key matches the active widget
+ *     → filled (remove class).
+ *   - Otherwise → faded background (add class + set --tater-mark-faded).
  *
- * Widgets without a recorded active entity are unaffected (all filled).
+ * Widgets without a recorded active widget are unaffected (all filled).
  */
 function applySpanStyles() {
     var active = window._taterActiveWidget;
@@ -86,7 +92,7 @@ function applySpanStyles() {
         if (!active || key === active) {
             mark.classList.remove('tater-span-outlined');
         } else {
-            mark.style.setProperty('--tater-mark-color', color);
+            mark.style.setProperty('--tater-mark-faded', hexToRgba(color, 0.25));
             mark.classList.add('tater-span-outlined');
         }
     }
@@ -104,9 +110,9 @@ function applySpanStyles() {
 // ---------- initialise active widget on page load + watch for new ones ----------
 // On page load: poll until the first [data-tater-field] button container is in
 // the DOM, then activate it.
-// After that: a body-level MutationObserver fires applySpanStyles() whenever a
-// new [data-tater-field] element is added (e.g. a new list item), so newly
-// rendered button groups get the correct outlined/filled state immediately.
+// After that: a MutationObserver on the annotation panel fires applySpanStyles()
+// whenever a new [data-tater-field] element is added (e.g. a new list item), so
+// newly rendered button groups get the correct faded/filled state immediately.
 
 (function () {
     var debounceTimer = null;
