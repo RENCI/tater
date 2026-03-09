@@ -442,8 +442,28 @@ class RepeaterWidget(ContainerWidget):
         doc_id: Optional[str] = None,
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
+        from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         rendered = []
         for template in self.item_widgets:
+            if isinstance(template, HierarchicalLabelWidget):
+                widget = copy.deepcopy(template)
+                widget._finalize_paths(
+                    parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
+                )
+                if tater_app and doc_id and doc_id in tater_app.annotations:
+                    annotation = tater_app.annotations[doc_id]
+                    value = tater_app._get_model_value(annotation, widget.field_path)
+                    if value is not None:
+                        widget.default = value
+                nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
+                items = []
+                if widget.label:
+                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
+                items.append(widget.component_in_nested_list(nested_ld, outer_li, inner_index))
+                if widget.description:
+                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
+                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+                continue
             if not isinstance(template, ControlWidget):
                 continue
             widget = copy.deepcopy(template)
@@ -560,14 +580,15 @@ class RepeaterWidget(ContainerWidget):
                 if tater_app and doc_id and doc_id in tater_app.annotations:
                     annotation = tater_app.annotations[doc_id]
                     for iw in item_widget_templates:
+                        if isinstance(iw, ContainerWidget):
+                            continue
                         if not isinstance(iw, ControlWidget):
                             continue
                         try:
-                            empty_val = iw.empty_value if hasattr(iw, "empty_value") else None
                             tater_app._set_model_value(
                                 annotation,
                                 f"{outer_list_field}.{outer_li}.{item_field}.{new_index}.{iw.schema_field}",
-                                empty_val,
+                                iw.empty_value,
                             )
                         except Exception:
                             pass
@@ -592,10 +613,16 @@ class RepeaterWidget(ContainerWidget):
             )
 
         if tater_app:
+            from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             for iw_template in item_widget_templates:
                 if isinstance(iw_template, ControlWidget):
                     self._register_nested_pattern_callback(
                         app, tater_app, ld, outer_list_field, item_field, iw_template
+                    )
+                elif isinstance(iw_template, HierarchicalLabelWidget):
+                    nested_ld = f"{outer_list_field}-{item_field}-{iw_template.schema_field}"
+                    iw_template.register_nested_list_callbacks(
+                        app, nested_ld, outer_list_field, item_field, iw_template.schema_field
                     )
 
     def _register_nested_pattern_callback(

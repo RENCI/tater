@@ -204,6 +204,11 @@ class HierarchicalLabelWidget(TaterWidget):
     ) -> list:
         raise NotImplementedError
 
+    def _render_sections_in_nested_list(
+        self, path: list[str], ld: str, li: int, inner_li: int, selected_value: Optional[str]
+    ) -> list:
+        raise NotImplementedError
+
     # ------------------------------------------------------------------
     # Component + callbacks
     # ------------------------------------------------------------------
@@ -432,6 +437,199 @@ class HierarchicalLabelWidget(TaterWidget):
             gap="xs",
         )
 
+    def component_in_nested_list(self, ld: str, outer_li: int, inner_li: int) -> Any:
+        """Render this widget when nested two levels deep (repeater inside repeater)."""
+        initial_sections = self._render_sections_in_nested_list([], ld, outer_li, inner_li, None)
+        return dmc.Stack(
+            [
+                dmc.TextInput(
+                    id={"type": "hier-search-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
+                    placeholder="Search…",
+                    size="xs",
+                    style={} if self.searchable else {"display": "none"},
+                    rightSection=dmc.ActionIcon(
+                        "×",
+                        id={"type": "hier-search-clear-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
+                        size="xs",
+                        variant="transparent",
+                        c="dimmed",
+                        style={"display": "none"},
+                    ),
+                    rightSectionPointerEvents="all",
+                ),
+                dmc.Text(
+                    "",
+                    id={"type": "hier-breadcrumb-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
+                    size="xs",
+                    fw=600,
+                    style={} if self._show_breadcrumb else {"display": "none"},
+                ),
+                dmc.Stack(
+                    initial_sections,
+                    id={"type": "hier-sections-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
+                    gap="sm",
+                ),
+                dcc.Store(
+                    id={"type": "hier-nav-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
+                    data=[],
+                ),
+            ],
+            gap="xs",
+        )
+
+    def register_nested_list_callbacks(
+        self,
+        app: Any,
+        ld: str,
+        outer_list_field: str,
+        item_field: str,
+        inner_item_field: str,
+    ) -> None:
+        """Register MATCH-based callbacks for widgets nested two levels deep.
+
+        ``ld`` is the discriminator; ``li`` (outer index) and ``inner_li``
+        (inner index) both use MATCH so each (outer, inner) pair is independent.
+        """
+        from tater.ui import value_helpers
+
+        root = self.root
+        render_sections_in_nested_list = self._render_sections_in_nested_list
+
+        def node_at(path: list[str]) -> Node:
+            node = root
+            for name in path:
+                child = node.find(name)
+                if child is None:
+                    return root
+                node = child
+            return node
+
+        def field_path_for(li: int, inner_li: int) -> str:
+            return f"{outer_list_field}.{li}.{item_field}.{inner_li}.{inner_item_field}"
+
+        # ---- 1a. Show/hide clear button ----
+        @app.callback(
+            Output({"type": "hier-search-clear-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "style"),
+            Input({"type": "hier-search-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "value"),
+            prevent_initial_call=False,
+        )
+        def toggle_clear_nested(value):
+            return {} if value else {"display": "none"}
+
+        # ---- 1b. Clear search on button click ----
+        @app.callback(
+            Output({"type": "hier-search-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "value", allow_duplicate=True),
+            Input({"type": "hier-search-clear-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def clear_search_nested(_):
+            return ""
+
+        # ---- 2. Reset all nav stores when document changes ----
+        @app.callback(
+            Output({"type": "hier-nav-nested", "ld": ld, "li": ALL, "inner_li": ALL}, "data"),
+            Input("current-doc-id", "data"),
+            prevent_initial_call=True,
+        )
+        def reset_nav_nested(_doc_id):
+            return [[] for _ in ctx.outputs_list]
+
+        # ---- 3. Handle node button click ----
+        @app.callback(
+            Output({"type": "hier-nav-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "data", allow_duplicate=True),
+            Output({"type": "hier-search-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "value", allow_duplicate=True),
+            Input({"type": "hier-node-btn-nested", "ld": ld, "li": MATCH, "inner_li": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
+            State({"type": "hier-nav-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "data"),
+            State("current-doc-id", "data"),
+            prevent_initial_call=True,
+        )
+        def handle_click_nested(node_clicks, current_path, doc_id):
+            if not ctx.triggered_id:
+                return no_update, no_update
+            triggered = ctx.triggered_id
+            if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn-nested":
+                return no_update, no_update
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                return no_update, no_update
+
+            li = triggered["li"]
+            inner_li = triggered["inner_li"]
+            depth = triggered["depth"]
+            node_name = triggered["name"]
+            path = list(current_path or [])
+            fp = field_path_for(li, inner_li)
+
+            parent = node_at(path[:depth])
+            clicked = parent.find(node_name)
+            is_search_result = False
+            if clicked is None:
+                clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
+                if clicked is None:
+                    return no_update, no_update
+                is_search_result = True
+
+            tater_app = app._tater_app
+
+            if clicked.is_leaf:
+                current_value = None
+                annotation = None
+                if doc_id and tater_app:
+                    annotation = tater_app.annotations.get(doc_id)
+                    if annotation is not None:
+                        current_value = value_helpers.get_model_value(annotation, fp)
+
+                if is_search_result:
+                    full_path = _find_path(root, node_name)
+                    new_path = full_path[:-1]
+                else:
+                    new_path = path[:depth]
+
+                if current_value == node_name:
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, fp, None)
+                        tater_app._save_annotations_to_file()
+                else:
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, fp, node_name)
+                        tater_app._save_annotations_to_file()
+
+                return new_path, ("" if is_search_result else no_update)
+            else:
+                if depth < len(path) and path[depth] == node_name:
+                    return path[:depth], no_update
+                return path[:depth] + [node_name], no_update
+
+        # ---- 4. Rebuild sections ----
+        @app.callback(
+            Output({"type": "hier-sections-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "children"),
+            Output({"type": "hier-breadcrumb-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "children"),
+            Input({"type": "hier-nav-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "data"),
+            Input({"type": "hier-search-nested", "ld": ld, "li": MATCH, "inner_li": MATCH}, "value"),
+            Input("current-doc-id", "data"),
+            prevent_initial_call=False,
+        )
+        def update_display_nested(current_path, search_query, doc_id):
+            li = ctx.outputs_list[0]["id"]["li"]
+            inner_li = ctx.outputs_list[0]["id"]["inner_li"]
+            fp = field_path_for(li, inner_li)
+            path = list(current_path or [])
+            tater_app = app._tater_app
+
+            selected_value = None
+            if doc_id and tater_app:
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation is not None:
+                    selected_value = value_helpers.get_model_value(annotation, fp)
+
+            breadcrumb = " → ".join(path) if path else "None selected"
+
+            if search_query and search_query.strip():
+                q = search_query.strip().lower()
+                matches = [n for n in root.all_leaves() if q in n.name.lower()]
+                return [_section("Search results", _make_buttons_nested(matches, ld, li, inner_li, 0, selected_value))], breadcrumb
+
+            return render_sections_in_nested_list(path, ld, li, inner_li, selected_value), breadcrumb
+
     def register_list_callbacks(self, app: Any, ld: str, list_field: str, item_field: str) -> None:
         """Register MATCH-based callbacks for list-embedded instances of this widget.
 
@@ -605,6 +803,11 @@ class HierarchicalLabelFullWidget(HierarchicalLabelWidget):
     ) -> list:
         return _build_sections_full_list(self.root, path, ld, li, selected_value=selected_value)
 
+    def _render_sections_in_nested_list(
+        self, path: list[str], ld: str, li: int, inner_li: int, selected_value: Optional[str]
+    ) -> list:
+        return _build_sections_full_nested(self.root, path, ld, li, inner_li, selected_value=selected_value)
+
 
 @dataclass(eq=False)
 class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
@@ -625,6 +828,12 @@ class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
         self, path: list[str], ld: str, li: int, selected_value: Optional[str]
     ) -> list:
         items = _build_sections_compact_list(self.root, path, ld, li, selected_value=selected_value)
+        return [dmc.Stack(items, gap=2)]
+
+    def _render_sections_in_nested_list(
+        self, path: list[str], ld: str, li: int, inner_li: int, selected_value: Optional[str]
+    ) -> list:
+        items = _build_sections_compact_nested(self.root, path, ld, li, inner_li, selected_value=selected_value)
         return [dmc.Stack(items, gap=2)]
 
 
@@ -662,6 +871,19 @@ def _make_buttons_list(
 ) -> list:
     def btn_id(node, d):
         return {"type": "hier-node-btn-list", "ld": ld, "li": li, "depth": d, "name": node.name}
+    return _make_buttons_impl(nodes, depth, selected_name, btn_id)
+
+
+def _make_buttons_nested(
+    nodes: list[Node],
+    ld: str,
+    li: int,
+    inner_li: int,
+    depth: int,
+    selected_name: Optional[str] = None,
+) -> list:
+    def btn_id(node, d):
+        return {"type": "hier-node-btn-nested", "ld": ld, "li": li, "inner_li": inner_li, "depth": d, "name": node.name}
     return _make_buttons_impl(nodes, depth, selected_name, btn_id)
 
 
@@ -724,6 +946,19 @@ def _build_sections_full_list(
     return _build_sections_full_impl(root, path, selected_value, make_btns)
 
 
+def _build_sections_full_nested(
+    root: Node,
+    path: list[str],
+    ld: str,
+    li: int,
+    inner_li: int,
+    selected_value: Optional[str] = None,
+) -> list:
+    def make_btns(nodes, depth, sel):
+        return _make_buttons_nested(nodes, ld, li, inner_li, depth, sel)
+    return _build_sections_full_impl(root, path, selected_value, make_btns)
+
+
 def _build_sections_full_impl(
     root: Node,
     path: list[str],
@@ -767,6 +1002,19 @@ def _build_sections_compact_list(
 ) -> list:
     def make_btns(nodes, depth, sel):
         return _make_buttons_list(nodes, ld, li, depth, sel)
+    return _build_sections_compact_impl(root, path, selected_value, make_btns)
+
+
+def _build_sections_compact_nested(
+    root: Node,
+    path: list[str],
+    ld: str,
+    li: int,
+    inner_li: int,
+    selected_value: Optional[str] = None,
+) -> list:
+    def make_btns(nodes, depth, sel):
+        return _make_buttons_nested(nodes, ld, li, inner_li, depth, sel)
     return _build_sections_compact_impl(root, path, selected_value, make_btns)
 
 
