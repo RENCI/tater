@@ -21,9 +21,20 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Removed clientside keyboard navigation callback
     """Register document and navigation callbacks on the Dash app."""
     from tater.widgets.span import SpanAnnotationWidget
+    from tater.widgets.repeater import RepeaterWidget
 
     app = tater_app.app
     span_widgets = [w for w in tater_app.widgets if isinstance(w, SpanAnnotationWidget)]
+
+    # Collect (span_widget, outer_field, span_field, ld) for span widgets inside repeaters
+    list_span_pairs = []
+    for w in tater_app.widgets:
+        if isinstance(w, RepeaterWidget):
+            for item_w in w.item_widgets:
+                if isinstance(item_w, SpanAnnotationWidget):
+                    ld = f"{w.field_path}-{item_w.schema_field}"
+                    list_span_pairs.append((item_w, w.field_path, item_w.schema_field, ld))
+
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
 
     # Setup timing callbacks
@@ -33,6 +44,10 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Span trigger stores are included as additional inputs so that adding or
     # deleting a span causes the document to re-render with updated highlights.
     span_trigger_inputs = [Input(f"span-trigger-{w.component_id}", "data") for w in span_widgets]
+    # Also include list-mode span triggers (global list trigger per (cid, ld))
+    for span_w, _, _, ld in list_span_pairs:
+        list_trigger_id = f"span-list-trigger-{span_w.component_id}-{ld}"
+        span_trigger_inputs.append(Input(list_trigger_id, "data"))
 
     @app.callback(
         [Output("document-content", "children"),
@@ -56,7 +71,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         except Exception as e:
             raw_text = f"Error loading file: {e}"
 
-        content = _render_document_content(raw_text, doc_id, span_widgets, tater_app)
+        content = _render_document_content(raw_text, doc_id, span_widgets, tater_app, list_span_pairs)
 
         doc_index = next((i for i, d in enumerate(tater_app.documents) if d.id == doc_id), 0)
         title = f"Document {doc_index + 1} of {len(tater_app.documents)}"
@@ -604,25 +619,43 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
     return doc_id, timing_data
 
 
-def _render_document_content(text: str, doc_id: str, span_widgets: list, tater_app) -> list | str:
+def _render_document_content(
+    text: str, doc_id: str, span_widgets: list, tater_app, list_span_pairs: list = ()
+) -> list | str:
     """
     Return Dash component children for the document viewer.
 
     When no SpanAnnotationWidgets are present, returns the raw text string.
-    Otherwise builds a list of strings and highlighted html.Span components.
+    Otherwise builds a list of strings and highlighted html.Mark components.
+
+    ``list_span_pairs`` is a list of (span_widget, outer_field, span_field, ld)
+    tuples for span widgets nested inside RepeaterWidgets.
     """
-    if not span_widgets or not doc_id:
+    if not span_widgets and not list_span_pairs or not doc_id:
         return text
 
-    # Collect all spans across all span widgets for this document
+    annotation = tater_app.annotations.get(doc_id)
+
+    # Collect (span, widget_cid, color, item_index_or_minus1) for all spans
+    # item_index == -1 means top-level (not inside a list)
     all_spans = []
+
     for widget in span_widgets:
-        annotation = tater_app.annotations.get(doc_id)
         if annotation:
             spans = value_helpers.get_model_value(annotation, widget.field_path) or []
             for span in spans:
                 color = widget.get_color_for_tag(span.tag)
-                all_spans.append((span, widget.component_id, color))
+                all_spans.append((span, widget.component_id, color, -1))
+
+    for span_widget, outer_field, span_field, _ld in list_span_pairs:
+        if annotation:
+            outer_list = value_helpers.get_model_value(annotation, outer_field) or []
+            for item_index in range(len(outer_list)):
+                item_field_path = f"{outer_field}.{item_index}.{span_field}"
+                spans = value_helpers.get_model_value(annotation, item_field_path) or []
+                for span in spans:
+                    color = span_widget.get_color_for_tag(span.tag)
+                    all_spans.append((span, span_widget.component_id, color, item_index))
 
     if not all_spans:
         return text
@@ -632,22 +665,27 @@ def _render_document_content(text: str, doc_id: str, span_widgets: list, tater_a
 
     components = []
     pos = 0
-    for span, widget_cid, color in all_spans:
+    for span, widget_cid, color, item_index in all_spans:
         if span.start < pos:
             continue  # overlapping — skip
         if span.start > pos:
             components.append(text[pos:span.start])
 
+        mark_props = {
+            "data-tag": span.tag,
+            "data-start": str(span.start),
+            "data-end": str(span.end),
+            "data-field": widget_cid,
+            "data-color": color,
+        }
+        if item_index >= 0:
+            mark_props["data-index"] = str(item_index)
+
         components.append(
             html.Mark(
                 span.text,
                 style={"backgroundColor": color, "padding": "1px 0"},
-                **{
-                    "data-tag": span.tag,
-                    "data-start": str(span.start),
-                    "data-end": str(span.end),
-                    "data-field": widget_cid,
-                },
+                **mark_props,
             )
         )
         pos = span.end

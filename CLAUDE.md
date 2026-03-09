@@ -18,12 +18,16 @@ tater/                  # Library package
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
   widgets/              # All widget classes
     base.py             # Widget base class hierarchy (see Widget conventions)
+    repeater.py         # RepeaterWidget (abstract), ListableWidget, TabsWidget
     hierarchical_label.py  # HierarchicalLabel* widgets + Node tree utilities
-    ...
+    ...                 # One file per concrete widget (see Widget conventions)
 apps/
-  config/               # Python config-file examples (simple, simple_defaults, simple_mixed, hooks, nested, list_nested, …)
-  schema/               # JSON schema-file examples + schemas
-data/                   # Sample documents and ontologies for examples
+  examples/
+    config/             # Python config-file examples (simple, hooks, span, span_in_list, tabs, …)
+    schema/             # JSON schema-file examples
+    data/               # Sample documents
+  pathology/            # Domain-specific example apps
+data/                   # Additional sample documents and ontologies
 spec/                   # Design documents (see below)
 ```
 
@@ -32,9 +36,9 @@ spec/                   # Design documents (see below)
 Apps are run via the `tater` CLI, which requires either `--config` (Python) or `--schema` (JSON):
 
 ```bash
-tater --config apps/config/simple.py --documents data/documents.json
-tater --config apps/config/hooks.py  --documents data/documents.json
-tater --schema apps/schema/simple.json --documents data/documents.json
+tater --config apps/examples/config/simple.py --documents data/documents.json
+tater --config apps/examples/config/hooks.py  --documents data/documents.json
+tater --schema apps/examples/schema/simple.json --documents data/documents.json
 ```
 
 CLI flags: `--documents` (required), `--config` or `--schema` (one required),
@@ -102,22 +106,31 @@ Widget base class hierarchy in `base.py`:
 - `TaterWidget` — abstract root; all widgets inherit from this
 - `ControlWidget(TaterWidget)` — leaf widgets that capture a value; adds `required`, `auto_advance`, `value_prop`, `empty_value`
   - `ChoiceWidget` — single `Literal[...]` field; derives `options` from schema
+    - `SegmentedControlWidget`, `RadioGroupWidget`, `SelectWidget`, `ChipGroupWidget`
   - `MultiChoiceWidget` — `List[Literal[...]]` field; derives `options` from schema
+    - `MultiSelectWidget`
   - `BooleanWidget` — `bool` field; `value_prop = "checked"`
+    - `CheckboxWidget`, `SwitchWidget`
   - `NumericWidget` — numeric field
+    - `NumberInputWidget`, `SliderWidget`, `RangeSliderWidget`
   - `TextWidget` — string field
-- `ContainerWidget(TaterWidget)` — widgets that contain other widgets (GroupWidget, ListableWidget)
+    - `TextInputWidget`, `TextAreaWidget`
+- `ContainerWidget(TaterWidget)` — widgets that contain other widgets
+  - `GroupWidget` — groups widgets for a nested sub-model (`schema_field` is a dot-path prefix)
+  - `RepeaterWidget` (abstract, in `repeater.py`) — manages a `List[ItemModel]` field; subclasses:
+    - `ListableWidget` — items as a vertical stack of bordered cards
+    - `TabsWidget` — items as switchable tabs
 
 - Constructor signature: `(schema_field, label="", description=None, ...)`.
 - `renders_own_label` property: if `True`, the widget renders its own label (skips the outer
-  wrapper label in layout). Most widgets return `False`; GroupWidget/ListableWidget return `True`.
+  wrapper label in layout). Most widgets return `False`; GroupWidget/RepeaterWidget subclasses return `True`.
 - `bind_schema(model)` should raise `TypeError` / `ValueError` with a clear message if the field
   type doesn't match what the widget expects.
 - `register_callbacks(app)` captures `self` fields into the closure — don't rely on `self` inside
   callback functions (capture to local variables before the `@app.callback` decorator).
 - **Escape-hatch callbacks**: for cross-field rules that can't be expressed as widget declarations,
   assign widgets to named variables and use `widget.component_id` in `Output`/`Input` — avoids
-  hard-coding ID strings. See `apps/config/hooks.py` for the pattern. The `configure(app)` function
+  hard-coding ID strings. See `apps/examples/config/hooks.py` for the pattern. The `configure(app)` function
   in a config module is the right place for these; it is called after `set_annotation_widgets` so
   all component IDs are finalised.
 - `required=True` is **UI-only**: it shows a `*` indicator and drives the `in_progress` /
@@ -141,18 +154,18 @@ Widget base class hierarchy in `base.py`:
 - All widgets listed in README
 - Manual widget definition (user provides widget list)
 - Nested models via GroupWidget (dot-path `schema_field`)
-- Repeatable lists via ListableWidget
-- Span annotation
+- Repeatable lists via ListableWidget (card stack) and TabsWidget (tab UI)
+- Span annotation, including SpanAnnotationWidget nested inside ListableWidget/TabsWidget
 - Hierarchical label (compact + full)
 - Auto-save, progress tracking, flag/notes, annotation timing
-
-**Not yet implemented (from spec):**
-- `RepeaterWidget` for arbitrary nested list models (ListableWidget covers the current use case)
+- Conditional visibility (`conditional_on`)
+- Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
+  MultiSelectWidget, CheckboxWidget, SwitchWidget, NumberInputWidget, SliderWidget,
+  RangeSliderWidget, TextInputWidget, TextAreaWidget
 
 ## spec/ files
 
-- `spec/tater.md` — Pydantic-first redesign spec; mostly implemented; nested list repeater
-  (`RepeaterWidget`) remains aspirational.
+- `spec/tater.md` — Pydantic-first redesign spec; fully implemented including RepeaterWidget.
 - `spec/app.md` — Original v1 spec with JSON schema files; obsolete.
 - `spec/STAND_LIBRARY_SPECIFICATION.md` — Spec for a Streamlit-based predecessor (STAND);
   kept as reference only.

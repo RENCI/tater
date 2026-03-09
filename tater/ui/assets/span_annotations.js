@@ -13,11 +13,179 @@
  *  - Floating tooltip: a single <div id="tater-span-tooltip"> appended to
  *    <body> (outside document-content) that shows the entity label and a
  *    × delete button when the mouse enters a <mark data-start> element.
+ *
+ *  - Active-entity highlighting: the most recently clicked entity type button
+ *    (per widget) has its spans shown filled; other entity types' spans in the
+ *    same widget are shown outlined.  Other widgets are unaffected.
  */
+
+
+// ---------- inject CSS for faded (inactive) spans ----------
+// Using a CSS class with !important ensures the faded state survives React
+// reconciliation, which sets inline background-color on <mark> elements.
+
+(function () {
+    var s = document.createElement('style');
+    s.textContent =
+        'mark[data-start].tater-span-outlined {' +
+        '  background-color: var(--tater-mark-faded, rgba(200,200,200,0.25)) !important;' +
+        '}' +
+        '[data-tater-field].tater-widget-outlined button {' +
+        '  opacity: 0.35 !important;' +
+        '}';
+    document.head.appendChild(s);
+})();
+
+
+// ---------- active-entity tracking + span styling ----------
+// component_id of the most recently clicked SpanAnnotationWidget, or null.
+
+window._taterActiveWidget = window._taterActiveWidget || null;
+
+/** Convert a 6-digit hex color to rgba with the given alpha (0–1). */
+function hexToRgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    var r = parseInt(h.slice(0, 2), 16);
+    var g = parseInt(h.slice(2, 4), 16);
+    var b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+/**
+ * Apply filled or faded styling to every <mark data-start> in the document.
+ *
+ * For each mark:
+ *   - If no active widget is recorded, OR its key matches the active widget
+ *     → filled (remove class).
+ *   - Otherwise → faded background (add class + set --tater-mark-faded).
+ *
+ * Widgets without a recorded active widget are unaffected (all filled).
+ */
+function applySpanStyles() {
+    var active = window._taterActiveWidget;
+
+    // Collect all button containers and build their keys.
+    var containers = document.querySelectorAll('[data-tater-field]');
+    var containerKeys = [];
+    for (var j = 0; j < containers.length; j++) {
+        var c  = containers[j];
+        var cf = c.getAttribute('data-tater-field');
+        var ci = c.getAttribute('data-tater-index');
+        containerKeys.push(ci !== null ? cf + '|' + ci : cf);
+    }
+
+    // If the active key no longer exists (e.g. after navigating to a document
+    // with fewer list items), reset to the first available container.
+    if (active && containerKeys.length > 0 && containerKeys.indexOf(active) === -1) {
+        active = containerKeys[0];
+        window._taterActiveWidget = active;
+    }
+
+    var marks = document.querySelectorAll('mark[data-start]');
+    for (var i = 0; i < marks.length; i++) {
+        var mark      = marks[i];
+        var field     = mark.getAttribute('data-field');
+        var indexAttr = mark.getAttribute('data-index');
+        var color     = mark.getAttribute('data-color') || '#ffe066';
+        var key = indexAttr !== null ? field + '|' + indexAttr : field;
+
+        if (!active || key === active) {
+            mark.classList.remove('tater-span-outlined');
+        } else {
+            mark.style.setProperty('--tater-mark-faded', hexToRgba(color, 0.25));
+            mark.classList.add('tater-span-outlined');
+        }
+    }
+
+    for (var k = 0; k < containers.length; k++) {
+        if (!active || containerKeys[k] === active) {
+            containers[k].classList.remove('tater-widget-outlined');
+        } else {
+            containers[k].classList.add('tater-widget-outlined');
+        }
+    }
+}
+
+
+// ---------- initialise active widget on page load + watch for new ones ----------
+// On page load: poll until the first [data-tater-field] button container is in
+// the DOM, then activate it.
+// After that: a MutationObserver on the annotation panel fires applySpanStyles()
+// whenever a new [data-tater-field] element is added (e.g. a new list item), so
+// newly rendered button groups get the correct faded/filled state immediately.
+
+(function () {
+    var debounceTimer = null;
+
+    function activate() {
+        if (!window._taterActiveWidget) {
+            var first = document.querySelector('[data-tater-field]');
+            if (first) {
+                var f = first.getAttribute('data-tater-field');
+                var i = first.getAttribute('data-tater-index');
+                window._taterActiveWidget = i !== null ? f + '|' + i : f;
+            }
+        }
+        applySpanStyles();
+    }
+
+    function watchAnnotationPanel() {
+        var panel = document.getElementById('tater-annotation-panel');
+        if (!panel) { setTimeout(watchAnnotationPanel, 200); return; }
+        new MutationObserver(function (mutations) {
+            for (var m = 0; m < mutations.length; m++) {
+                var added = mutations[m].addedNodes;
+                for (var n = 0; n < added.length; n++) {
+                    var node = added[n];
+                    if (node.nodeType === 1 && node.querySelector &&
+                            node.querySelector('[data-tater-field]')) {
+                        clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(applySpanStyles, 50);
+                        return;
+                    }
+                }
+            }
+        }).observe(panel, { childList: true, subtree: true });
+    }
+
+    function tryInit() {
+        if (document.querySelector('[data-tater-field]')) {
+            activate();
+            // Watch for future additions (new list items, etc.) — scoped to
+            // the annotation panel only to avoid interfering with Dash's
+            // own DOM operations elsewhere on the page.
+            watchAnnotationPanel();
+        } else {
+            setTimeout(tryInit, 200);
+        }
+    }
+    tryInit();
+})();
+
+
+// ---------- click listener for entity buttons ----------
+// Each button group is wrapped in an html.Div with data-tater-field (and
+// data-tater-index for list items).  We detect clicks via these attributes,
+// independent of the Dash callback chain, so the active widget is updated
+// even when no text is selected.
+
+document.addEventListener('click', function (e) {
+    var container = e.target.closest('[data-tater-field]');
+    if (!container) { return; }
+    var field     = container.getAttribute('data-tater-field');
+    var indexAttr = container.getAttribute('data-tater-index');
+    // List button groups carry data-tater-index; non-list groups do not.
+    var activeKey = indexAttr !== null ? field + '|' + indexAttr : field;
+    if (activeKey) {
+        window._taterActiveWidget = activeKey;
+        applySpanStyles();
+    }
+}, true);
+
 
 // ---------- scroll preservation ----------
 // Saves document-content scrollTop before a server round-trip and restores it
-// after Dash replaces the element's children.
+// after Dash replaces the element's children.  Also re-applies span styles.
 
 var _savedDocScroll = null;
 
@@ -29,11 +197,16 @@ var _savedDocScroll = null;
         _savedDocScroll = null;
     }
 
+    function afterDocUpdate() {
+        restoreScroll();
+        applySpanStyles();
+    }
+
     function setupObserver() {
         var el = document.getElementById('document-content');
         if (!el) { setTimeout(setupObserver, 200); return; }
         new MutationObserver(function () {
-            requestAnimationFrame(restoreScroll);
+            requestAnimationFrame(afterDocUpdate);
         }).observe(el, { childList: true, subtree: false });
     }
     setupObserver();
@@ -52,6 +225,7 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         }
 
         // prop_id format: '{"field":"...","tag":"...","type":"..."}.n_clicks'
+        //             or: '{"type":"...","ld":"...","cid":"...","tag":"...","index":N}.n_clicks'
         var propId = ctx.triggered[0].prop_id;
         var btnId;
         try {
@@ -133,7 +307,7 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         var field = mark.getAttribute('data-field') || '';
         var start = mark.getAttribute('data-start') || '';
         var end   = mark.getAttribute('data-end')   || '';
-        var color = mark.style.backgroundColor      || '#ffe066';
+        var color = mark.getAttribute('data-color') || '#ffe066';
 
         // Rebuild tooltip contents — the entire popup IS the colored label
         t.innerHTML = '';
@@ -144,8 +318,10 @@ window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater ||
         btn.className = 'tater-tooltip-delete';
         btn.textContent = 'x';
         btn.addEventListener('click', function () {
+            var indexAttr = mark.getAttribute('data-index');
             window._taterDeletePending = {
                 field: field,
+                index: indexAttr !== null ? parseInt(indexAttr, 10) : -1,
                 start: parseInt(start, 10),
                 end:   parseInt(end,   10),
                 ts:    Date.now()
