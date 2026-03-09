@@ -307,6 +307,10 @@ class MultiChoiceWidget(ControlWidget):
 class BooleanWidget(ControlWidget):
     """Base for boolean widgets. Schema field must be ``bool`` or ``Optional[bool]``."""
 
+    @property
+    def empty_value(self) -> bool:
+        return False
+
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
         if field_info is None:

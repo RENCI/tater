@@ -207,12 +207,16 @@ class RepeaterWidget(ContainerWidget):
                 return
             extended = False
             for iw in item_widget_templates:
+                if isinstance(iw, ContainerWidget):
+                    # Containers (ListableWidget, GroupWidget, …) have no empty_value;
+                    # their fields are already initialised to defaults by create_list_item.
+                    extended = True
+                    continue
                 try:
-                    empty_val = iw.empty_value if hasattr(iw, "empty_value") else None
                     tater_app._set_model_value(
                         annotation,
                         f"{field_path}.{new_index}.{iw.schema_field}",
-                        empty_val,
+                        iw.empty_value,
                     )
                     extended = True
                 except Exception:
