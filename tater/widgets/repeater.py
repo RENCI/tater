@@ -707,7 +707,9 @@ class RepeaterWidget(ContainerWidget):
             return
         inner = _unwrap_optional(field_info.annotation)
         if typing.get_origin(inner) is not list:
-            return
+            raise TypeError(
+                f"Field '{self.field_path}' has type {inner!r}, but {type(self).__name__} requires a list field."
+            )
         item_type = typing.get_args(inner)[0]
         for item_widget in self.item_widgets:
             item_widget.bind_schema(item_type)

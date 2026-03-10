@@ -42,8 +42,8 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
 
             if next_value is None:
                 # Create the nested structure if the model field exists
-                if hasattr(current, "model_fields"):
-                    field_info = current.model_fields.get(key)
+                if isinstance(current, BaseModel):
+                    field_info = type(current).model_fields.get(key)
                     if field_info:
                         # Unwrap Optional[X] → X
                         inner = field_info.annotation
@@ -96,9 +96,9 @@ def create_list_item(navigation_stack: list) -> Any:
     type at each level rather than always using the outermost field.
     """
     for model, key in reversed(navigation_stack):
-        if not isinstance(model, BaseModel) or not hasattr(model, "model_fields"):
+        if not isinstance(model, BaseModel):
             continue
-        field_info = model.model_fields.get(key)
+        field_info = type(model).model_fields.get(key)
         if field_info is None:
             continue
         ann = field_info.annotation
@@ -186,21 +186,25 @@ def set_nested_value(obj: dict, path: str, value: Any) -> None:
     current = obj
 
     for i, key in enumerate(keys[:-1]):
-        if key not in current:
-            next_key = keys[i + 1]
-            if next_key.isdigit():
-                current[key] = []
-            else:
-                current[key] = {}
-
-        current = current[key]
-
         if isinstance(current, list):
-            next_key = keys[i + 1]
-            if next_key.isdigit():
-                index = int(next_key)
-                while len(current) <= index:
-                    current.append({})
+            index = int(key)
+            while len(current) <= index:
+                current.append({})
+            current = current[index]
+        else:
+            if key not in current:
+                next_key = keys[i + 1]
+                if next_key.isdigit():
+                    current[key] = []
+                else:
+                    current[key] = {}
+            current = current[key]
+            if isinstance(current, list):
+                next_key = keys[i + 1]
+                if next_key.isdigit():
+                    index = int(next_key)
+                    while len(current) <= index:
+                        current.append({})
 
     final_key = keys[-1]
     if isinstance(current, list):
