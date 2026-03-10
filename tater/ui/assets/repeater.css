@@ -1,0 +1,14 @@
+.tater-delete-x {
+    cursor: pointer;
+    color: var(--mantine-color-dimmed);
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: var(--mantine-radius-sm);
+    transition: background-color 80ms ease, color 80ms ease;
+}
+
+.tater-delete-x:hover {
+    background-color: var(--mantine-color-gray-1);
+    color: var(--mantine-color-gray-7);
+}

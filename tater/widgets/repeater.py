@@ -1,11 +1,12 @@
-"""RepeaterWidget, ListableWidget, and TabsWidget.
+"""RepeaterWidget, ListableWidget, TabsWidget, and AccordionWidget.
 
 RepeaterWidget is the abstract base for widgets that manage a repeatable list
 of sub-form items (a ``List[ItemModel]`` schema field).  Subclasses implement
 ``_render_items()`` to control how items are presented:
 
-- ``ListableWidget`` — vertical stack of bordered cards (default)
-- ``TabsWidget``     — items as switchable tabs
+- ``ListableWidget``   — vertical stack of bordered cards (default)
+- ``TabsWidget``       — items as switchable tabs
+- ``AccordionWidget``  — items as collapsible accordion sections
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Optional, Any
 
-from dash import dcc, Input, Output, State, ctx, ALL, MATCH
+from dash import dcc, html, Input, Output, State, ctx, ALL, MATCH
 from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
@@ -777,28 +778,79 @@ class TabsWidget(RepeaterWidget):
             tab_value = str(index)
             tabs.append(
                 dmc.TabsTab(
-                    f"{self.item_label} {index + 1}",
+                    dmc.Group([
+                        dmc.Text(f"{self.item_label} {index + 1}", size="sm"),
+                        html.Span(
+                            DashIconify(icon="tabler:x", width=14),
+                            id={"type": self._delete_type(), "index": index},
+                            n_clicks=0,
+                            className="tater-delete-x",
+                        ),
+                    ], gap="xs"),
                     value=tab_value,
                 )
             )
             panels.append(
                 dmc.TabsPanel(
-                    dmc.Stack([
-                        dmc.Group([
-                            dmc.Text(f"{self.item_label} {index + 1}", size="xs", c="dimmed"),
-                            dmc.ActionIcon(
-                                DashIconify(icon="tabler:x", width=14),
-                                id={"type": self._delete_type(), "index": index},
-                                variant="subtle",
-                                color="gray",
-                                size="sm",
-                            ),
-                        ], justify="space-between"),
-                        *self._render_item_widgets(index, tater_app, doc_id),
-                    ], gap="sm"),
+                    dmc.Stack(
+                        self._render_item_widgets(index, tater_app, doc_id),
+                        gap="sm",
+                    ),
                     value=tab_value,
                     pt="md",
                 )
             )
 
         return [dmc.Tabs([dmc.TabsList(tabs), *panels], value=active_value)]
+
+
+# ---------------------------------------------------------------------------
+# Concrete: AccordionWidget
+# ---------------------------------------------------------------------------
+
+@dataclass(eq=False)
+class AccordionWidget(RepeaterWidget):
+    """Repeatable list rendered as collapsible accordion sections."""
+
+    def _render_items(
+        self,
+        indices: list[int],
+        tater_app: Optional[Any] = None,
+        doc_id: Optional[str] = None,
+        active_value: Optional[str] = None,
+    ) -> list[Any]:
+        if not indices:
+            return []
+
+        if active_value is None:
+            active_value = str(indices[0])
+
+        items = []
+        for index in indices:
+            item_value = str(index)
+            items.append(
+                dmc.AccordionItem(
+                    [
+                        dmc.AccordionControl(
+                            dmc.Group([
+                                dmc.Text(f"{self.item_label} {index + 1}", size="sm"),
+                                html.Span(
+                                    DashIconify(icon="tabler:x", width=14),
+                                    id={"type": self._delete_type(), "index": index},
+                                    n_clicks=0,
+                                    className="tater-delete-x",
+                                ),
+                            ], justify="space-between", style={"flex": 1}),
+                        ),
+                        dmc.AccordionPanel(
+                            dmc.Stack(
+                                self._render_item_widgets(index, tater_app, doc_id),
+                                gap="sm",
+                            ),
+                        ),
+                    ],
+                    value=item_value,
+                )
+            )
+
+        return [dmc.Accordion(items, value=active_value, variant="separated", chevronPosition="left")]
