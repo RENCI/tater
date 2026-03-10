@@ -1,0 +1,32 @@
+[
+  {
+    "id": "span_001",
+    "info": {"type": "Breast"},
+    "text": "BREAST, LEFT, CORE NEEDLE BIOPSY\n\nClinical History: 52-year-old female with a 1.8 cm hypoechoic mass in the left breast upper outer quadrant on ultrasound.\n\nMicroscopic Description: Sections show invasive carcinoma of no special type (NST) with moderate nuclear pleomorphism and brisk mitotic activity. Stromal desmoplasia is present. No in-situ component identified in the sampled tissue.\n\nFinal Diagnosis:\n- Left breast, core needle biopsy: Invasive carcinoma, no special type (NST), histologic grade 2.\n- ER: Positive (90%, strong). PR: Positive (70%, moderate). HER2: Negative (score 1+). Ki67: 18%."
+  },
+  {
+    "id": "span_002",
+    "info": {"type": "Colon"},
+    "text": "COLON, SIGMOID, LAPAROSCOPIC RESECTION\n\nClinical History: 68-year-old male with obstructing sigmoid colon mass on CT. CEA elevated at 12.4 ng/mL.\n\nMacroscopic Description: Sigmoid colon segment 18 cm in length with an ulcerated annular mass 5.0 x 4.5 cm, 6 cm from the distal margin. Tumor penetrates through the muscularis propria into the pericolic adipose tissue.\n\nFinal Diagnosis:\n- Sigmoid colon, resection: Moderately differentiated adenocarcinoma, pT3 N2a Mx.\n- Twelve lymph nodes identified; three positive for metastatic adenocarcinoma (3/12).\n- Lymphovascular invasion present. Perineural invasion present.\n- Proximal and distal resection margins negative. Radial margin 1 mm."
+  },
+  {
+    "id": "span_003",
+    "info": {"type": "Lung"},
+    "text": "LUNG, RIGHT UPPER LOBE, WEDGE RESECTION\n\nClinical History: 61-year-old female, never-smoker, 1.2 cm ground-glass opacity on CT, biopsy confirmed adenocarcinoma.\n\nMicroscopic Description: Sections show a well-differentiated adenocarcinoma with a predominantly lepidic growth pattern. Focal acinar and papillary components present. No pleural invasion. No lymphovascular invasion identified.\n\nFinal Diagnosis:\n- Right upper lobe, wedge resection: Invasive adenocarcinoma, predominantly lepidic, grade 1. Tumor size 1.2 cm.\n- pT1a(mi) Nx Mx. Margins negative.\n- Molecular studies pending (EGFR, ALK, ROS1, KRAS, PD-L1)."
+  },
+  {
+    "id": "span_004",
+    "info": {"type": "Prostate"},
+    "text": "PROSTATE, RADICAL PROSTATECTOMY\n\nClinical History: 64-year-old male, PSA 7.8, biopsy Gleason 4+3=7 in 4 of 12 cores.\n\nMacroscopic Description: Prostate gland measuring 4.5 x 4.0 x 3.5 cm, weight 42 g. Tumor visible as a firm, white area in the left posterior aspect.\n\nFinal Diagnosis:\n- Prostate, radical prostatectomy: Acinar adenocarcinoma, Gleason score 4+3=7 (Grade Group 3).\n- Tumor involves left posterior and left lateral zones; maximum linear extent 2.2 cm.\n- Extraprostatic extension present (left posterolateral). Seminal vesicles not involved.\n- Surgical margins: Positive at left apex (focal, 1 mm). All other margins negative.\n- Lymph nodes: Not submitted."
+  },
+  {
+    "id": "span_005",
+    "info": {"type": "Skin"},
+    "text": "SKIN, LEFT FOREARM, WIDE LOCAL EXCISION\n\nClinical History: 45-year-old male, 1.4 mm Breslow thickness melanoma on punch biopsy.\n\nMicroscopic Description: Sections show malignant melanoma, superficial spreading type, with ulceration. Clark level IV. Breslow thickness 1.6 mm on excision specimen. Mitotic rate 3 per mm². Tumor-infiltrating lymphocytes present (non-brisk). Regression not identified.\n\nFinal Diagnosis:\n- Left forearm, wide local excision: Malignant melanoma, superficial spreading type.\n- Breslow thickness 1.6 mm. Ulceration present. Mitotic rate 3/mm². Clark level IV.\n- Deep margin: 6 mm clear. Peripheral margins: all clear (minimum 10 mm).\n- pT2b Nx Mx."
+  },
+  {
+    "id": "span_006",
+    "info": {"type": "Thyroid"},
+    "text": "THYROID, TOTAL THYROIDECTOMY\n\nClinical History: 38-year-old female with a 2.3 cm right thyroid nodule, FNA Bethesda V (suspicious for malignancy).\n\nMacroscopic Description: Total thyroid gland weighing 28 g. Right lobe contains a 2.1 cm well-circumscribed pale lesion. Left lobe and isthmus unremarkable.\n\nFinal Diagnosis:\n- Right thyroid lobe: Papillary thyroid carcinoma, classical variant, 2.1 cm.\n- Minimal extrathyroidal extension into the perithyroidal soft tissue (pT3a).\n- Margins negative. No lymphovascular invasion.\n- Left thyroid lobe and isthmus: No malignancy. Focal lymphocytic thyroiditis.\n- Two central compartment lymph nodes: Negative for malignancy (0/2). pN0."
+  }
+]
