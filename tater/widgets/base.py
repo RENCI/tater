@@ -129,7 +129,7 @@ class TaterWidget:
                 gap=4,
             )
             items = [label_row]
-            if self.description:
+            if self.description and not getattr(self, "_description_in_component", False):
                 items.append(dmc.Text(self.description, size="xs", c="dimmed"))
             items.append(self.component())
             return dmc.Stack(items, gap="xs", mt=mt)

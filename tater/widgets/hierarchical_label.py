@@ -170,6 +170,8 @@ class HierarchicalLabelWidget(TaterWidget):
     def renders_own_label(self) -> bool:
         return False
 
+    _description_in_component = True
+
     def to_python_type(self) -> type:
         return str
 
@@ -216,9 +218,10 @@ class HierarchicalLabelWidget(TaterWidget):
     def component(self) -> Any:
         cid = self.component_id
         initial_sections = self._render_sections([], cid, None)
+        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
 
         return dmc.Stack(
-            [
+            description + [
                 dmc.TextInput(
                     id=f"hier-search-{cid}",
                     placeholder="Search…",
@@ -403,8 +406,9 @@ class HierarchicalLabelWidget(TaterWidget):
         (list index) so that a single set of registered callbacks handles all indices.
         """
         initial_sections = self._render_sections_in_list([], ld, li, None)
+        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
         return dmc.Stack(
-            [
+            description + [
                 dmc.TextInput(
                     id={"type": "hier-search-list", "ld": ld, "li": li},
                     placeholder="Search…",
@@ -440,8 +444,9 @@ class HierarchicalLabelWidget(TaterWidget):
     def component_in_nested_list(self, ld: str, outer_li: int, inner_li: int) -> Any:
         """Render this widget when nested two levels deep (repeater inside repeater)."""
         initial_sections = self._render_sections_in_nested_list([], ld, outer_li, inner_li, None)
+        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
         return dmc.Stack(
-            [
+            description + [
                 dmc.TextInput(
                     id={"type": "hier-search-nested", "ld": ld, "li": outer_li, "inner_li": inner_li},
                     placeholder="Search…",
