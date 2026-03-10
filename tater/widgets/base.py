@@ -3,6 +3,7 @@ import typing
 from dataclasses import dataclass, field
 from typing import Any, Optional
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 
 # ---------------------------------------------------------------------------
@@ -121,10 +122,20 @@ class TaterWidget:
                 items.append(dmc.Text(self.description, size="xs", c="dimmed"))
             return dmc.Stack(items, gap="xs", mt=mt)
         else:
+            auto_advance = getattr(self, "auto_advance", False)
             label_row = dmc.Group(
                 [
                     *([dmc.Text("*", size="sm", c="red")] if required else []),
                     dmc.Text(self.label, fw=500, size="sm"),
+                    *(
+                        [dmc.Tooltip(
+                            DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
+                            label="Auto-advances to next document",
+                            position="right",
+                            withArrow=True,
+                        )]
+                        if auto_advance else []
+                    ),
                 ],
                 gap=4,
             )

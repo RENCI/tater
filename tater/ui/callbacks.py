@@ -452,39 +452,47 @@ def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> 
     default_value = getattr(widget, "default", None)
     empty_value = widget.empty_value
 
-    # Callback for updating self.annotations when widget value changes
-    @app.callback(
-        Output(widget_id, "id"),  # Dummy output, just to trigger
-        Output("status-store", "data", allow_duplicate=True),
-        Input(widget_id, value_prop),
-        State("current-doc-id", "data"),
-        prevent_initial_call=True
-    )
-    def capture_value(value, doc_id):
-        if not doc_id:
-            return widget_id, "not_started"
+    auto_advance = getattr(widget, "auto_advance", False)
+    _empty = widget.empty_value
 
-        value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
-
-        update_status_for_doc(tater_app, doc_id)
-        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-        return widget_id, status
-
-    # Auto-advance: when this widget gets a non-empty value, increment the
-    # auto-advance-store to trigger navigation to the next document.
-    if getattr(widget, "auto_advance", False):
-        _empty = widget.empty_value
-
+    if auto_advance:
+        # With auto-advance: include auto-advance-store as an output so we can
+        # fire navigation only when the user actually changes the value.
+        # A doc load sets the widget to the value already in the annotation
+        # (old == new), so we skip advancing in that case.
         @app.callback(
+            Output(widget_id, "id"),
+            Output("status-store", "data", allow_duplicate=True),
             Output("auto-advance-store", "data", allow_duplicate=True),
             Input(widget_id, value_prop),
+            State("current-doc-id", "data"),
             State("auto-advance-store", "data"),
             prevent_initial_call=True,
         )
-        def _trigger_auto_advance(value, current_count, _empty=_empty):
-            if value is None or value == _empty:
-                return no_update
-            return (current_count or 0) + 1
+        def capture_value(value, doc_id, advance_count, _empty=_empty):
+            if not doc_id:
+                return widget_id, "not_started", no_update
+            old_value = value_helpers.get_model_value(tater_app.annotations[doc_id], field_path)
+            value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
+            update_status_for_doc(tater_app, doc_id)
+            status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+            user_changed = value != old_value and value is not None and value != _empty
+            return widget_id, status, ((advance_count or 0) + 1) if user_changed else no_update
+    else:
+        @app.callback(
+            Output(widget_id, "id"),  # Dummy output, just to trigger
+            Output("status-store", "data", allow_duplicate=True),
+            Input(widget_id, value_prop),
+            State("current-doc-id", "data"),
+            prevent_initial_call=True,
+        )
+        def capture_value(value, doc_id):
+            if not doc_id:
+                return widget_id, "not_started"
+            value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
+            update_status_for_doc(tater_app, doc_id)
+            status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+            return widget_id, status
 
     # Callback for updating widget value when document changes.
     # Always allow_duplicate=True so that escape-hatch callbacks registered by
