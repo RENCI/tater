@@ -53,17 +53,19 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         [Output("document-content", "children"),
          Output("document-title", "children"),
          Output("document-metadata", "children"),
-         Output("document-progress", "value")],
+         Output("document-progress", "value"),
+         Output("btn-prev", "disabled"),
+         Output("btn-next", "disabled")],
         [Input("current-doc-id", "data")] + span_trigger_inputs,
     )
     def update_document(doc_id, *_span_triggers):
         if not doc_id:
-            return "No document loaded", "No document", "", 0
+            return "No document loaded", "No document", "", 0, True, True
 
         # Find document by ID
         doc = next((d for d in tater_app.documents if d.id == doc_id), None)
         if not doc:
-            return "Document not found", "Error", "", 0
+            return "Document not found", "Error", "", 0, True, True
 
         # Load document content
         try:
@@ -85,7 +87,9 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
         progress = ((doc_index + 1) / len(tater_app.documents)) * 100 if tater_app.documents else 0
 
-        return content, title, metadata, progress
+        is_first = doc_index == 0
+        is_last = doc_index == len(tater_app.documents) - 1
+        return content, title, metadata, progress, is_first, is_last
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".

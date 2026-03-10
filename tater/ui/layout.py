@@ -65,11 +65,9 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         dmc.GridCol([
             dmc.Paper(
                 dmc.Stack(
-                    annotation_components + [
-                        dmc.Divider(),
-                        dmc.Button("Save", id="btn-save", variant="outline", fullWidth=True,
-                                   leftSection=DashIconify(icon="tabler:device-floppy", width=16)),
-                    ] + ([dmc.Text("* Required", size="xs", c="red")] if has_required else []),
+                    annotation_components + (
+                        [dmc.Text("* Required", size="xs", c="red")] if has_required else []
+                    ),
                     gap="md",
                 ),
                 id="tater-annotation-panel",
@@ -247,8 +245,16 @@ def _build_navigation_controls(tater_app: TaterApp) -> dmc.Flex:
             style={"flex": "1 1 0", "minWidth": 0},
         ),
         dmc.Box(
-            dmc.Button("Next", id="btn-next", variant="outline", fullWidth=True,
-                       rightSection=DashIconify(icon="tabler:arrow-right", width=16)),
+            dmc.ButtonGroup([
+                dmc.Button("Next", id="btn-next", variant="outline", fullWidth=True,
+                           rightSection=DashIconify(icon="tabler:arrow-right", width=16)),
+                dmc.Button(
+                    DashIconify(icon="tabler:device-floppy", width=16),
+                    id="btn-save",
+                    variant="outline",
+                    px="xs",
+                ),
+            ], style={"width": "100%"}),
             style={"flex": "1 1 0", "minWidth": 0},
         ),
     ], gap="md", align="stretch", wrap="nowrap", style={"width": "100%"})
