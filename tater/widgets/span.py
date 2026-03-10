@@ -137,20 +137,21 @@ class SpanAnnotationWidget(TaterWidget):
         """Build the entity-type button group with per-entity span counts."""
         from dash import html
         buttons = [
-            dmc.Button(
-                et.name,
-                id={"type": "span-add-btn", "field": self.component_id, "tag": et.name},
-                size="xs",
-                variant="outline",
-                fw=600,
-                style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
-                       "color": "var(--mantine-color-gray-9)"},
-                rightSection=dmc.Badge(
-                    str(counts.get(et.name, 0)),
-                    size="sm",
-                    variant="filled",
-                    style={"backgroundColor": _lighten_hex(et.color, 0.7), "color": "var(--mantine-color-gray-9)", "lineHeight": "1"},
+            dmc.Indicator(
+                dmc.Button(
+                    et.name,
+                    id={"type": "span-add-btn", "field": self.component_id, "tag": et.name},
+                    size="xs",
+                    variant="outline",
+                    fw=600,
+                    style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
+                           "color": "var(--mantine-color-gray-9)"},
                 ),
+                label=str(counts.get(et.name, 0)),
+                color=et.color,
+                size=16,
+                disabled=counts.get(et.name, 0) == 0,
+                inline=True,
             )
             for et in self.entity_types
         ]
@@ -168,20 +169,21 @@ class SpanAnnotationWidget(TaterWidget):
         """
         cid = self.component_id
         buttons = [
-            dmc.Button(
-                et.name,
-                id={"type": "span-add-btn-list", "ld": ld, "cid": cid, "tag": et.name, "index": index},
-                size="xs",
-                variant="outline",
-                fw=600,
-                style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
-                       "color": "var(--mantine-color-gray-9)"},
-                rightSection=dmc.Badge(
-                    str(counts.get(et.name, 0)),
-                    size="sm",
-                    variant="filled",
-                    style={"backgroundColor": _lighten_hex(et.color, 0.7), "color": "var(--mantine-color-gray-9)", "lineHeight": "1"},
+            dmc.Indicator(
+                dmc.Button(
+                    et.name,
+                    id={"type": "span-add-btn-list", "ld": ld, "cid": cid, "tag": et.name, "index": index},
+                    size="xs",
+                    variant="outline",
+                    fw=600,
+                    style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
+                           "color": "var(--mantine-color-gray-9)"},
                 ),
+                label=str(counts.get(et.name, 0)),
+                color=et.color,
+                size=16,
+                disabled=counts.get(et.name, 0) == 0,
+                inline=True,
             )
             for et in self.entity_types
         ]

@@ -30,8 +30,8 @@
         'mark[data-start].tater-span-outlined {' +
         '  background-color: var(--tater-mark-faded, rgba(200,200,200,0.25)) !important;' +
         '}' +
-        '[data-tater-field].tater-widget-outlined button {' +
-        '  opacity: 0.35 !important;' +
+        '[data-tater-field].tater-widget-outlined {' +
+        '  filter: opacity(0.25) !important;' +
         '}';
     document.head.appendChild(s);
 })();
