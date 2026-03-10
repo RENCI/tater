@@ -78,8 +78,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         ], span={"base": 12, "md": 5}),
     ], gutter="xl")
 
-    # Build help icon once if instructions exist
-    help_icon = (
+    help_button = (
         dmc.ActionIcon(
             DashIconify(icon="tabler:help-circle", width=20),
             id="btn-open-instructions",
@@ -107,11 +106,13 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                             (dmc.Group(
                                 [
                                     dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center"),
-                                    help_icon,
+                                    help_button,
                                 ],
                                 gap="xs",
                                 justify="center",
-                            ) if tater_app.description else help_icon) if has_instructions else None,
+                            ) if tater_app.description else help_button) if has_instructions else (
+                                dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None
+                            ),
                         ], gap="xs", align="center")
                     ),
                     dmc.Stack([
@@ -143,18 +144,13 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 ], gap="lg")
             ], size="xl", py="xl", fluid=True, pb="100px"),
             dmc.Drawer(
-                title="",
+                title="Instructions",
                 id="instructions-drawer",
                 opened=False,
-                position="right",
+                position="top",
                 size="lg",
                 padding="md",
-                children=dmc.Stack(
-                    [
-                        dcc.Markdown(tater_app.instructions or ""),
-                    ],
-                    gap="md",
-                ),
+                children=dcc.Markdown(tater_app.instructions or ""),
             ) if has_instructions else None,
             footer_bar,
         ]
