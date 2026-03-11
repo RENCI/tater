@@ -12,7 +12,7 @@ class SegmentedControlWidget(ChoiceWidget):
     def component(self) -> dmc.SegmentedControl:
         data = [{"label": opt, "value": opt} for opt in self.options]
         return dmc.SegmentedControl(
-            id=self.component_id,
+            id=self.schema_id,
             data=data,
             value=self.default,
             fullWidth=True,

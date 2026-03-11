@@ -405,24 +405,106 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
 
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
-    """Setup callbacks to capture widget value changes to annotations store."""
-    # Collect all widgets that need value capture
-    widgets_to_capture = _collect_value_capture_widgets(tater_app.widgets)
+    """Setup unified callbacks to capture all ControlWidget value changes."""
+    app = tater_app.app
 
-    if not widgets_to_capture:
-        return
+    # Build auto-advance field set at registration time
+    auto_advance_fields = {
+        w.field_path
+        for w in _collect_value_capture_widgets(tater_app.widgets)
+        if w.auto_advance
+    }
 
-    # Create callback for each widget
-    for widget in widgets_to_capture:
-        _register_widget_value_capture(tater_app, widget)
+    # --- Capture: value prop (all non-boolean ControlWidgets) ---
+    @app.callback(
+        Output("status-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
+        Input({"type": "tater-control", "field": ALL}, "value"),
+        State("current-doc-id", "data"),
+        State("auto-advance-store", "data"),
+        prevent_initial_call=True,
+    )
+    def capture_values(all_values, doc_id, advance_count):
+        if not doc_id or not ctx.triggered:
+            return no_update, no_update
+        triggered = ctx.triggered[0]
+        field_path = json.loads(triggered["prop_id"].split(".")[0])["field"]
+        value = triggered["value"]
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation is None:
+            return no_update, no_update
+        old_value = value_helpers.get_model_value(annotation, field_path)
+        value_helpers.set_model_value(annotation, field_path, value)
+        update_status_for_doc(tater_app, doc_id)
+        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+        if field_path in auto_advance_fields:
+            if value != old_value and value is not None and value != "":
+                return status, (advance_count or 0) + 1
+        return status, no_update
+
+    # --- Capture: checked prop (BooleanWidgets) ---
+    @app.callback(
+        Output("status-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
+        Input({"type": "tater-bool-control", "field": ALL}, "checked"),
+        State("current-doc-id", "data"),
+        State("auto-advance-store", "data"),
+        prevent_initial_call=True,
+    )
+    def capture_checked(all_values, doc_id, advance_count):
+        if not doc_id or not ctx.triggered:
+            return no_update, no_update
+        triggered = ctx.triggered[0]
+        field_path = json.loads(triggered["prop_id"].split(".")[0])["field"]
+        value = triggered["value"]
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation is None:
+            return no_update, no_update
+        old_value = value_helpers.get_model_value(annotation, field_path)
+        value_helpers.set_model_value(annotation, field_path, value)
+        update_status_for_doc(tater_app, doc_id)
+        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+        if field_path in auto_advance_fields:
+            if value != old_value:
+                return status, (advance_count or 0) + 1
+        return status, no_update
+
+    # --- Load: value prop --- push annotation values to widgets on doc change
+    @app.callback(
+        Output({"type": "tater-control", "field": ALL}, "value"),
+        Input("current-doc-id", "data"),
+        State({"type": "tater-control", "field": ALL}, "id"),
+        prevent_initial_call="initial_duplicate",
+    )
+    def load_values(doc_id, all_ids):
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        return [
+            value_helpers.get_model_value(annotation, wid["field"]) if annotation else None
+            for wid in (all_ids or [])
+        ]
+
+    # --- Load: checked prop ---
+    @app.callback(
+        Output({"type": "tater-bool-control", "field": ALL}, "checked"),
+        Input("current-doc-id", "data"),
+        State({"type": "tater-bool-control", "field": ALL}, "id"),
+        prevent_initial_call="initial_duplicate",
+    )
+    def load_checked(doc_id, all_ids):
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        result = []
+        for wid in (all_ids or []):
+            v = value_helpers.get_model_value(annotation, wid["field"]) if annotation else None
+            result.append(bool(v) if v is not None else False)
+        return result
 
 
 def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidget]:
-    """
-    Recursively collect all widgets that capture values (non-containers).
+    """Recursively collect all ControlWidget instances (non-containers).
 
-    Skips GroupWidget children (processes them recursively instead).
-    Skips RepeaterWidget subclasses — they manage their own value capture.
+    Used to build the auto-advance field set and to find required widgets
+    for status checking. Skips RepeaterWidget children (their items are
+    handled dynamically via unified ALL callbacks).
     """
     from tater.widgets.base import ControlWidget
     from tater.widgets.group import GroupWidget
@@ -431,96 +513,13 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
     captured = []
     for widget in widgets:
         if isinstance(widget, RepeaterWidget):
-            # Skip RepeaterWidget subclasses — they manage their own value capture
             continue
         elif isinstance(widget, GroupWidget):
-            # Recursively process GroupWidget children
             if hasattr(widget, "children") and widget.children:
                 captured.extend(_collect_value_capture_widgets(widget.children))
         elif isinstance(widget, ControlWidget):
             captured.append(widget)
-
     return captured
-
-
-def _register_widget_value_capture(tater_app: TaterApp, widget: TaterWidget) -> None:
-    """Register a callback to capture a widget's value changes."""
-    app = tater_app.app
-    widget_id = widget.component_id
-    field_path = widget.field_path
-    value_prop = widget.value_prop
-    default_value = getattr(widget, "default", None)
-    empty_value = widget.empty_value
-
-    auto_advance = getattr(widget, "auto_advance", False)
-    _empty = widget.empty_value
-
-    if auto_advance:
-        # With auto-advance: include auto-advance-store as an output so we can
-        # fire navigation only when the user actually changes the value.
-        # A doc load sets the widget to the value already in the annotation
-        # (old == new), so we skip advancing in that case.
-        @app.callback(
-            Output(widget_id, "id"),
-            Output("status-store", "data", allow_duplicate=True),
-            Output("auto-advance-store", "data", allow_duplicate=True),
-            Input(widget_id, value_prop),
-            State("current-doc-id", "data"),
-            State("auto-advance-store", "data"),
-            prevent_initial_call=True,
-        )
-        def capture_value(value, doc_id, advance_count, _empty=_empty):
-            if not doc_id:
-                return widget_id, "not_started", no_update
-            old_value = value_helpers.get_model_value(tater_app.annotations[doc_id], field_path)
-            value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
-            update_status_for_doc(tater_app, doc_id)
-            status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-            user_changed = value != old_value and value is not None and value != _empty
-            return widget_id, status, ((advance_count or 0) + 1) if user_changed else no_update
-    else:
-        @app.callback(
-            Output(widget_id, "id"),  # Dummy output, just to trigger
-            Output("status-store", "data", allow_duplicate=True),
-            Input(widget_id, value_prop),
-            State("current-doc-id", "data"),
-            prevent_initial_call=True,
-        )
-        def capture_value(value, doc_id):
-            if not doc_id:
-                return widget_id, "not_started"
-            value_helpers.set_model_value(tater_app.annotations[doc_id], field_path, value)
-            update_status_for_doc(tater_app, doc_id)
-            status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-            return widget_id, status
-
-    # Callback for updating widget value when document changes.
-    # Always allow_duplicate=True so that escape-hatch callbacks registered by
-    # app code can also write to widget outputs without a Dash conflict error.
-    @app.callback(
-        Output(widget_id, value_prop, allow_duplicate=True),
-        Input("current-doc-id", "data"),
-        prevent_initial_call="initial_duplicate",
-    )
-    def update_widget_value(doc_id):
-        if not doc_id or doc_id not in tater_app.annotations:
-            if value_prop == "checked":
-                return bool(default_value) if default_value is not None else False
-            if default_value is not None:
-                return default_value
-            return empty_value
-
-        annotation = tater_app.annotations[doc_id]
-        value = value_helpers.get_model_value(annotation, field_path)
-        if value_prop == "checked":
-            if value is None:
-                return bool(default_value) if default_value is not None else False
-            return bool(value)
-        if value is None:
-            if default_value is not None:
-                return default_value
-            return empty_value
-        return value
 
 
 def update_status_for_doc(tater_app: TaterApp, doc_id: str) -> None:

@@ -19,7 +19,7 @@ class TextAreaWidget(TextWidget):
 
     def component(self) -> dmc.Textarea:
         return dmc.Textarea(
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default if self.default is not None else self.empty_value,
             placeholder=self.placeholder,
         )

@@ -16,7 +16,7 @@ class ChipGroupWidget(MultiChoiceWidget):
         container = dmc.Stack(chips, gap="xs") if self.vertical else dmc.Group(chips, wrap="wrap")
         return dmc.ChipGroup(
             container,
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default,
             multiple=True,
         )

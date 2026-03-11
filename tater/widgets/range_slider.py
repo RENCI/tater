@@ -50,7 +50,7 @@ class RangeSliderWidget(ControlWidget):
 
     def component(self) -> dmc.RangeSlider:
         return dmc.RangeSlider(
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default,
             min=self.min_value,
             max=self.max_value,

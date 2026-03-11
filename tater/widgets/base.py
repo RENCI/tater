@@ -157,12 +157,11 @@ class TaterWidget:
         from dash import Output, Input, no_update
 
         controlling_field, target_value = self._condition
-        controlling_id = f"annotation-{controlling_field.replace('.', '-')}"
-
-        # Determine which property the controlling widget uses.
-        # For simplicity: assume it's "checked" for BooleanWidget, "value" for all others.
-        # This will be refined via the app's widget registry if needed.
         controlling_prop = self._get_controlling_property(app, controlling_field)
+
+        # Build the controlling widget's schema_id dict.
+        controlling_type = "tater-bool-control" if controlling_prop == "checked" else "tater-control"
+        controlling_schema_id = {"type": controlling_type, "field": controlling_field}
 
         # Serialize target_value for JavaScript comparison.
         # For booleans: use true/false; for strings: use quoted "value".
@@ -175,7 +174,7 @@ class TaterWidget:
         app.clientside_callback(
             f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
             Output(self.conditional_wrapper_id, "style"),
-            Input(controlling_id, controlling_prop),
+            Input(controlling_schema_id, controlling_prop),
             prevent_initial_call=False,
         )
 
@@ -183,10 +182,11 @@ class TaterWidget:
         _empty = self.empty_value
         _value_prop = self.value_prop
         _target = target_value
+        _schema_id = self.schema_id
 
         @app.callback(
-            Output(self.component_id, _value_prop, allow_duplicate=True),
-            Input(controlling_id, controlling_prop),
+            Output(_schema_id, _value_prop, allow_duplicate=True),
+            Input(controlling_schema_id, controlling_prop),
             prevent_initial_call=True,
         )
         def _clear_when_hidden(v):
@@ -246,6 +246,10 @@ class ControlWidget(TaterWidget):
     @property
     def empty_value(self) -> Any:
         return None
+
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "tater-control", "field": self.field_path}
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +325,10 @@ class BooleanWidget(ControlWidget):
     @property
     def empty_value(self) -> bool:
         return False
+
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "tater-bool-control", "field": self.field_path}
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)

@@ -12,7 +12,7 @@ class MultiSelectWidget(MultiChoiceWidget):
     def component(self) -> dmc.MultiSelect:
         data = [{"label": opt, "value": opt} for opt in self.options]
         return dmc.MultiSelect(
-            id=self.component_id,
+            id=self.schema_id,
             data=data,
             value=self.default,
             clearable=True,

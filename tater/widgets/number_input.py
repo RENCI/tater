@@ -17,7 +17,7 @@ class NumberInputWidget(NumericWidget):
 
     def component(self) -> dmc.NumberInput:
         return dmc.NumberInput(
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default,
             min=self.min_value,
             max=self.max_value,
