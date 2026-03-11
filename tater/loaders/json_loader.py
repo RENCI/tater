@@ -68,6 +68,7 @@ Field types:
   ``hierarchical_label``— tree-based label (default: HierarchicalLabelCompactWidget)
   ``group``             — nested sub-model with ``fields``
   ``listable``          — repeatable list of sub-items with ``item_fields``
+                          (widget type override: ``tabs`` or ``accordion``)
 
 Widget override types (``"widget": {"type": "..."}``):
   ``radio_group``             — for ``choice`` fields
@@ -108,6 +109,7 @@ from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
+from tater.widgets.repeater import TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
@@ -319,12 +321,15 @@ def _process_field(
             item_widgets.append(child_widget)
         item_model = create_model(_to_classname(local_id) + "Item", **item_model_fields)
         widget_spec: dict = spec.get("widget") or {}
-        return (list[item_model], Field(default_factory=list)), ListableWidget(
+        widget_type = widget_spec.get("type")
+        item_label = widget_spec.get("item_label", "Item")
+        repeater_cls = {"tabs": TabsWidget, "accordion": AccordionWidget}.get(widget_type, ListableWidget)
+        return (list[item_model], Field(default_factory=list)), repeater_cls(
             local_id,
             label=label,
             description=description,
             item_widgets=item_widgets,
-            item_label=widget_spec.get("item_label", "Item"),
+            item_label=item_label,
         )
 
     # --- Leaf field types ---
