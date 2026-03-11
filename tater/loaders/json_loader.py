@@ -73,6 +73,7 @@ Field types:
 Widget override types (``"widget": {"type": "..."}``):
   ``radio_group``             — for ``choice`` fields
   ``select``                  — for ``choice`` fields
+  ``checkbox_group``          — for ``multi_choice`` fields
   ``text_area``               — for ``text`` fields
   ``switch``                  — for ``boolean`` fields
   ``chip_boolean``            — for ``boolean`` fields
@@ -98,6 +99,7 @@ from tater.widgets.segmented_control import SegmentedControlWidget
 from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.select import SelectWidget
 from tater.widgets.multiselect import MultiSelectWidget
+from tater.widgets.checkbox_group import CheckboxGroupWidget
 from tater.widgets.text_input import TextInputWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
@@ -394,6 +396,11 @@ def _build_widget(
         return SegmentedControlWidget(fid, label=label, description=description, required=required)
 
     if ftype == "multi_choice":
+        if widget_type == "checkbox_group":
+            return CheckboxGroupWidget(
+                fid, label=label, description=description, required=required,
+                vertical=widget_spec.get("orientation") == "vertical",
+            )
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
     if ftype == "text":

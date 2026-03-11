@@ -17,6 +17,7 @@ from tater.widgets.text_input import TextInputWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import RepeaterWidget, ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.multiselect import MultiSelectWidget
+from tater.widgets.checkbox_group import CheckboxGroupWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
@@ -53,6 +54,7 @@ __all__ = [
     "TabsWidget",
     "AccordionWidget",
     "MultiSelectWidget",
+    "CheckboxGroupWidget",
     "NumberInputWidget",
     "SliderWidget",
     "TextAreaWidget",

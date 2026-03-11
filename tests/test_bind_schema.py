@@ -2,7 +2,7 @@
 import pytest
 from tater.widgets import (
     SegmentedControlWidget, RadioGroupWidget, SelectWidget,
-    MultiSelectWidget, CheckboxWidget, SwitchWidget, ChipWidget,
+    MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
     TextInputWidget, TextAreaWidget, ListableWidget,
 )
 from tests.conftest import Schema, Pet
@@ -50,6 +50,11 @@ class TestChoiceWidgetBindSchema:
 class TestMultiChoiceWidgetBindSchema:
     def test_multi_select_derives_options(self):
         w = MultiSelectWidget(schema_field="flags", label="Flags")
+        w.bind_schema(Schema)
+        assert w.options == ["urgent", "review"]
+
+    def test_checkbox_group_derives_options(self):
+        w = CheckboxGroupWidget(schema_field="flags", label="Flags")
         w.bind_schema(Schema)
         assert w.options == ["urgent", "review"]
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget,
-    MultiSelectWidget, NumberInputWidget, SliderWidget, RangeSliderWidget,
+    MultiSelectWidget, CheckboxGroupWidget, NumberInputWidget, SliderWidget, RangeSliderWidget,
     SwitchWidget, SelectWidget, TextAreaWidget, ChipWidget, GroupWidget,
 )
 
@@ -23,6 +23,7 @@ class BooleanFields(BaseModel):
 
 class MultiChoiceFields(BaseModel):
     favorite_colors: Optional[List[Literal["red", "green", "blue", "yellow", "purple"]]] = None
+    traits: Optional[List[Literal["friendly", "shy", "energetic", "calm", "playful"]]] = None
 
 
 class NumericFields(BaseModel):
@@ -107,6 +108,11 @@ widgets = [
                 label="Favorite Colors",
                 description="Select one or more favorite colors",
                 required=True,
+            ),
+            CheckboxGroupWidget(
+                schema_field="traits",
+                label="Traits",
+                description="Select all traits that apply",
             ),
         ],
     ),

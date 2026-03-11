@@ -79,6 +79,14 @@
           "required": true,
           "label": "Favorite Colors",
           "description": "Select one or more favorite colors"
+        },
+        {
+          "id": "traits",
+          "type": "multi_choice",
+          "options": ["friendly", "shy", "energetic", "calm", "playful"],
+          "label": "Traits",
+          "description": "Select all traits that apply",
+          "widget": {"type": "checkbox_group"}
         }
       ]
     },
