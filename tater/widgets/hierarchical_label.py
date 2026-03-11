@@ -970,6 +970,13 @@ def _build_sections_full_impl(
     selected_value: Optional[str],
     make_btns_fn,
 ) -> list:
+    # If nav state was reset (e.g. after navigation) but a value is already
+    # selected, reconstruct the path so the tree expands to show the selection.
+    if selected_value and not path:
+        computed_path = _find_path(root, selected_value)
+        if computed_path:
+            path = computed_path[:-1]  # navigate to parent; siblings shown at leaf level
+
     sections = []
     selected_at = path[0] if path else None
     sections.append(_section("Top level categories", make_btns_fn(root.children, 0, selected_at or selected_value)))
