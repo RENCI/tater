@@ -9,6 +9,8 @@ from .base import ChoiceWidget
 class SegmentedControlWidget(ChoiceWidget):
     """Widget for selecting from a list of mutually exclusive options."""
 
+    vertical: bool = False
+
     def component(self) -> dmc.SegmentedControl:
         data = [{"label": opt, "value": opt} for opt in self.options]
         return dmc.SegmentedControl(
@@ -16,6 +18,7 @@ class SegmentedControlWidget(ChoiceWidget):
             data=data,
             value=self.default,
             fullWidth=True,
+            orientation="vertical" if self.vertical else "horizontal",
         )
 
     def to_python_type(self) -> type:

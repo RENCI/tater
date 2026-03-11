@@ -56,6 +56,15 @@
           "description": "Overall sentiment of the document"
         },
         {
+          "id": "priority",
+          "type": "choice",
+          "options": ["low", "medium", "high"],
+          "required": true,
+          "label": "Priority",
+          "description": "Priority level for this document",
+          "widget": {"type": "chip_radio"}
+        },
+        {
           "id": "location",
           "type": "choice",
           "options": ["home", "park", "vet", "shelter", "other"],

@@ -18,6 +18,7 @@ class RadioGroupWidget(ChoiceWidget):
             id=self.schema_id,
             children=container,
             value=self.default,
+            deselectable=True,
         )
 
     def to_python_type(self) -> type:

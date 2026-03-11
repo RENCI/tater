@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget,
-    MultiSelectWidget, CheckboxGroupWidget, NumberInputWidget, SliderWidget, RangeSliderWidget,
+    MultiSelectWidget, CheckboxGroupWidget, ChipRadioWidget, NumberInputWidget, SliderWidget, RangeSliderWidget,
     SwitchWidget, SelectWidget, TextAreaWidget, ChipWidget, GroupWidget,
 )
 
@@ -12,6 +12,7 @@ from tater.widgets import (
 class SingleChoiceFields(BaseModel):
     pet_type: Optional[Literal["cat", "dog", "fish"]] = None
     sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    priority: Optional[Literal["low", "medium", "high"]] = None
     location: Optional[Literal["home", "park", "vet", "shelter", "other"]] = None
 
 
@@ -88,6 +89,12 @@ widgets = [
                 schema_field="sentiment",
                 label="Sentiment",
                 description="Overall sentiment of the document",
+                required=True,
+            ),
+            ChipRadioWidget(
+                schema_field="priority",
+                label="Priority",
+                description="Priority level for this document",
                 required=True,
             ),
             SelectWidget(

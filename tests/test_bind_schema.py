@@ -1,7 +1,7 @@
 """Tests for widget bind_schema — option derivation and type validation."""
 import pytest
 from tater.widgets import (
-    SegmentedControlWidget, RadioGroupWidget, SelectWidget,
+    SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipRadioWidget,
     MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
     TextInputWidget, TextAreaWidget, ListableWidget,
 )
@@ -27,6 +27,12 @@ class TestChoiceWidgetBindSchema:
 
     def test_select_derives_options(self):
         w = SelectWidget(schema_field="kind", label="Kind")
+        w._finalize_paths(parent_path="pets.0")
+        w.bind_schema(Schema)
+        assert w.options == ["cat", "dog", "fish"]
+
+    def test_chip_radio_derives_options(self):
+        w = ChipRadioWidget(schema_field="kind", label="Kind")
         w._finalize_paths(parent_path="pets.0")
         w.bind_schema(Schema)
         assert w.options == ["cat", "dog", "fish"]
