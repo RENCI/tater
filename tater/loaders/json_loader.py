@@ -74,6 +74,7 @@ Widget override types (``"widget": {"type": "..."}``):
   ``select``                  — for ``choice`` fields
   ``text_area``               — for ``text`` fields
   ``switch``                  — for ``boolean`` fields
+  ``chip_boolean``            — for ``boolean`` fields
   ``slider``                  — for ``numeric`` fields
   ``hierarchical_label_full`` — for ``hierarchical_label`` fields
 
@@ -99,6 +100,7 @@ from tater.widgets.multiselect import MultiSelectWidget
 from tater.widgets.text_input import TextInputWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
+from tater.widgets.chip import ChipWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
@@ -403,6 +405,8 @@ def _build_widget(
     if ftype == "boolean":
         if widget_type == "switch":
             return SwitchWidget(fid, label=label, description=description)
+        if widget_type == "chip_boolean":
+            return ChipWidget(fid, label=label, description=description)
         return CheckboxWidget(fid, label=label, description=description)
 
     if ftype == "numeric":

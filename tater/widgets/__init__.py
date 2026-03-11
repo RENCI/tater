@@ -22,6 +22,7 @@ from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.switch import SwitchWidget
+from tater.widgets.chip import ChipWidget
 from tater.widgets.select import SelectWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.hierarchical_label import (
@@ -57,6 +58,7 @@ __all__ = [
     "TextAreaWidget",
     "RangeSliderWidget",
     "SwitchWidget",
+    "ChipWidget",
     "SelectWidget",
     "SpanAnnotationWidget",
     "EntityType",
