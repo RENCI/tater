@@ -20,6 +20,66 @@
  */
 
 
+// ---------- clientside namespace — initialised first so Dash can find these
+//            functions even if pattern-matching callbacks fire early ----------
+//
+// Use Object.assign onto the existing object rather than replacing it, so any
+// hash-keyed references the Dash renderer stored internally are preserved.
+
+window.dash_clientside = window.dash_clientside || {};
+window.dash_clientside.tater = window.dash_clientside.tater || {};
+
+Object.assign(window.dash_clientside.tater, {
+
+    captureSelection: function (_n_clicks_list) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
+            return window.dash_clientside.no_update;
+        }
+
+        var propId = ctx.triggered[0].prop_id;
+        var btnId;
+        try {
+            btnId = JSON.parse(propId.split('.n_clicks')[0]);
+        } catch (e) {
+            return window.dash_clientside.no_update;
+        }
+        var tag = btnId.tag;
+        if (!tag) { return window.dash_clientside.no_update; }
+
+        var selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') {
+            return window.dash_clientside.no_update;
+        }
+
+        var selectedText = selection.toString();
+        var range = selection.getRangeAt(0);
+        var docEl = document.getElementById('document-content');
+        if (!docEl || !docEl.contains(range.commonAncestorContainer)) {
+            return window.dash_clientside.no_update;
+        }
+
+        var preRange = range.cloneRange();
+        preRange.selectNodeContents(docEl);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        var start = preRange.toString().length;
+        var end = start + selectedText.length;
+
+        _savedDocScroll = docEl.scrollTop;
+        selection.removeAllRanges();
+        return { text: selectedText, start: start, end: end, tag: tag, ts: Date.now() };
+    },
+
+    captureDelete: function (_n_clicks) {
+        var d = window._taterDeletePending;
+        if (!d) { return window.dash_clientside.no_update; }
+        window._taterDeletePending = null;
+        return d;
+    }
+
+});
+
+
 // ---------- inject CSS for faded (inactive) spans ----------
 // Using a CSS class with !important ensures the faded state survives React
 // reconciliation, which sets inline background-color on <mark> elements.
@@ -211,64 +271,6 @@ var _savedDocScroll = null;
     }
     setupObserver();
 })();
-
-
-// ---------- clientside callbacks ----------
-
-window.dash_clientside = window.dash_clientside || {};
-window.dash_clientside.tater = Object.assign({}, window.dash_clientside.tater || {}, {
-
-    captureSelection: function (n_clicks_list) {
-        var ctx = window.dash_clientside.callback_context;
-        if (!ctx || !ctx.triggered || !ctx.triggered.length) {
-            return window.dash_clientside.no_update;
-        }
-
-        // prop_id format: '{"field":"...","tag":"...","type":"..."}.n_clicks'
-        //             or: '{"type":"...","ld":"...","cid":"...","tag":"...","index":N}.n_clicks'
-        var propId = ctx.triggered[0].prop_id;
-        var btnId;
-        try {
-            btnId = JSON.parse(propId.split('.n_clicks')[0]);
-        } catch (e) {
-            return window.dash_clientside.no_update;
-        }
-        var tag = btnId.tag;
-        if (!tag) {
-            return window.dash_clientside.no_update;
-        }
-
-        var selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') {
-            return window.dash_clientside.no_update;
-        }
-
-        var selectedText = selection.toString();
-        var range = selection.getRangeAt(0);
-        var docEl = document.getElementById('document-content');
-        if (!docEl || !docEl.contains(range.commonAncestorContainer)) {
-            return window.dash_clientside.no_update;
-        }
-
-        var preRange = range.cloneRange();
-        preRange.selectNodeContents(docEl);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        var start = preRange.toString().length;
-        var end = start + selectedText.length;
-
-        _savedDocScroll = docEl.scrollTop;
-        selection.removeAllRanges();
-        return { text: selectedText, start: start, end: end, tag: tag, ts: Date.now() };
-    },
-
-    captureDelete: function (n_clicks) {
-        var d = window._taterDeletePending;
-        if (!d) { return window.dash_clientside.no_update; }
-        window._taterDeletePending = null;
-        return d;
-    }
-
-});
 
 
 // ---------- floating tooltip ----------
