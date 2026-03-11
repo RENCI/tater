@@ -415,6 +415,14 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         if w.auto_advance
     }
 
+    # Build empty_value lookup keyed by schema_field (last path segment).
+    # Used by load callbacks to return widget-appropriate defaults instead of None.
+    # Keying by last segment handles list-item widgets (e.g. "pets.0.weight" → "weight").
+    empty_value_lookup = {
+        w.schema_field: w.empty_value
+        for w in _collect_all_control_templates(tater_app.widgets)
+    }
+
     # --- Capture: value prop (all non-boolean ControlWidgets) ---
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
@@ -430,6 +438,8 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         triggered = ctx.triggered[0]
         field_path = json.loads(triggered["prop_id"].split(".")[0])["field"]
         value = triggered["value"]
+        if value == "":
+            value = None
         annotation = tater_app.annotations.get(doc_id)
         if annotation is None:
             return no_update, no_update
@@ -438,7 +448,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         update_status_for_doc(tater_app, doc_id)
         status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
         if field_path in auto_advance_fields:
-            if value != old_value and value is not None and value != "":
+            if value != old_value and value is not None:
                 return status, (advance_count or 0) + 1
         return status, no_update
 
@@ -478,10 +488,14 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     )
     def load_values(doc_id, all_ids):
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        return [
-            value_helpers.get_model_value(annotation, wid["field"]) if annotation else None
-            for wid in (all_ids or [])
-        ]
+        result = []
+        for wid in (all_ids or []):
+            field = wid["field"]
+            v = value_helpers.get_model_value(annotation, field) if annotation else None
+            if v is None:
+                v = empty_value_lookup.get(field.split(".")[-1])
+            result.append(v)
+        return result
 
     # --- Load: checked prop ---
     @app.callback(
@@ -517,6 +531,27 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
         elif isinstance(widget, GroupWidget):
             if hasattr(widget, "children") and widget.children:
                 captured.extend(_collect_value_capture_widgets(widget.children))
+        elif isinstance(widget, ControlWidget):
+            captured.append(widget)
+    return captured
+
+
+def _collect_all_control_templates(widgets: list[TaterWidget]) -> list[TaterWidget]:
+    """Recursively collect all ControlWidget templates, including inside repeaters.
+
+    Used to build empty_value lookups for load callbacks.
+    """
+    from tater.widgets.base import ControlWidget
+    from tater.widgets.group import GroupWidget
+    from tater.widgets.repeater import RepeaterWidget
+
+    captured = []
+    for widget in widgets:
+        if isinstance(widget, RepeaterWidget):
+            captured.extend(_collect_all_control_templates(widget.item_widgets))
+        elif isinstance(widget, GroupWidget):
+            if hasattr(widget, "children") and widget.children:
+                captured.extend(_collect_all_control_templates(widget.children))
         elif isinstance(widget, ControlWidget):
             captured.append(widget)
     return captured

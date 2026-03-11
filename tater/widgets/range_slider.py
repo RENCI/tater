@@ -45,8 +45,8 @@ class RangeSliderWidget(ControlWidget):
             )
 
     @property
-    def empty_value(self) -> None:
-        return None
+    def empty_value(self) -> list:
+        return self.default
 
     def component(self) -> dmc.RangeSlider:
         return dmc.RangeSlider(
