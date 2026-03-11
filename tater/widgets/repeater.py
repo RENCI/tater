@@ -98,7 +98,7 @@ class RepeaterWidget(ContainerWidget):
                 items = []
                 if not widget.renders_own_label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_list(ld, index))
+                items.append(widget.component_in_repeater(ld, str(index)))
                 if widget.description:
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
@@ -294,8 +294,8 @@ class RepeaterWidget(ContainerWidget):
             for item_widget_template in self.item_widgets:
                 if isinstance(item_widget_template, HierarchicalLabelWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
-                    item_widget_template.register_list_callbacks(
-                        app, ld, self.field_path, item_widget_template.schema_field
+                    item_widget_template.register_repeater_callbacks(
+                        app, ld, [self.field_path, item_widget_template.schema_field]
                     )
                 elif isinstance(item_widget_template, SpanAnnotationWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
@@ -305,7 +305,7 @@ class RepeaterWidget(ContainerWidget):
                 elif isinstance(item_widget_template, RepeaterWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
                     item_widget_template.register_list_callbacks(
-                        app, ld, self.field_path, item_widget_template.schema_field
+                        app, ld, [self.field_path, item_widget_template.schema_field]
                     )
 
     # ------------------------------------------------------------------
@@ -391,7 +391,7 @@ class RepeaterWidget(ContainerWidget):
                 items = []
                 if widget.label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_nested_list(nested_ld, outer_li, inner_index))
+                items.append(widget.component_in_repeater(nested_ld, f"{outer_li}.{inner_index}"))
                 if widget.description:
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
@@ -461,12 +461,21 @@ class RepeaterWidget(ContainerWidget):
         self,
         app: Any,
         ld: str,
-        outer_list_field: str,
-        item_field: str,
+        field_segments: list[str],
     ) -> None:
-        """Register MATCH-based callbacks for this widget when nested inside another repeater."""
+        """Register MATCH-based callbacks for this widget when nested inside another repeater.
+
+        ``field_segments`` is the ordered list of field names from the outermost list down
+        to this repeater's own field, e.g. ``["findings", "annotations"]`` when this
+        repeater lives at ``findings[i].annotations``.  Passing a longer list here is what
+        enables arbitrary-depth nesting: each recursive call appends one more segment.
+        """
         from dash import ALL, MATCH, Input, Output, State, ctx
         from dash.exceptions import PreventUpdate
+
+        # The two names needed for the 2-level MATCH callback body.
+        outer_list_field = field_segments[0]
+        item_field = field_segments[-1]
 
         tater_app = getattr(app, "_tater_app", None)
         item_widget_templates = self.item_widgets
@@ -540,11 +549,12 @@ class RepeaterWidget(ContainerWidget):
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             for iw_template in item_widget_templates:
+                child_segments = field_segments + [iw_template.schema_field]
+                child_ld = "-".join(child_segments)
                 if isinstance(iw_template, HierarchicalLabelWidget):
-                    nested_ld = f"{outer_list_field}-{item_field}-{iw_template.schema_field}"
-                    iw_template.register_nested_list_callbacks(
-                        app, nested_ld, outer_list_field, item_field, iw_template.schema_field
-                    )
+                    iw_template.register_repeater_callbacks(app, child_ld, child_segments)
+                elif isinstance(iw_template, RepeaterWidget):
+                    iw_template.register_list_callbacks(app, child_ld, child_segments)
 
     # ------------------------------------------------------------------
     # Schema binding (shared)
