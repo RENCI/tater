@@ -1,8 +1,8 @@
 """Tests for widget bind_schema — option derivation and type validation."""
 import pytest
 from tater.widgets import (
-    SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
-    MultiSelectWidget, CheckboxWidget, SwitchWidget,
+    SegmentedControlWidget, RadioGroupWidget, SelectWidget,
+    MultiSelectWidget, CheckboxWidget, SwitchWidget, ChipWidget,
     TextInputWidget, TextAreaWidget, ListableWidget,
 )
 from tests.conftest import Schema, Pet
@@ -79,6 +79,11 @@ class TestBooleanWidgetBindSchema:
         w._finalize_paths(parent_path="pets.0")
         with pytest.raises(TypeError):
             w.bind_schema(Schema)
+
+    def test_chip_binds_bool_field(self):
+        w = ChipWidget(schema_field="indoor", label="Indoor")
+        w._finalize_paths(parent_path="pets.0")
+        w.bind_schema(Schema)  # should not raise
 
     def test_empty_value_is_false(self):
         w = CheckboxWidget(schema_field="neutered", label="Neutered")
