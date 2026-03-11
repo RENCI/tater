@@ -57,21 +57,29 @@ class TaterWidget:
     _full_path: Optional[str] = field(init=False, default=None, repr=False)
     _condition: Optional[tuple] = field(init=False, default=None, repr=False)
 
-    def conditional_on(self, controlling_field: str, value: Any) -> "TaterWidget":
+    def conditional_on(self, controlling_field: "str | list[str] | tuple[str, ...]", value: Any) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
 
         Args:
-            controlling_field: The schema_field of the controlling widget (boolean or option).
+            controlling_field: The field of the controlling widget. Either a
+                dot-joined path string (``"is_indoor"`` / ``"booleans.is_indoor"``)
+                or a sequence of path segments (``["booleans", "is_indoor"]``).
+                Use a sequence to avoid writing dot-joined group prefixes by hand.
             value: Show this widget when the controlling field equals this value.
                    For booleans: True or False. For options: string value (e.g., "dog").
 
-        Example::
+        Examples::
 
-            TextInputWidget("indoor_location", label="Location").conditional_on("is_indoor", True)
-            TextInputWidget("breed_notes", label="Breed").conditional_on("pet_type", "dog")
+            # flat schema
+            TextInputWidget("location").conditional_on("is_indoor", True)
+
+            # inside a GroupWidget — sequence avoids hard-coding the prefix
+            TextInputWidget("location").conditional_on(["booleans", "is_indoor"], True)
 
         Note: Controlling widget must be declared before this widget in the widget list.
         """
+        if isinstance(controlling_field, (list, tuple)):
+            controlling_field = ".".join(controlling_field)
         self._condition = (controlling_field, value)
         return self
 
@@ -157,12 +165,15 @@ class TaterWidget:
         from dash import Output, Input, no_update
 
         controlling_field, target_value = self._condition
-        controlling_id = f"annotation-{controlling_field.replace('.', '-')}"
+        controlling_widget, controlling_prop = self._get_controlling_widget(app, controlling_field)
 
-        # Determine which property the controlling widget uses.
-        # For simplicity: assume it's "checked" for BooleanWidget, "value" for all others.
-        # This will be refined via the app's widget registry if needed.
-        controlling_prop = self._get_controlling_property(app, controlling_field)
+        # Use the controlling widget's own schema_id so the encoding is always
+        # consistent with how the component was actually rendered.
+        if controlling_widget is not None:
+            controlling_schema_id = controlling_widget.schema_id
+        else:
+            controlling_type = "tater-control"
+            controlling_schema_id = {"type": controlling_type, "field": controlling_field.replace(".", "|")}
 
         # Serialize target_value for JavaScript comparison.
         # For booleans: use true/false; for strings: use quoted "value".
@@ -175,7 +186,7 @@ class TaterWidget:
         app.clientside_callback(
             f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
             Output(self.conditional_wrapper_id, "style"),
-            Input(controlling_id, controlling_prop),
+            Input(controlling_schema_id, controlling_prop),
             prevent_initial_call=False,
         )
 
@@ -183,10 +194,11 @@ class TaterWidget:
         _empty = self.empty_value
         _value_prop = self.value_prop
         _target = target_value
+        _schema_id = self.schema_id
 
         @app.callback(
-            Output(self.component_id, _value_prop, allow_duplicate=True),
-            Input(controlling_id, controlling_prop),
+            Output(_schema_id, _value_prop, allow_duplicate=True),
+            Input(controlling_schema_id, controlling_prop),
             prevent_initial_call=True,
         )
         def _clear_when_hidden(v):
@@ -194,20 +206,18 @@ class TaterWidget:
                 return _empty
             return no_update
 
-    def _get_controlling_property(self, app: Any, controlling_field: str) -> str:
-        """Determine which property (checked/value) the controlling widget uses.
+    def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
+        """Look up the controlling widget and its value property.
 
-        Returns "checked" for BooleanWidget, "value" for all others.
+        Returns ``(widget, prop)`` where ``prop`` is ``"checked"`` for
+        BooleanWidgets and ``"value"`` for all others.  ``widget`` may be
+        ``None`` if the registry is not yet available.
         """
-        # Try to look up the controlling widget from the app's registry.
-        # If not found, default to "value" (which works for most option widgets).
         if hasattr(app, "_tater_app") and hasattr(app._tater_app, "_all_widgets"):
             for widget in app._tater_app._all_widgets:
                 if widget.field_path == controlling_field:
-                    # BooleanWidget has value_prop="checked"
-                    return getattr(widget, "value_prop", "value")
-        # Default: assume option/choice widget uses "value"
-        return "value"
+                    return widget, getattr(widget, "value_prop", "value")
+        return None, "value"
 
     # Subclasses must override these three methods.
     # Without ABC enforcement, forgetting to do so will cause a runtime error
@@ -246,6 +256,16 @@ class ControlWidget(TaterWidget):
     @property
     def empty_value(self) -> Any:
         return None
+
+    @property
+    def schema_id(self) -> dict:
+        # Dots in dict ID field values break Dash 4's client-side dependency
+        # parser (splitIdAndProp in dependencies.js splits prop_ids on "." to
+        # separate the component ID from the property name, so a dot inside a
+        # JSON string value causes JSON.parse to fail). Pipes are safe because
+        # they cannot appear in Python identifiers. Callbacks decode "|" → "."
+        # before using the field as a dot-notation path.
+        return {"type": "tater-control", "field": self.field_path.replace(".", "|")}
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +341,11 @@ class BooleanWidget(ControlWidget):
     @property
     def empty_value(self) -> bool:
         return False
+
+    @property
+    def schema_id(self) -> dict:
+        # See ControlWidget.schema_id for why dots are encoded as pipes.
+        return {"type": "tater-bool-control", "field": self.field_path.replace(".", "|")}
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)

@@ -26,7 +26,7 @@ class CheckboxWidget(BooleanWidget):
             ], gap=4)
         else:
             label = self.label
-        return dmc.Checkbox(id=self.component_id, label=label, checked=self.default)
+        return dmc.Checkbox(id=self.schema_id, label=label, checked=self.default)
 
     @property
     def renders_own_label(self) -> bool:

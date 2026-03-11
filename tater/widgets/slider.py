@@ -15,9 +15,13 @@ class SliderWidget(NumericWidget):
     max_value: float = 100
     step: Optional[float] = None
 
+    @property
+    def empty_value(self):
+        return self.default if self.default is not None else self.min_value
+
     def component(self) -> dmc.Slider:
         return dmc.Slider(
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default if self.default is not None else self.min_value,
             min=self.min_value,
             max=self.max_value,

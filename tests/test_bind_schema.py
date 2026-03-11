@@ -1,8 +1,8 @@
 """Tests for widget bind_schema — option derivation and type validation."""
 import pytest
 from tater.widgets import (
-    SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
-    MultiSelectWidget, CheckboxWidget, SwitchWidget,
+    SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipRadioWidget,
+    MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
     TextInputWidget, TextAreaWidget, ListableWidget,
 )
 from tests.conftest import Schema, Pet
@@ -31,6 +31,12 @@ class TestChoiceWidgetBindSchema:
         w.bind_schema(Schema)
         assert w.options == ["cat", "dog", "fish"]
 
+    def test_chip_radio_derives_options(self):
+        w = ChipRadioWidget(schema_field="kind", label="Kind")
+        w._finalize_paths(parent_path="pets.0")
+        w.bind_schema(Schema)
+        assert w.options == ["cat", "dog", "fish"]
+
     def test_raises_for_non_literal_field(self):
         w = SegmentedControlWidget(schema_field="breed", label="Breed")
         w._finalize_paths(parent_path="pets.0")
@@ -50,6 +56,11 @@ class TestChoiceWidgetBindSchema:
 class TestMultiChoiceWidgetBindSchema:
     def test_multi_select_derives_options(self):
         w = MultiSelectWidget(schema_field="flags", label="Flags")
+        w.bind_schema(Schema)
+        assert w.options == ["urgent", "review"]
+
+    def test_checkbox_group_derives_options(self):
+        w = CheckboxGroupWidget(schema_field="flags", label="Flags")
         w.bind_schema(Schema)
         assert w.options == ["urgent", "review"]
 
@@ -79,6 +90,11 @@ class TestBooleanWidgetBindSchema:
         w._finalize_paths(parent_path="pets.0")
         with pytest.raises(TypeError):
             w.bind_schema(Schema)
+
+    def test_chip_binds_bool_field(self):
+        w = ChipWidget(schema_field="indoor", label="Indoor")
+        w._finalize_paths(parent_path="pets.0")
+        w.bind_schema(Schema)  # should not raise
 
     def test_empty_value_is_false(self):
         w = CheckboxWidget(schema_field="neutered", label="Neutered")

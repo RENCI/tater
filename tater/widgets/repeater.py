@@ -28,7 +28,6 @@ _NESTED_ADD_TYPE = "listable-add-list"
 _NESTED_DELETE_TYPE = "listable-delete-list"
 _NESTED_STORE_TYPE = "listable-store-list"
 _NESTED_ITEMS_TYPE = "listable-items-list"
-_NESTED_VAL_TYPE = "listable-val-list"
 
 
 # ---------------------------------------------------------------------------
@@ -116,17 +115,6 @@ class RepeaterWidget(ContainerWidget):
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
                 continue
-
-            # ControlWidget — override the component ID for pattern matching
-            original_component = widget.component
-            pattern_type = f"{self.component_id}-item"
-
-            def make_pattern_component(w, pt):
-                comp = original_component()
-                comp.id = {"type": pt, "field": w.schema_field, "index": index}
-                return comp
-
-            widget.component = lambda w=widget, pt=pattern_type: make_pattern_component(w, pt)
 
             items = []
             if not widget.renders_own_label:
@@ -304,9 +292,7 @@ class RepeaterWidget(ContainerWidget):
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             from tater.widgets.span import SpanAnnotationWidget
             for item_widget_template in self.item_widgets:
-                if isinstance(item_widget_template, ControlWidget):
-                    self._register_item_pattern_callback(item_widget_template, app, tater_app)
-                elif isinstance(item_widget_template, HierarchicalLabelWidget):
+                if isinstance(item_widget_template, HierarchicalLabelWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
                     item_widget_template.register_list_callbacks(
                         app, ld, self.field_path, item_widget_template.schema_field
@@ -321,61 +307,6 @@ class RepeaterWidget(ContainerWidget):
                     item_widget_template.register_list_callbacks(
                         app, ld, self.field_path, item_widget_template.schema_field
                     )
-
-    def _register_item_pattern_callback(
-        self, item_widget_template: TaterWidget, app: Any, tater_app: Any
-    ) -> None:
-        """Register a value-capture callback for one ControlWidget field in this list."""
-        from dash import ALL, Input, Output, State, MATCH
-
-        pattern_type = f"{self.component_id}-item"
-        field_name = item_widget_template.schema_field
-        value_prop = item_widget_template.value_prop
-
-        @app.callback(
-            Output({"type": pattern_type, "field": field_name, "index": ALL}, "id"),
-            Input({"type": pattern_type, "field": field_name, "index": ALL}, value_prop),
-            State({"type": pattern_type, "field": field_name, "index": ALL}, "id"),
-            State("current-doc-id", "data"),
-            prevent_initial_call=True,
-        )
-        def capture_pattern_values(all_values, all_ids, doc_id):
-            if not doc_id or not ctx.triggered:
-                return all_ids if all_ids else []
-
-            triggered_prop = ctx.triggered[0]["prop_id"]
-            if "." not in triggered_prop:
-                return all_ids if all_ids else []
-
-            triggered_id_str = triggered_prop.split(".")[0]
-            try:
-                triggered_id = json.loads(triggered_id_str)
-            except (json.JSONDecodeError, ValueError):
-                return all_ids if all_ids else []
-
-            if not isinstance(triggered_id, dict):
-                return all_ids if all_ids else []
-
-            index = triggered_id.get("index")
-            field = triggered_id.get("field")
-
-            if index is None or field is None:
-                return all_ids if all_ids else []
-
-            full_field_path = f"{self.field_path}.{index}.{field}"
-
-            for i, widget_id in enumerate(all_ids or []):
-                if isinstance(widget_id, dict) and widget_id.get("index") == index:
-                    if i < len(all_values):
-                        value = all_values[i]
-                        if tater_app.schema_model:
-                            if doc_id not in tater_app.annotations:
-                                tater_app.annotations[doc_id] = tater_app.schema_model()
-                            model = tater_app.annotations[doc_id]
-                            tater_app._set_model_value(model, full_field_path, value)
-                    break
-
-            return all_ids if all_ids else []
 
     # ------------------------------------------------------------------
     # Nested (repeater-inside-repeater) support (shared)
@@ -478,13 +409,6 @@ class RepeaterWidget(ContainerWidget):
                     widget.default = value
 
             comp = widget.component()
-            comp.id = {
-                "type": _NESTED_VAL_TYPE,
-                "ld": ld,
-                "li": outer_li,
-                "field": template.schema_field,
-                "inner_li": inner_index,
-            }
 
             items = []
             if not widget.renders_own_label:
@@ -616,85 +540,11 @@ class RepeaterWidget(ContainerWidget):
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             for iw_template in item_widget_templates:
-                if isinstance(iw_template, ControlWidget):
-                    self._register_nested_pattern_callback(
-                        app, tater_app, ld, outer_list_field, item_field, iw_template
-                    )
-                elif isinstance(iw_template, HierarchicalLabelWidget):
+                if isinstance(iw_template, HierarchicalLabelWidget):
                     nested_ld = f"{outer_list_field}-{item_field}-{iw_template.schema_field}"
                     iw_template.register_nested_list_callbacks(
                         app, nested_ld, outer_list_field, item_field, iw_template.schema_field
                     )
-
-    def _register_nested_pattern_callback(
-        self,
-        app: Any,
-        tater_app: Any,
-        ld: str,
-        outer_list_field: str,
-        item_field: str,
-        iw_template: TaterWidget,
-    ) -> None:
-        """Register value-capture for one ControlWidget field in a nested list."""
-        from dash import ALL, MATCH, Input, Output, State, ctx
-
-        field_name = iw_template.schema_field
-        value_prop = iw_template.value_prop
-
-        @app.callback(
-            Output(
-                {"type": _NESTED_VAL_TYPE, "ld": ld, "li": MATCH, "field": field_name, "inner_li": ALL},
-                "id",
-            ),
-            Input(
-                {"type": _NESTED_VAL_TYPE, "ld": ld, "li": MATCH, "field": field_name, "inner_li": ALL},
-                value_prop,
-            ),
-            State(
-                {"type": _NESTED_VAL_TYPE, "ld": ld, "li": MATCH, "field": field_name, "inner_li": ALL},
-                "id",
-            ),
-            State("current-doc-id", "data"),
-            prevent_initial_call=True,
-        )
-        def capture_nested_values(all_values, all_ids, doc_id):
-            if not doc_id or not ctx.triggered:
-                return all_ids if all_ids else []
-
-            triggered_prop = ctx.triggered[0]["prop_id"]
-            if "." not in triggered_prop:
-                return all_ids if all_ids else []
-
-            triggered_id_str = triggered_prop.split(".")[0]
-            try:
-                triggered_id = json.loads(triggered_id_str)
-            except (json.JSONDecodeError, ValueError):
-                return all_ids if all_ids else []
-
-            if not isinstance(triggered_id, dict):
-                return all_ids if all_ids else []
-
-            outer_li = triggered_id.get("li")
-            inner_li = triggered_id.get("inner_li")
-            f = triggered_id.get("field")
-
-            if outer_li is None or inner_li is None or f is None:
-                return all_ids if all_ids else []
-
-            full_field_path = f"{outer_list_field}.{outer_li}.{item_field}.{inner_li}.{f}"
-
-            for i, widget_id in enumerate(all_ids or []):
-                if isinstance(widget_id, dict) and widget_id.get("inner_li") == inner_li:
-                    if i < len(all_values):
-                        value = all_values[i]
-                        if tater_app.schema_model:
-                            if doc_id not in tater_app.annotations:
-                                tater_app.annotations[doc_id] = tater_app.schema_model()
-                            model = tater_app.annotations[doc_id]
-                            tater_app._set_model_value(model, full_field_path, value)
-                    break
-
-            return all_ids if all_ids else []
 
     # ------------------------------------------------------------------
     # Schema binding (shared)

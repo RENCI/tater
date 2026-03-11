@@ -17,12 +17,14 @@ from tater.widgets.text_input import TextInputWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import RepeaterWidget, ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.multiselect import MultiSelectWidget
+from tater.widgets.checkbox_group import CheckboxGroupWidget
+from tater.widgets.chip_radio import ChipRadioWidget
 from tater.widgets.number_input import NumberInputWidget
-from tater.widgets.chip_group import ChipGroupWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.switch import SwitchWidget
+from tater.widgets.chip import ChipWidget
 from tater.widgets.select import SelectWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.hierarchical_label import (
@@ -53,12 +55,14 @@ __all__ = [
     "TabsWidget",
     "AccordionWidget",
     "MultiSelectWidget",
+    "CheckboxGroupWidget",
+    "ChipRadioWidget",
     "NumberInputWidget",
-    "ChipGroupWidget",
     "SliderWidget",
     "TextAreaWidget",
     "RangeSliderWidget",
     "SwitchWidget",
+    "ChipWidget",
     "SelectWidget",
     "SpanAnnotationWidget",
     "EntityType",

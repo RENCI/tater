@@ -1,13 +1,13 @@
-"""ChipGroup widget for multi-choice annotations."""
+"""ChipRadio widget for single-choice annotations displayed as chip buttons."""
 from dataclasses import dataclass
 import dash_mantine_components as dmc
 
-from .base import MultiChoiceWidget
+from .base import ChoiceWidget
 
 
 @dataclass(eq=False)
-class ChipGroupWidget(MultiChoiceWidget):
-    """Widget for selecting multiple options displayed as inline chip buttons."""
+class ChipRadioWidget(ChoiceWidget):
+    """Widget for selecting one option from a set displayed as inline chip buttons."""
 
     vertical: bool = False
 
@@ -16,10 +16,10 @@ class ChipGroupWidget(MultiChoiceWidget):
         container = dmc.Stack(chips, gap="xs") if self.vertical else dmc.Group(chips, wrap="wrap")
         return dmc.ChipGroup(
             container,
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default,
-            multiple=True,
+            deselectable=True,
         )
 
     def to_python_type(self) -> type:
-        return list
+        return str

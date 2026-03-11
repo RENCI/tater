@@ -70,8 +70,8 @@ def configure(app) -> None:
     from dash import Input, Output, no_update
 
     @app.app.callback(
-        Output(pet_mood.component_id, "value", allow_duplicate=True),
-        Input(needs_attention.component_id, "checked"),
+        Output(pet_mood.schema_id, "value", allow_duplicate=True),
+        Input(needs_attention.schema_id, "checked"),
         prevent_initial_call=True,
     )
     def clear_mood_when_no_attention(needs_attention):

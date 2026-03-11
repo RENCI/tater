@@ -25,7 +25,7 @@ class SwitchWidget(BooleanWidget):
             ], gap=4)
         else:
             label = self.label
-        return dmc.Switch(id=self.component_id, label=label, checked=self.default)
+        return dmc.Switch(id=self.schema_id, label=label, checked=self.default)
 
     @property
     def renders_own_label(self) -> bool:

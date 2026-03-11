@@ -68,13 +68,16 @@ Field types:
   ``hierarchical_label``— tree-based label (default: HierarchicalLabelCompactWidget)
   ``group``             — nested sub-model with ``fields``
   ``listable``          — repeatable list of sub-items with ``item_fields``
+                          (widget type override: ``tabs`` or ``accordion``)
 
 Widget override types (``"widget": {"type": "..."}``):
   ``radio_group``             — for ``choice`` fields
   ``select``                  — for ``choice`` fields
-  ``chip_group``              — for ``choice`` or ``multi_choice`` fields
+  ``chip_radio``              — for ``choice`` fields
+  ``checkbox_group``          — for ``multi_choice`` fields
   ``text_area``               — for ``text`` fields
   ``switch``                  — for ``boolean`` fields
+  ``chip_boolean``            — for ``boolean`` fields
   ``slider``                  — for ``numeric`` fields
   ``hierarchical_label_full`` — for ``hierarchical_label`` fields
 
@@ -96,11 +99,13 @@ from tater.widgets.base import TaterWidget
 from tater.widgets.segmented_control import SegmentedControlWidget
 from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.select import SelectWidget
-from tater.widgets.chip_group import ChipGroupWidget
 from tater.widgets.multiselect import MultiSelectWidget
+from tater.widgets.checkbox_group import CheckboxGroupWidget
+from tater.widgets.chip_radio import ChipRadioWidget
 from tater.widgets.text_input import TextInputWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
+from tater.widgets.chip import ChipWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
@@ -108,6 +113,7 @@ from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
+from tater.widgets.repeater import TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
@@ -319,12 +325,15 @@ def _process_field(
             item_widgets.append(child_widget)
         item_model = create_model(_to_classname(local_id) + "Item", **item_model_fields)
         widget_spec: dict = spec.get("widget") or {}
-        return (list[item_model], Field(default_factory=list)), ListableWidget(
+        widget_type = widget_spec.get("type")
+        item_label = widget_spec.get("item_label", "Item")
+        repeater_cls = {"tabs": TabsWidget, "accordion": AccordionWidget}.get(widget_type, ListableWidget)
+        return (list[item_model], Field(default_factory=list)), repeater_cls(
             local_id,
             label=label,
             description=description,
             item_widgets=item_widgets,
-            item_label=widget_spec.get("item_label", "Item"),
+            item_label=item_label,
         )
 
     # --- Leaf field types ---
@@ -386,13 +395,22 @@ def _build_widget(
             )
         if widget_type == "select":
             return SelectWidget(fid, label=label, description=description, required=required)
-        if widget_type == "chip_group":
-            return ChipGroupWidget(fid, label=label, description=description, required=required)
-        return SegmentedControlWidget(fid, label=label, description=description, required=required)
+        if widget_type == "chip_radio":
+            return ChipRadioWidget(
+                fid, label=label, description=description, required=required,
+                vertical=widget_spec.get("orientation") == "vertical",
+            )
+        return SegmentedControlWidget(
+            fid, label=label, description=description, required=required,
+            vertical=widget_spec.get("orientation") == "vertical",
+        )
 
     if ftype == "multi_choice":
-        if widget_type == "chip_group":
-            return ChipGroupWidget(fid, label=label, description=description, required=required)
+        if widget_type == "checkbox_group":
+            return CheckboxGroupWidget(
+                fid, label=label, description=description, required=required,
+                vertical=widget_spec.get("orientation") == "vertical",
+            )
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
     if ftype == "text":
@@ -409,6 +427,8 @@ def _build_widget(
     if ftype == "boolean":
         if widget_type == "switch":
             return SwitchWidget(fid, label=label, description=description)
+        if widget_type == "chip_boolean":
+            return ChipWidget(fid, label=label, description=description)
         return CheckboxWidget(fid, label=label, description=description)
 
     if ftype == "numeric":

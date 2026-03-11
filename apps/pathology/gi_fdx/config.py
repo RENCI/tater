@@ -7,7 +7,7 @@ present in a GI pathology final diagnosis.
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
-from tater.widgets import RadioGroupWidget, ChipGroupWidget
+from tater.widgets import RadioGroupWidget, MultiSelectWidget
 
 
 DiagnosisCategory = Literal[
@@ -35,7 +35,7 @@ widgets = [
         description="Select the single best category for the overall diagnosis.",
         required=True,
     ),
-    ChipGroupWidget(
+    MultiSelectWidget(
         schema_field="other_labels",
         label="Secondary Diagnosis Categories",
         description="Select any additional categories also present in this diagnosis.",
