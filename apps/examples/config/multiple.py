@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from tater.widgets import (
     SegmentedControlWidget, RadioGroupWidget, CheckboxWidget, TextInputWidget,
-    MultiSelectWidget, NumberInputWidget, ChipGroupWidget, SliderWidget,
+    MultiSelectWidget, NumberInputWidget, SliderWidget,
     SwitchWidget, SelectWidget, TextAreaWidget, RangeSliderWidget,
 )
 
@@ -64,7 +64,7 @@ widgets = [
         description="Select one or more favorite colors",
         required=True,
     ),
-    ChipGroupWidget(
+    MultiSelectWidget(
         schema_field="traits",
         label="Traits",
         description="Select all traits that apply",

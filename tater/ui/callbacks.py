@@ -110,11 +110,10 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
 
         current_index = next((i for i, d in enumerate(tater_app.documents) if d.id == current_doc_id), 0)
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        if button_id == "btn-prev" and current_index > 0:
+        if ctx.triggered_id == "btn-prev" and current_index > 0:
             current_index -= 1
-        elif button_id == "btn-next" and current_index < len(tater_app.documents) - 1:
+        elif ctx.triggered_id == "btn-next" and current_index < len(tater_app.documents) - 1:
             current_index += 1
         else:
             return no_update, no_update
@@ -135,12 +134,10 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         if not ctx.triggered or not tater_app.documents:
             return no_update, no_update
 
-        triggered = ctx.triggered[0]
-        if not triggered["value"]:
+        if not ctx.triggered[0]["value"]:
             return no_update, no_update
 
-        prop_id = triggered["prop_id"].split(".")[0]
-        new_index = json.loads(prop_id)["index"]
+        new_index = ctx.triggered_id["index"]
 
         doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, new_index, timing_data)
         return doc_id, new_timing
@@ -433,11 +430,10 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def capture_values(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered:
+        if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        triggered = ctx.triggered[0]
-        field_path = json.loads(triggered["prop_id"].split(".")[0])["field"]
-        value = triggered["value"]
+        field_path = ctx.triggered_id["field"]
+        value = ctx.triggered[0]["value"]
         if value == "":
             value = None
         annotation = tater_app.annotations.get(doc_id)
@@ -462,11 +458,10 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def capture_checked(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered:
+        if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        triggered = ctx.triggered[0]
-        field_path = json.loads(triggered["prop_id"].split(".")[0])["field"]
-        value = triggered["value"]
+        field_path = ctx.triggered_id["field"]
+        value = ctx.triggered[0]["value"]
         annotation = tater_app.annotations.get(doc_id)
         if annotation is None:
             return no_update, no_update
