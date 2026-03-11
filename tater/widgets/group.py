@@ -31,6 +31,7 @@ class GroupWidget(ContainerWidget):
     def register_callbacks(self, app) -> None:
         for child in self.children:
             child.register_callbacks(app)
+            child._register_conditional_callbacks(app)
 
     def to_python_type(self) -> type:
         return dict

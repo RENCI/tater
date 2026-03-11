@@ -432,7 +432,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     def capture_values(all_values, doc_id, advance_count):
         if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        field_path = ctx.triggered_id["field"]
+        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
         value = ctx.triggered[0]["value"]
         if value == "":
             value = None
@@ -460,7 +460,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     def capture_checked(all_values, doc_id, advance_count):
         if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        field_path = ctx.triggered_id["field"]
+        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
         value = ctx.triggered[0]["value"]
         annotation = tater_app.annotations.get(doc_id)
         if annotation is None:
@@ -485,7 +485,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         result = []
         for wid in (all_ids or []):
-            field = wid["field"]
+            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
             v = value_helpers.get_model_value(annotation, field) if annotation else None
             if v is None:
                 v = empty_value_lookup.get(field.split(".")[-1])
@@ -503,7 +503,8 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         result = []
         for wid in (all_ids or []):
-            v = value_helpers.get_model_value(annotation, wid["field"]) if annotation else None
+            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
+            v = value_helpers.get_model_value(annotation, field) if annotation else None
             result.append(bool(v) if v is not None else False)
         return result
 
