@@ -72,7 +72,6 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-        from tater.widgets.span import SpanAnnotationWidget
         print(f"[TATER:render] {type(self).__name__}._render_item_widgets: field={self.field_path!r} index={index} doc={doc_id!r}")
         rendered = []
         for template in self.item_widgets:
@@ -100,18 +99,6 @@ class RepeaterWidget(ContainerWidget):
                 if not widget.renders_own_label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
                 items.append(widget.component_in_repeater(ld, str(index)))
-                if widget.description:
-                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
-                continue
-
-            # SpanAnnotationWidget uses MATCH-based dict IDs
-            if isinstance(template, SpanAnnotationWidget):
-                ld = f"{self.field_path}-{template.schema_field}"
-                items = []
-                if widget.label:
-                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_list(ld, index))
                 if widget.description:
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
@@ -292,17 +279,11 @@ class RepeaterWidget(ContainerWidget):
 
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-            from tater.widgets.span import SpanAnnotationWidget
             for item_widget_template in self.item_widgets:
                 if isinstance(item_widget_template, HierarchicalLabelWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
                     item_widget_template.register_repeater_callbacks(
                         app, ld, [self.field_path, item_widget_template.schema_field]
-                    )
-                elif isinstance(item_widget_template, SpanAnnotationWidget):
-                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
-                    item_widget_template.register_list_callbacks(
-                        app, ld, self.field_path, item_widget_template.schema_field
                     )
                 elif isinstance(item_widget_template, RepeaterWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
@@ -377,6 +358,7 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+        from tater.widgets.span import SpanAnnotationWidget
         rendered = []
         for template in self.item_widgets:
             if isinstance(template, HierarchicalLabelWidget):
@@ -394,6 +376,19 @@ class RepeaterWidget(ContainerWidget):
                 if widget.label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
                 items.append(widget.component_in_repeater(nested_ld, f"{outer_li}.{inner_index}"))
+                if widget.description:
+                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
+                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+                continue
+            if isinstance(template, SpanAnnotationWidget):
+                widget = copy.deepcopy(template)
+                widget._finalize_paths(
+                    parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
+                )
+                items = []
+                if widget.label:
+                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
+                items.append(widget.component())
                 if widget.description:
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))

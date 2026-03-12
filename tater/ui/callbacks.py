@@ -20,34 +20,17 @@ if TYPE_CHECKING:
 def setup_callbacks(tater_app: TaterApp) -> None:
     # Removed clientside keyboard navigation callback
     """Register document and navigation callbacks on the Dash app."""
-    from tater.widgets.span import SpanAnnotationWidget
-    from tater.widgets.repeater import RepeaterWidget
-
     app = tater_app.app
-    span_widgets = [w for w in tater_app.widgets if isinstance(w, SpanAnnotationWidget)]
-
-    # Collect (span_widget, outer_field, span_field, ld) for span widgets inside repeaters
-    list_span_pairs = []
-    for w in tater_app.widgets:
-        if isinstance(w, RepeaterWidget):
-            for item_w in w.item_widgets:
-                if isinstance(item_w, SpanAnnotationWidget):
-                    ld = f"{w.field_path}-{item_w.schema_field}"
-                    list_span_pairs.append((item_w, w.field_path, item_w.schema_field, ld))
-
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
 
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app)
 
     # Update document display and info.
-    # Span trigger stores are included as additional inputs so that adding or
-    # deleting a span causes the document to re-render with updated highlights.
-    span_trigger_inputs = [Input(f"span-trigger-{w.component_id}", "data") for w in span_widgets]
-    # Also include list-mode span triggers (global list trigger per (cid, ld))
-    for span_w, _, _, ld in list_span_pairs:
-        list_trigger_id = f"span-list-trigger-{span_w.component_id}-{ld}"
-        span_trigger_inputs.append(Input(list_trigger_id, "data"))
+    # span-any-change fires whenever a span is added or deleted, causing re-render.
+    span_trigger_inputs = (
+        [Input("span-any-change", "data")] if _has_any_span(tater_app.widgets) else []
+    )
 
     @app.callback(
         [Output("document-content", "children"),
@@ -73,7 +56,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         except Exception as e:
             raw_text = f"Error loading file: {e}"
 
-        content = _render_document_content(raw_text, doc_id, span_widgets, tater_app, list_span_pairs)
+        content = _render_document_content(raw_text, doc_id, tater_app)
 
         doc_index = next((i for i, d in enumerate(tater_app.documents) if d.id == doc_id), 0)
         title = f"Document {doc_index + 1} of {len(tater_app.documents)}"
@@ -518,6 +501,215 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         return result
 
 
+def setup_span_callbacks(tater_app: TaterApp) -> None:
+    """Register unified MATCH-based callbacks for all SpanAnnotationWidgets."""
+    from tater.widgets.span import SpanAnnotationWidget
+    from dash import MATCH, ALL
+
+    span_templates = _collect_all_span_templates(tater_app.widgets)
+    if not span_templates:
+        return
+
+    app = tater_app.app
+    # Map schema_field → widget template so entity buttons can be rebuilt
+    span_by_schema_field = {w.schema_field: w for w in span_templates}
+
+    # ---- Clientside: relay pending delete from global proxy to delete store ----
+    app.clientside_callback(
+        "window.dash_clientside.tater.captureDelete",
+        Output("span-delete-store", "data"),
+        Input("span-delete-proxy", "n_clicks"),
+        prevent_initial_call=True,
+    )
+
+    # ---- Clientside: capture text selection → per-item selection store ----
+    app.clientside_callback(
+        "window.dash_clientside.tater.captureSelection",
+        Output({"type": "span-selection", "field": MATCH}, "data"),
+        Input({"type": "span-add-btn", "field": MATCH, "tag": ALL}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+
+    # ---- Server: add span → increment per-item trigger (MATCH-only output) ----
+    # Dash disallows mixing MATCH dict-ID outputs with static string-ID outputs
+    # in the same callback.  add_span therefore writes only to the per-item
+    # span-trigger store; a separate relay_span_triggers callback converts the
+    # ALL pattern to the global span-any-change store so the doc viewer refreshes.
+    @app.callback(
+        Output({"type": "span-trigger", "field": MATCH}, "data"),
+        Input({"type": "span-selection", "field": MATCH}, "data"),
+        State("current-doc-id", "data"),
+        State({"type": "span-trigger", "field": MATCH}, "data"),
+        prevent_initial_call=True,
+    )
+    def add_span(selection, doc_id, trigger_count):
+        if not selection or not doc_id:
+            return no_update
+
+        pipe_field = ctx.triggered_id["field"]
+        field_path = pipe_field.replace("|", ".")
+
+        start_js = selection.get("start")
+        end_js = selection.get("end")
+        tag = selection.get("tag")
+
+        if start_js is None or end_js is None or not tag:
+            return no_update
+
+        doc = next((d for d in tater_app.documents if d.id == doc_id), None)
+        if not doc:
+            return no_update
+
+        full_text = doc.load_content()
+        if not (0 <= start_js < end_js <= len(full_text)):
+            return no_update
+
+        raw_slice = full_text[start_js:end_js]
+        text = raw_slice.strip()
+        if not text:
+            return no_update
+
+        trim_start = raw_slice.find(text)
+        start = start_js + trim_start
+        end = start + len(text)
+
+        from tater.models.span import SpanAnnotation
+        annotation = tater_app.annotations[doc_id]
+        current_spans = value_helpers.get_model_value(annotation, field_path) or []
+
+        for existing in current_spans:
+            if start < existing.end and end > existing.start:
+                return no_update
+
+        new_spans = list(current_spans) + [SpanAnnotation(start=start, end=end, text=text, tag=tag)]
+        value_helpers.set_model_value(annotation, field_path, new_spans)
+        tater_app._save_annotations_to_file(doc_id=doc_id)
+
+        return (trigger_count or 0) + 1
+
+    # ---- Server: relay any per-item trigger → global span-any-change ----
+    # This is the first writer of span-any-change (no allow_duplicate needed).
+    @app.callback(
+        Output("span-any-change", "data"),
+        Input({"type": "span-trigger", "field": ALL}, "data"),
+        State("span-any-change", "data"),
+        prevent_initial_call=True,
+    )
+    def relay_span_triggers(all_triggers, global_count):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update
+        return (global_count or 0) + 1
+
+    # ---- Server: refresh entity-button counts on add, delete, or doc navigation ----
+    @app.callback(
+        Output({"type": "span-entity-buttons", "field": MATCH}, "children"),
+        Input({"type": "span-trigger", "field": MATCH}, "data"),
+        Input("span-any-change", "data"),
+        Input("current-doc-id", "data"),
+    )
+    def update_entity_counts(item_trigger, any_change, doc_id):
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        schema_field = field_path.split(".")[-1]
+        widget = span_by_schema_field.get(schema_field)
+        if widget is None:
+            return no_update
+        counts = {}
+        if doc_id:
+            annotation = tater_app.annotations.get(doc_id)
+            if annotation:
+                spans = value_helpers.get_model_value(annotation, field_path) or []
+                for span in spans:
+                    counts[span.tag] = counts.get(span.tag, 0) + 1
+        return widget._make_buttons(pipe_field, counts)
+
+    # ---- Server: delete span → increment global span-any-change ----
+    # Must be registered AFTER relay_span_triggers (which is the first writer).
+    @app.callback(
+        Output("span-any-change", "data", allow_duplicate=True),
+        Input("span-delete-store", "data"),
+        State("current-doc-id", "data"),
+        State("span-any-change", "data"),
+        prevent_initial_call=True,
+    )
+    def delete_span(delete_data, doc_id, global_count):
+        if not delete_data or not doc_id:
+            return no_update
+
+        pipe_field = delete_data.get("field")
+        del_start = delete_data.get("start")
+        del_end = delete_data.get("end")
+        if not pipe_field or del_start is None or del_end is None:
+            return no_update
+
+        field_path = pipe_field.replace("|", ".")
+        annotation = tater_app.annotations.get(doc_id)
+        if not annotation:
+            return no_update
+
+        current_spans = value_helpers.get_model_value(annotation, field_path) or []
+        new_spans = [s for s in current_spans if not (s.start == del_start and s.end == del_end)]
+        value_helpers.set_model_value(annotation, field_path, new_spans)
+        tater_app._save_annotations_to_file(doc_id=doc_id)
+
+        return (global_count or 0) + 1
+
+
+def _has_any_span(widgets: list) -> bool:
+    """Return True if any SpanAnnotationWidget exists at any nesting depth."""
+    from tater.widgets.span import SpanAnnotationWidget
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    for w in widgets:
+        if isinstance(w, SpanAnnotationWidget):
+            return True
+        if isinstance(w, RepeaterWidget) and _has_any_span(w.item_widgets):
+            return True
+        if isinstance(w, ContainerWidget) and hasattr(w, "children") and _has_any_span(w.children):
+            return True
+    return False
+
+
+def _collect_all_span_templates(widgets: list) -> list:
+    """Recursively collect all unique SpanAnnotationWidget templates."""
+    from tater.widgets.span import SpanAnnotationWidget
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    result = []
+    for w in widgets:
+        if isinstance(w, SpanAnnotationWidget):
+            result.append(w)
+        elif isinstance(w, RepeaterWidget):
+            result.extend(_collect_all_span_templates(w.item_widgets))
+        elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
+            result.extend(_collect_all_span_templates(w.children))
+    return result
+
+
+def _collect_span_instances(widgets: list, annotation, path_prefix: str = ""):
+    """Yield (span_widget_template, actual_field_path) for every span list in the annotation.
+
+    Traverses the widget tree, expanding repeater items based on the annotation's
+    actual list length.  Supports arbitrary nesting depth.
+    """
+    from tater.widgets.span import SpanAnnotationWidget
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    for w in widgets:
+        w_path = f"{path_prefix}.{w.schema_field}" if path_prefix else w.schema_field
+        if isinstance(w, SpanAnnotationWidget):
+            yield w, w_path
+        elif isinstance(w, RepeaterWidget):
+            n = 0
+            if annotation is not None:
+                lst = value_helpers.get_model_value(annotation, w_path)
+                n = len(lst) if isinstance(lst, list) else 0
+            for i in range(n):
+                yield from _collect_span_instances(w.item_widgets, annotation, f"{w_path}.{i}")
+        elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
+            yield from _collect_span_instances(w.children, annotation, w_path)
+
+
 def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidget]:
     """Recursively collect all ControlWidget instances (non-containers).
 
@@ -670,43 +862,32 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
     return doc_id, timing_data
 
 
-def _render_document_content(
-    text: str, doc_id: str, span_widgets: list, tater_app, list_span_pairs: list = ()
-) -> list | str:
+def _render_document_content(text: str, doc_id: str, tater_app) -> list | str:
     """
     Return Dash component children for the document viewer.
 
     When no SpanAnnotationWidgets are present, returns the raw text string.
     Otherwise builds a list of strings and highlighted html.Mark components.
 
-    ``list_span_pairs`` is a list of (span_widget, outer_field, span_field, ld)
-    tuples for span widgets nested inside RepeaterWidgets.
+    Each mark's ``data-field`` is the full pipe-encoded field path
+    (e.g. ``"findings|0|spans"``), which the JS uses for delete routing
+    and active-entity tracking.
     """
-    if not span_widgets and not list_span_pairs or not doc_id:
+    if not doc_id or not _has_any_span(tater_app.widgets):
         return text
 
     annotation = tater_app.annotations.get(doc_id)
 
-    # Collect (span, widget_cid, color, item_index_or_minus1) for all spans
-    # item_index == -1 means top-level (not inside a list)
+    # Collect (span, pipe_field, color) for all span instances in the annotation
     all_spans = []
-
-    for widget in span_widgets:
-        if annotation:
-            spans = value_helpers.get_model_value(annotation, widget.field_path) or []
-            for span in spans:
-                color = widget.get_color_for_tag(span.tag)
-                all_spans.append((span, widget.component_id, color, -1))
-
-    for span_widget, outer_field, span_field, _ld in list_span_pairs:
-        if annotation:
-            outer_list = value_helpers.get_model_value(annotation, outer_field) or []
-            for item_index in range(len(outer_list)):
-                item_field_path = f"{outer_field}.{item_index}.{span_field}"
-                spans = value_helpers.get_model_value(annotation, item_field_path) or []
-                for span in spans:
-                    color = span_widget.get_color_for_tag(span.tag)
-                    all_spans.append((span, span_widget.component_id, color, item_index))
+    for widget_template, field_path in _collect_span_instances(tater_app.widgets, annotation):
+        if annotation is None:
+            continue
+        spans = value_helpers.get_model_value(annotation, field_path) or []
+        pipe_field = field_path.replace(".", "|")
+        for span in spans:
+            color = widget_template.get_color_for_tag(span.tag)
+            all_spans.append((span, pipe_field, color))
 
     if not all_spans:
         return text
@@ -716,27 +897,23 @@ def _render_document_content(
 
     components = []
     pos = 0
-    for span, widget_cid, color, item_index in all_spans:
+    for span, pipe_field, color in all_spans:
         if span.start < pos:
             continue  # overlapping — skip
         if span.start > pos:
             components.append(text[pos:span.start])
 
-        mark_props = {
-            "data-tag": span.tag,
-            "data-start": str(span.start),
-            "data-end": str(span.end),
-            "data-field": widget_cid,
-            "data-color": color,
-        }
-        if item_index >= 0:
-            mark_props["data-index"] = str(item_index)
-
         components.append(
             html.Mark(
                 span.text,
                 style={"backgroundColor": color, "padding": "1px 0"},
-                **mark_props,
+                **{
+                    "data-tag": span.tag,
+                    "data-start": str(span.start),
+                    "data-end": str(span.end),
+                    "data-field": pipe_field,
+                    "data-color": color,
+                },
             )
         )
         pos = span.end
