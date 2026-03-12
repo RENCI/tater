@@ -781,7 +781,7 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
             prevent_initial_call=True,
         )
         def relay_repeater_changes(all_changes, global_count):
-            if not ctx.triggered or not ctx.triggered[0].get("value"):
+            if not ctx.triggered or not any(t.get("value") for t in ctx.triggered):
                 return no_update
             return (global_count or 0) + 1
 

@@ -76,7 +76,7 @@ class RepeaterWidget(ContainerWidget):
             if not widget.renders_own_label:
                 items.append(dmc.Text(widget.label, fw=500, size="sm"))
             items.append(comp)
-            if widget.description:
+            if widget.description and not widget.renders_own_label:
                 items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
             rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
         return rendered
