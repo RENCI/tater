@@ -73,6 +73,7 @@ class RepeaterWidget(ContainerWidget):
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.span import SpanAnnotationWidget
+        from tater.widgets.group import GroupWidget
         rendered = []
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
@@ -116,13 +117,29 @@ class RepeaterWidget(ContainerWidget):
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
                 continue
 
+            # GroupWidget: propagate repeater context to children so their
+            # schema_ids use MATCH-compatible ld/path/tf keys, then render normally.
+            if isinstance(template, GroupWidget):
+                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
+                rendered.append(widget.render_field(mt="sm"))
+                continue
+
+            # Set repeater context on ControlWidget so schema_id uses MATCH-
+            # compatible ld/path keys instead of the full pipe-encoded path.
+            if isinstance(template, ControlWidget):
+                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
+
             items = []
             if not widget.renders_own_label:
                 items.append(dmc.Text(widget.label, fw=500, size="sm"))
             items.append(widget.component())
             if widget.description:
                 items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-            rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+            stack = dmc.Stack(items, gap="xs", mt="sm")
+            if widget._condition is not None:
+                rendered.append(html.Div(stack, id=widget.conditional_wrapper_id))
+            else:
+                rendered.append(stack)
         return rendered
 
     # ------------------------------------------------------------------
@@ -291,6 +308,9 @@ class RepeaterWidget(ContainerWidget):
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             from tater.widgets.span import SpanAnnotationWidget
+            from tater.widgets.group import GroupWidget
+            # ld for MATCH-based conditional callbacks: pipe-encoded outer list field.
+            repeater_ld = self.field_path.replace(".", "|")
             for item_widget_template in self.item_widgets:
                 if isinstance(item_widget_template, HierarchicalLabelWidget):
                     ld = f"{self.field_path}-{item_widget_template.schema_field}"
@@ -307,6 +327,15 @@ class RepeaterWidget(ContainerWidget):
                     item_widget_template.register_list_callbacks(
                         app, ld, [self.field_path, item_widget_template.schema_field]
                     )
+                elif isinstance(item_widget_template, GroupWidget):
+                    item_widget_template._register_repeater_conditional_callbacks(
+                        app, repeater_ld
+                    )
+                elif isinstance(item_widget_template, ControlWidget):
+                    if item_widget_template._condition is not None:
+                        item_widget_template._register_repeater_conditional_callbacks(
+                            app, repeater_ld, self.item_widgets
+                        )
 
     # ------------------------------------------------------------------
     # Nested (repeater-inside-repeater) support (shared)
@@ -375,6 +404,7 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+        from tater.widgets.group import GroupWidget
         rendered = []
         for template in self.item_widgets:
             if isinstance(template, HierarchicalLabelWidget):
@@ -396,17 +426,29 @@ class RepeaterWidget(ContainerWidget):
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
                 continue
+            nested_ld = f"{outer_list_field}|{item_field}"
+            nested_path = f"{outer_li}.{inner_index}"
+            parent_path = f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
+
+            if isinstance(template, GroupWidget):
+                widget = copy.deepcopy(template)
+                widget._finalize_paths(parent_path=parent_path)
+                widget._set_repeater_context(nested_ld, nested_path)
+                rendered.append(widget.render_field(mt="sm"))
+                continue
+
             if not isinstance(template, ControlWidget):
                 continue
             widget = copy.deepcopy(template)
-            widget._finalize_paths(
-                parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
-            )
+            widget._finalize_paths(parent_path=parent_path)
             if tater_app and doc_id and doc_id in tater_app.annotations:
                 annotation = tater_app.annotations[doc_id]
                 value = tater_app._get_model_value(annotation, widget.field_path)
                 if value is not None:
                     widget.default = value
+
+            # Set repeater context for MATCH-based callbacks (2-level nesting).
+            widget._set_repeater_context(nested_ld, nested_path)
 
             comp = widget.component()
 
@@ -416,7 +458,11 @@ class RepeaterWidget(ContainerWidget):
             items.append(comp)
             if widget.description:
                 items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-            rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+            stack = dmc.Stack(items, gap="xs", mt="sm")
+            if widget._condition is not None:
+                rendered.append(html.Div(stack, id=widget.conditional_wrapper_id))
+            else:
+                rendered.append(stack)
         return rendered
 
     def _render_nested_items(
@@ -548,6 +594,10 @@ class RepeaterWidget(ContainerWidget):
 
         if tater_app:
             from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+            from tater.widgets.group import GroupWidget
+            # ld for ControlWidget conditional callbacks: pipe-join the list fields
+            # (field_segments without the last element which is the inner list field).
+            nested_ld = "|".join(field_segments)
             for iw_template in item_widget_templates:
                 child_segments = field_segments + [iw_template.schema_field]
                 child_ld = "-".join(child_segments)
@@ -555,6 +605,13 @@ class RepeaterWidget(ContainerWidget):
                     iw_template.register_repeater_callbacks(app, child_ld, child_segments)
                 elif isinstance(iw_template, RepeaterWidget):
                     iw_template.register_list_callbacks(app, child_ld, child_segments)
+                elif isinstance(iw_template, GroupWidget):
+                    iw_template._register_repeater_conditional_callbacks(app, nested_ld)
+                elif isinstance(iw_template, ControlWidget):
+                    if iw_template._condition is not None:
+                        iw_template._register_repeater_conditional_callbacks(
+                            app, nested_ld, item_widget_templates
+                        )
 
     # ------------------------------------------------------------------
     # Schema binding (shared)
@@ -572,6 +629,9 @@ class RepeaterWidget(ContainerWidget):
             )
         item_type = typing.get_args(inner)[0]
         for item_widget in self.item_widgets:
+            # Pre-finalize so GroupWidget children get item-relative field_path
+            # values (e.g. "booleans.is_indoor") before bind_schema traverses them.
+            item_widget._finalize_paths()
             item_widget.bind_schema(item_type)
 
     def to_python_type(self) -> type:

@@ -424,7 +424,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
-        Input({"type": "tater-control", "field": ALL}, "value"),
+        Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
         prevent_initial_call=True,
@@ -432,7 +432,8 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     def capture_values(all_values, doc_id, advance_count):
         if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
+        tid = ctx.triggered_id
+        field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
         value = ctx.triggered[0]["value"]
         if value == "":
             value = None
@@ -452,7 +453,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
-        Input({"type": "tater-bool-control", "field": ALL}, "checked"),
+        Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
         prevent_initial_call=True,
@@ -460,7 +461,8 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     def capture_checked(all_values, doc_id, advance_count):
         if not doc_id or not ctx.triggered_id:
             return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
+        tid = ctx.triggered_id
+        field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
         value = ctx.triggered[0]["value"]
         annotation = tater_app.annotations.get(doc_id)
         if annotation is None:
@@ -476,16 +478,16 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
 
     # --- Load: value prop --- push annotation values to widgets on doc change
     @app.callback(
-        Output({"type": "tater-control", "field": ALL}, "value"),
+        Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-control", "field": ALL}, "id"),
+        State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         prevent_initial_call="initial_duplicate",
     )
     def load_values(doc_id, all_ids):
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         result = []
         for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
+            field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
             v = value_helpers.get_model_value(annotation, field) if annotation else None
             if v is None:
                 v = empty_value_lookup.get(field.split(".")[-1])
@@ -494,19 +496,44 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
 
     # --- Load: checked prop ---
     @app.callback(
-        Output({"type": "tater-bool-control", "field": ALL}, "checked"),
+        Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-bool-control", "field": ALL}, "id"),
+        State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         prevent_initial_call="initial_duplicate",
     )
     def load_checked(doc_id, all_ids):
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         result = []
         for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
+            field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
             v = value_helpers.get_model_value(annotation, field) if annotation else None
             result.append(bool(v) if v is not None else False)
         return result
+
+
+def _decode_field_path(ld: str, path: str, tf: str) -> str:
+    """Reconstruct a dot-notation field path from schema_id components.
+
+    For standalone widgets (``ld == ""``), ``tf`` holds the full pipe-encoded
+    path and is simply decoded.
+
+    For repeater items, ``ld`` is the pipe-joined list-field path
+    (e.g. ``"pets"`` or ``"findings|annotations"``), ``path`` is the
+    dot-joined index chain (e.g. ``"0"`` or ``"0.2"``), and ``tf`` is the
+    widget's schema_field within the item (e.g. ``"kind"``).  The three parts
+    are interleaved to reconstruct the full path.
+    """
+    if not ld:
+        return tf.replace("|", ".")
+    list_fields = ld.split("|")
+    indices = path.split(".")
+    parts: list[str] = []
+    for seg, idx in zip(list_fields, indices):
+        parts.extend([seg, idx])
+    # tf may itself be pipe-encoded when the widget is a GroupWidget child
+    # (e.g. "booleans|is_indoor" → "booleans.is_indoor").
+    parts.append(tf.replace("|", "."))
+    return ".".join(parts)
 
 
 def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidget]:
