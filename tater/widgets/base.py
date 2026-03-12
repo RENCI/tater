@@ -81,6 +81,7 @@ class TaterWidget:
         if isinstance(controlling_field, (list, tuple)):
             controlling_field = ".".join(controlling_field)
         self._condition = (controlling_field, value)
+        print(f"[TATER:create] {type(self).__name__}({self.schema_field!r}).conditional_on({controlling_field!r}, {value!r})")
         return self
 
     @property
@@ -89,6 +90,7 @@ class TaterWidget:
 
     def _finalize_paths(self, parent_path: str = "") -> None:
         self._full_path = f"{parent_path}.{self.schema_field}" if parent_path else self.schema_field
+        print(f"[TATER:create] _finalize_paths: {type(self).__name__}({self.schema_field!r}) → field_path={self._full_path!r}")
 
     def bind_schema(self, model: type) -> None:
         """Validate against the schema model and derive any missing config. No-op by default."""
@@ -162,6 +164,7 @@ class TaterWidget:
         """
         if self._condition is None:
             return
+        print(f"[TATER:register] _register_conditional_callbacks: {type(self).__name__}({self.field_path!r}) controlling={self._condition[0]!r} when={self._condition[1]!r}")
         from dash import Output, Input, no_update
 
         controlling_field, target_value = self._condition
@@ -182,6 +185,8 @@ class TaterWidget:
         else:
             target_js = f'"{target_value}"'
 
+        print(f"[TATER:register]   controlling_schema_id={controlling_schema_id!r} prop={controlling_prop!r}")
+        print(f"[TATER:register]   wrapper_id={self.conditional_wrapper_id!r} self_schema_id={self.schema_id!r}")
         # Clientside: toggle display instantly without a server round-trip.
         app.clientside_callback(
             f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
@@ -203,7 +208,9 @@ class TaterWidget:
         )
         def _clear_when_hidden(v):
             if v != _target:
+                print(f"[TATER:fire] _clear_when_hidden: controlling={v!r} != target={_target!r} → clearing {_schema_id} {_value_prop}={_empty!r}")
                 return _empty
+            print(f"[TATER:fire] _clear_when_hidden: controlling={v!r} == target={_target!r} → no_update")
             return no_update
 
     def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:

@@ -73,6 +73,7 @@ class RepeaterWidget(ContainerWidget):
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.span import SpanAnnotationWidget
+        print(f"[TATER:render] {type(self).__name__}._render_item_widgets: field={self.field_path!r} index={index} doc={doc_id!r}")
         rendered = []
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
@@ -182,6 +183,7 @@ class RepeaterWidget(ContainerWidget):
         from pydantic import BaseModel
 
         tater_app = getattr(app, "_tater_app", None)
+        print(f"[TATER:register] {type(self).__name__}.register_callbacks: field={self.field_path!r} store={self._store_id()!r}")
 
         add_id = self._add_id()
         items_id = self._items_id()
@@ -571,6 +573,7 @@ class RepeaterWidget(ContainerWidget):
                 f"Field '{self.field_path}' has type {inner!r}, but {type(self).__name__} requires a list field."
             )
         item_type = typing.get_args(inner)[0]
+        print(f"[TATER:create] {type(self).__name__}.bind_schema: field={self.field_path!r} item_type={item_type.__name__} templates={[w.schema_field for w in self.item_widgets]}")
         for item_widget in self.item_widgets:
             item_widget.bind_schema(item_type)
 
