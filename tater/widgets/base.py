@@ -43,6 +43,55 @@ def _resolve_field_info(model: type, field_path: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# Shared callback helper
+# ---------------------------------------------------------------------------
+
+def _build_conditional_callbacks(
+    app: Any,
+    target_value: Any,
+    *,
+    wrapper_id: Any,
+    controlling_id: Any,
+    controlling_prop: str,
+    self_id: Any,
+    value_prop: str,
+    empty_value: Any,
+) -> None:
+    """Register the clientside visibility toggle and server-side value-clear callbacks.
+
+    Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
+    dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
+    MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
+    """
+    from dash import Output, Input, no_update
+
+    if isinstance(target_value, bool):
+        target_js = "true" if target_value else "false"
+    else:
+        target_js = f'"{target_value}"'
+
+    app.clientside_callback(
+        f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
+        Output(wrapper_id, "style"),
+        Input(controlling_id, controlling_prop),
+        prevent_initial_call=False,
+    )
+
+    _empty = empty_value
+    _target = target_value
+
+    @app.callback(
+        Output(self_id, value_prop, allow_duplicate=True),
+        Input(controlling_id, controlling_prop),
+        prevent_initial_call=True,
+    )
+    def _clear_when_hidden(v):
+        if v != _target:
+            return _empty
+        return no_update
+
+
+# ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
 
@@ -200,36 +249,15 @@ class TaterWidget:
                 "tf": controlling_field.replace(".", "|"),
             }
 
-        # Serialize target_value for JavaScript comparison.
-        # For booleans: use true/false; for strings: use quoted "value".
-        if isinstance(target_value, bool):
-            target_js = "true" if target_value else "false"
-        else:
-            target_js = f'"{target_value}"'
-
-        # Clientside: toggle display instantly without a server round-trip.
-        app.clientside_callback(
-            f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
-            Output(self.conditional_wrapper_id, "style"),
-            Input(controlling_schema_id, controlling_prop),
-            prevent_initial_call=False,
+        _build_conditional_callbacks(
+            app, target_value,
+            wrapper_id=self.conditional_wrapper_id,
+            controlling_id=controlling_schema_id,
+            controlling_prop=controlling_prop,
+            self_id=self.schema_id,
+            value_prop=self.value_prop,
+            empty_value=self.empty_value,
         )
-
-        # Server: clear value when widget is hidden so stale data is not saved.
-        _empty = self.empty_value
-        _value_prop = self.value_prop
-        _target = target_value
-        _schema_id = self.schema_id
-
-        @app.callback(
-            Output(_schema_id, _value_prop, allow_duplicate=True),
-            Input(controlling_schema_id, controlling_prop),
-            prevent_initial_call=True,
-        )
-        def _clear_when_hidden(v):
-            if v != _target:
-                return _empty
-            return no_update
 
     def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
         """Look up the controlling widget and its value property.
@@ -345,7 +373,7 @@ class ControlWidget(TaterWidget):
         """
         if self._condition is None:
             return
-        from dash import Output, Input, no_update, MATCH
+        from dash import MATCH
 
         controlling_field, target_value = self._condition
 
@@ -364,40 +392,25 @@ class ControlWidget(TaterWidget):
         controlling_type = "tater-bool-control" if is_bool else "tater-control"
         controlling_prop = "checked" if is_bool else "value"
 
-        if isinstance(target_value, bool):
-            target_js = "true" if target_value else "false"
-        else:
-            target_js = f'"{target_value}"'
-
         # Use _item_relative_tf so group children encode their group prefix
         # (e.g. "booleans|is_indoor") matching what the rendered components emit.
         self_tf = self._item_relative_tf
         controlling_tf = controlling_widget._item_relative_tf
         self_type = self.schema_id["type"]
-        _value_prop = self.value_prop
-        _empty = self.empty_value
-        _target = target_value
 
         wrapper_match_id = {"type": "tater-cond-wrapper", "ld": ld, "path": MATCH, "tf": self_tf}
         controlling_match_id = {"type": controlling_type, "ld": ld, "path": MATCH, "tf": controlling_tf}
         self_match_id = {"type": self_type, "ld": ld, "path": MATCH, "tf": self_tf}
 
-        app.clientside_callback(
-            f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
-            Output(wrapper_match_id, "style"),
-            Input(controlling_match_id, controlling_prop),
-            prevent_initial_call=False,
+        _build_conditional_callbacks(
+            app, target_value,
+            wrapper_id=wrapper_match_id,
+            controlling_id=controlling_match_id,
+            controlling_prop=controlling_prop,
+            self_id=self_match_id,
+            value_prop=self.value_prop,
+            empty_value=self.empty_value,
         )
-
-        @app.callback(
-            Output(self_match_id, _value_prop, allow_duplicate=True),
-            Input(controlling_match_id, controlling_prop),
-            prevent_initial_call=True,
-        )
-        def _clear_when_hidden_repeater(v):
-            if v != _target:
-                return _empty
-            return no_update
 
 
 # ---------------------------------------------------------------------------

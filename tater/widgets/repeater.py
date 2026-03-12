@@ -30,6 +30,26 @@ _NESTED_STORE_TYPE = "listable-store-list"
 _NESTED_ITEMS_TYPE = "listable-items-list"
 
 
+def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str) -> None:
+    """Recursively set annotation values as widget defaults for ControlWidget descendants.
+
+    Called before rendering a GroupWidget inside a repeater so components are
+    initialised with the stored value instead of schema defaults, avoiding a
+    visible flash of incorrect values before the load_values/load_checked
+    callbacks fire.
+    """
+    from tater.widgets.group import GroupWidget
+    if isinstance(widget, GroupWidget):
+        for child in widget.children:
+            _load_defaults_from_annotation(child, tater_app, doc_id)
+    elif isinstance(widget, ControlWidget):
+        if tater_app and doc_id and doc_id in tater_app.annotations:
+            annotation = tater_app.annotations[doc_id]
+            value = tater_app._get_model_value(annotation, widget.field_path)
+            if value is not None:
+                widget.default = value
+
+
 # ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
@@ -121,6 +141,7 @@ class RepeaterWidget(ContainerWidget):
             # schema_ids use MATCH-compatible ld/path/tf keys, then render normally.
             if isinstance(template, GroupWidget):
                 widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
+                _load_defaults_from_annotation(widget, tater_app, doc_id)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
@@ -434,6 +455,7 @@ class RepeaterWidget(ContainerWidget):
                 widget = copy.deepcopy(template)
                 widget._finalize_paths(parent_path=parent_path)
                 widget._set_repeater_context(nested_ld, nested_path)
+                _load_defaults_from_annotation(widget, tater_app, doc_id)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
