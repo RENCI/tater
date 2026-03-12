@@ -412,11 +412,14 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         if w.auto_advance
     }
 
-    # Build empty_value lookup keyed by schema_field (last path segment).
-    # Used by load callbacks to return widget-appropriate defaults instead of None.
-    # Keying by last segment handles list-item widgets (e.g. "pets.0.weight" → "weight").
+    # Build empty_value lookup keyed by the template's pipe-encoded field_path.
+    # This matches the ``tf`` component of each widget's schema_id, so the load
+    # callbacks can look up the correct empty_value with ``wid["tf"]`` directly.
+    # Keying by tf (e.g. "booleans|is_indoor" for a GroupWidget child) avoids
+    # the collision that would arise from keying by the bare schema_field when
+    # multiple sub-models have fields with the same name.
     empty_value_lookup = {
-        w.schema_field: w.empty_value
+        w.field_path.replace(".", "|"): w.empty_value
         for w in _collect_all_control_templates(tater_app.widgets)
     }
 
@@ -424,89 +427,124 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
-        Input({"type": "tater-control", "field": ALL}, "value"),
+        Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
         prevent_initial_call=True,
     )
     def capture_values(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered_id:
-            return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
-        value = ctx.triggered[0]["value"]
-        if value == "":
-            value = None
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return no_update, no_update
-        old_value = value_helpers.get_model_value(annotation, field_path)
-        value_helpers.set_model_value(annotation, field_path, value)
-        update_status_for_doc(tater_app, doc_id)
-        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-        if field_path in auto_advance_fields:
-            if value != old_value and value is not None:
-                return status, (advance_count or 0) + 1
-        return status, no_update
+        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields, convert_empty_str=True)
 
     # --- Capture: checked prop (BooleanWidgets) ---
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
-        Input({"type": "tater-bool-control", "field": ALL}, "checked"),
+        Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
         prevent_initial_call=True,
     )
     def capture_checked(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered_id:
-            return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
-        value = ctx.triggered[0]["value"]
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return no_update, no_update
-        old_value = value_helpers.get_model_value(annotation, field_path)
-        value_helpers.set_model_value(annotation, field_path, value)
-        update_status_for_doc(tater_app, doc_id)
-        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-        if field_path in auto_advance_fields:
-            if value != old_value:
-                return status, (advance_count or 0) + 1
-        return status, no_update
+        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields, advance_requires_value=False)
 
     # --- Load: value prop --- push annotation values to widgets on doc change
     @app.callback(
-        Output({"type": "tater-control", "field": ALL}, "value"),
+        Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-control", "field": ALL}, "id"),
+        State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         prevent_initial_call="initial_duplicate",
     )
     def load_values(doc_id, all_ids):
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        result = []
-        for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
-            v = value_helpers.get_model_value(annotation, field) if annotation else None
-            if v is None:
-                v = empty_value_lookup.get(field.split(".")[-1])
-            result.append(v)
-        return result
+        return _do_load(doc_id, all_ids, tater_app, empty_value_lookup)
 
     # --- Load: checked prop ---
     @app.callback(
-        Output({"type": "tater-bool-control", "field": ALL}, "checked"),
+        Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-bool-control", "field": ALL}, "id"),
+        State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         prevent_initial_call="initial_duplicate",
     )
     def load_checked(doc_id, all_ids):
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        result = []
-        for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
-            v = value_helpers.get_model_value(annotation, field) if annotation else None
-            result.append(bool(v) if v is not None else False)
-        return result
+        return _do_load(doc_id, all_ids, tater_app, empty_value_lookup, as_bool=True)
+
+
+def _do_capture(
+    doc_id: str,
+    advance_count,
+    tater_app,
+    auto_advance_fields: set,
+    convert_empty_str: bool = False,
+    advance_requires_value: bool = True,
+):
+    """Shared body for capture_values and capture_checked.
+
+    ``convert_empty_str`` normalises empty strings to None (needed for text
+    widgets where Dash reports ``""`` when the user clears a field).
+
+    ``advance_requires_value`` keeps the auto-advance guard ``value is not None``
+    used for non-boolean widgets; pass ``False`` for boolean widgets where a
+    toggle back to ``False`` should also trigger auto-advance.
+    """
+    if not doc_id or not ctx.triggered_id:
+        return no_update, no_update
+    tid = ctx.triggered_id
+    field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
+    value = ctx.triggered[0]["value"]
+    if convert_empty_str and value == "":
+        value = None
+    annotation = tater_app.annotations.get(doc_id)
+    if annotation is None:
+        return no_update, no_update
+    old_value = value_helpers.get_model_value(annotation, field_path)
+    value_helpers.set_model_value(annotation, field_path, value)
+    update_status_for_doc(tater_app, doc_id)
+    status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+    if field_path in auto_advance_fields:
+        changed = value != old_value
+        if changed and (not advance_requires_value or value is not None):
+            return status, (advance_count or 0) + 1
+    return status, no_update
+
+
+def _do_load(doc_id: str, all_ids: list, tater_app, empty_value_lookup: dict, as_bool: bool = False) -> list:
+    """Shared body for load_values and load_checked.
+
+    ``as_bool`` wraps each value in ``bool()`` (needed for boolean widgets).
+    """
+    annotation = tater_app.annotations.get(doc_id) if doc_id else None
+    result = []
+    for wid in (all_ids or []):
+        field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
+        v = value_helpers.get_model_value(annotation, field) if annotation else None
+        if v is None:
+            v = empty_value_lookup.get(wid["tf"])
+        result.append(bool(v) if (as_bool and v is not None) else (False if as_bool else v))
+    return result
+
+
+def _decode_field_path(ld: str, path: str, tf: str) -> str:
+    """Reconstruct a dot-notation field path from schema_id components.
+
+    For standalone widgets (``ld == ""``), ``tf`` holds the full pipe-encoded
+    path and is simply decoded.
+
+    For repeater items, ``ld`` is the pipe-joined list-field path
+    (e.g. ``"pets"`` or ``"findings|annotations"``), ``path`` is the
+    dot-joined index chain (e.g. ``"0"`` or ``"0.2"``), and ``tf`` is the
+    widget's schema_field within the item (e.g. ``"kind"``).  The three parts
+    are interleaved to reconstruct the full path.
+    """
+    if not ld:
+        return tf.replace("|", ".")
+    list_fields = ld.split("|")
+    indices = path.split(".")
+    parts: list[str] = []
+    for seg, idx in zip(list_fields, indices):
+        parts.extend([seg, idx])
+    # tf may itself be pipe-encoded when the widget is a GroupWidget child
+    # (e.g. "booleans|is_indoor" → "booleans.is_indoor").
+    parts.append(tf.replace("|", "."))
+    return ".".join(parts)
 
 
 def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidget]:

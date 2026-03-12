@@ -16,6 +16,18 @@ class GroupWidget(ContainerWidget):
         for child in self.children:
             child._finalize_paths(self.field_path)
 
+    def _set_repeater_context(self, ld: str, path: str) -> None:
+        """Propagate repeater context to all children."""
+        for child in self.children:
+            child._set_repeater_context(ld, path)
+
+    def _register_repeater_conditional_callbacks(self, app, ld: str) -> None:
+        """Register MATCH-based conditional callbacks for children inside a repeater."""
+        from .base import ControlWidget
+        for child in self.children:
+            if isinstance(child, ControlWidget) and child._condition is not None:
+                child._register_repeater_conditional_callbacks(app, ld, self.children)
+
     def component(self) -> dmc.Card:
         child_components = [child.render_field(mt="sm") for child in self.children]
         return dmc.Card([
