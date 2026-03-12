@@ -179,6 +179,7 @@ class TaterApp:
         self._setup_callbacks()
         self._setup_value_capture_callbacks()
         self._setup_span_callbacks()
+        self._setup_repeater_callbacks()
         print(f"[TATER:register] --- All callbacks registered ---")
 
     def _setup_layout(self) -> None:
@@ -274,6 +275,10 @@ class TaterApp:
     def _setup_span_callbacks(self) -> None:
         """Setup unified span annotation callbacks."""
         callbacks.setup_span_callbacks(self)
+
+    def _setup_repeater_callbacks(self) -> None:
+        """Setup unified MATCH-based repeater callbacks."""
+        callbacks.setup_repeater_callbacks(self)
 
     def _collect_value_capture_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
         """

@@ -1,13 +1,14 @@
 """Dash callback registrations for TaterApp."""
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 import json
 import time
 from datetime import datetime
 
-from dash import Input, Output, State, ALL, ctx, no_update, html
+from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from tater.ui import value_helpers
@@ -653,6 +654,191 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         tater_app._save_annotations_to_file(doc_id=doc_id)
 
         return (global_count or 0) + 1
+
+
+def setup_repeater_callbacks(tater_app: TaterApp) -> None:
+    """Register a single MATCH callback handling all repeaters at every nesting depth.
+
+    Also registers HierarchicalLabel repeater callbacks (which need per-ld registration)
+    and, when any SpanAnnotationWidget is present, a relay that increments
+    span-any-change whenever a list item is deleted so the doc viewer re-renders.
+    """
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget, ControlWidget
+    from dash.exceptions import PreventUpdate
+
+    if not any(isinstance(w, RepeaterWidget) for w in tater_app._all_widgets):
+        return
+
+    app = tater_app.app
+
+    # --- Register HierarchicalLabel callbacks for all HL items inside repeaters ---
+    for hl_widget, ld, field_segments in _collect_hl_in_repeaters(tater_app.widgets):
+        hl_widget.register_repeater_callbacks(app, ld, field_segments)
+
+    # --- Annotation sync helpers ---
+    def _sync_annotation_add(widget_template, field_path, doc_id, new_index):
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation is None:
+            return
+        extended = False
+        for iw in widget_template.item_widgets:
+            if isinstance(iw, ContainerWidget):
+                extended = True
+                continue
+            if not isinstance(iw, ControlWidget):
+                continue
+            try:
+                tater_app._set_model_value(
+                    annotation,
+                    f"{field_path}.{new_index}.{iw.schema_field}",
+                    iw.empty_value,
+                )
+                extended = True
+            except Exception:
+                pass
+        if not extended:
+            try:
+                tater_app._set_model_value(annotation, f"{field_path}.{new_index}", None)
+            except Exception:
+                pass
+        tater_app._save_annotations_to_file(doc_id=doc_id)
+
+    def _sync_annotation_delete(field_path, doc_id, del_position):
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation is None:
+            return
+        current_list = value_helpers.get_model_value(annotation, field_path)
+        if isinstance(current_list, list) and del_position < len(current_list):
+            current_list.pop(del_position)
+        tater_app._save_annotations_to_file(doc_id=doc_id)
+
+    # --- Unified MATCH callback ---
+    @app.callback(
+        [Output({"type": "repeater-store",  "field": MATCH}, "data"),
+         Output({"type": "repeater-items",  "field": MATCH}, "children"),
+         Output({"type": "repeater-change", "field": MATCH}, "data")],
+        [Input({"type": "repeater-add",    "field": MATCH}, "n_clicks"),
+         Input({"type": "repeater-delete", "field": MATCH, "index": ALL}, "n_clicks"),
+         Input("current-doc-id", "data")],
+        [State({"type": "repeater-store",  "field": MATCH}, "data"),
+         State({"type": "repeater-change", "field": MATCH}, "data")],
+    )
+    def update_repeater(add_clicks, delete_clicks, doc_id, store_data, change_count):
+        pipe_field = ctx.outputs_list[0]["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+
+        # Find the template and finalize its field_path for rendering.
+        template = _find_repeater_template(tater_app.widgets, field_path)
+        if template is None:
+            raise PreventUpdate
+        widget = copy.deepcopy(template)
+        parts = field_path.rsplit(".", 1)
+        widget._finalize_paths(parent_path=parts[0] if len(parts) > 1 else "")
+
+        # Doc navigation / initial load: reload indices from annotation.
+        if not ctx.triggered_id or ctx.triggered_id == "current-doc-id":
+            indices = []
+            if doc_id:
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation is not None:
+                    lst = value_helpers.get_model_value(annotation, field_path)
+                    if isinstance(lst, list):
+                        indices = list(range(len(lst)))
+            store_data = {"indices": indices, "next_index": len(indices)}
+            return store_data, widget._render_items(indices, tater_app, doc_id), no_update
+
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            raise PreventUpdate
+
+        if store_data is None:
+            store_data = {"indices": [], "next_index": 0}
+
+        indices = list(store_data.get("indices", []))
+        active_value = None
+        is_delete = False
+
+        if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-add":
+            new_index = len(indices)
+            indices = list(range(new_index + 1))
+            active_value = str(new_index)
+            if doc_id and doc_id in tater_app.annotations:
+                _sync_annotation_add(widget, field_path, doc_id, new_index)
+
+        elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-delete":
+            delete_index = ctx.triggered_id.get("index")
+            if delete_index in indices:
+                del_position = indices.index(delete_index)
+                if doc_id and doc_id in tater_app.annotations:
+                    _sync_annotation_delete(field_path, doc_id, del_position)
+                indices = list(range(len(indices) - 1))
+                active_value = str(indices[0]) if indices else None
+                is_delete = True
+
+        new_data = {"indices": indices, "next_index": len(indices)}
+        new_change = (change_count or 0) + 1 if is_delete else no_update
+        return new_data, widget._render_items(indices, tater_app, doc_id, active_value=active_value), new_change
+
+    # --- Relay repeater deletes → span-any-change so doc viewer re-renders ---
+    if _has_any_span(tater_app.widgets):
+        @app.callback(
+            Output("span-any-change", "data", allow_duplicate=True),
+            Input({"type": "repeater-change", "field": ALL}, "data"),
+            State("span-any-change", "data"),
+            prevent_initial_call=True,
+        )
+        def relay_repeater_changes(all_changes, global_count):
+            if not ctx.triggered or not ctx.triggered[0].get("value"):
+                return no_update
+            return (global_count or 0) + 1
+
+
+def _find_repeater_template(widgets: list, field_path: str):
+    """Find the RepeaterWidget template for a (possibly nested) field path.
+
+    Strips numeric segments so ``"findings.0.annotations"`` resolves the same
+    template as ``"findings.annotations"``.
+    """
+    segments = [s for s in field_path.split(".") if not s.isdigit()]
+    return _find_by_segments(widgets, segments)
+
+
+def _find_by_segments(widgets: list, segments: list):
+    from tater.widgets.repeater import RepeaterWidget
+    if not segments:
+        return None
+    for w in widgets:
+        if w.schema_field == segments[0]:
+            if len(segments) == 1:
+                return w if isinstance(w, RepeaterWidget) else None
+            if isinstance(w, RepeaterWidget):
+                return _find_by_segments(w.item_widgets, segments[1:])
+    return None
+
+
+def _collect_hl_in_repeaters(widgets: list, field_segments: list | None = None):
+    """Yield (hl_widget, ld, field_segments) for every HierarchicalLabel inside a repeater.
+
+    ``ld`` is the dash-joined schema-field path used as the MATCH discriminator in
+    ``register_repeater_callbacks``; ``field_segments`` is the list of field names
+    from the outermost list down to the HL widget.
+    """
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+    from tater.widgets.base import ContainerWidget
+    if field_segments is None:
+        field_segments = []
+    for w in widgets:
+        if isinstance(w, RepeaterWidget):
+            outer_segments = field_segments + [w.schema_field]
+            for item_w in w.item_widgets:
+                if isinstance(item_w, HierarchicalLabelWidget):
+                    segs = outer_segments + [item_w.schema_field]
+                    yield item_w, "-".join(segs), segs
+                elif isinstance(item_w, RepeaterWidget):
+                    yield from _collect_hl_in_repeaters([item_w], outer_segments)
+        elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
+            yield from _collect_hl_in_repeaters(w.children, field_segments)
 
 
 def _has_any_span(widgets: list) -> bool:
