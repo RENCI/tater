@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import json
 import time
@@ -396,15 +396,64 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         if w.auto_advance
     }
 
-    # Build empty_value lookup keyed by schema_field (last path segment).
-    # Used by load callbacks to return widget-appropriate defaults instead of None.
-    # Keying by last segment handles list-item widgets (e.g. "pets.0.weight" → "weight").
+    # Build empty_value lookup keyed by pipe-encoded field path.
+    # Using the full path (not just schema_field) avoids collisions when two
+    # widgets share the same field name in different groups or repeaters.
     empty_value_lookup = {
-        w.schema_field: w.empty_value
+        w.field_path.replace(".", "|"): w.empty_value
         for w in _collect_all_control_templates(tater_app.widgets)
     }
     print(f"[TATER:register] setup_value_capture_callbacks: auto_advance_fields={auto_advance_fields!r}")
     print(f"[TATER:register] setup_value_capture_callbacks: empty_value_lookup={empty_value_lookup!r}")
+
+    # Shared helpers closed over tater_app, auto_advance_fields, empty_value_lookup.
+
+    def _do_capture(doc_id, advance_count, normalize_empty: bool):
+        """Shared body for capture_values and capture_checked.
+
+        ``normalize_empty=True`` converts empty-string to None (text widgets).
+        Boolean widgets skip the ``value is not None`` guard on auto-advance.
+        """
+        if not doc_id or not ctx.triggered_id:
+            return no_update, no_update
+        field_path = ctx.triggered_id["field"].replace("|", ".")
+        value = ctx.triggered[0]["value"]
+        if normalize_empty and value == "":
+            value = None
+        annotation = tater_app.annotations.get(doc_id)
+        if annotation is None:
+            return no_update, no_update
+        old_value = value_helpers.get_model_value(annotation, field_path)
+        print(f"[TATER:fire] capture: doc={doc_id!r} field={field_path!r} old={old_value!r} → new={value!r}")
+        value_helpers.set_model_value(annotation, field_path, value)
+        update_status_for_doc(tater_app, doc_id)
+        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+        if field_path in auto_advance_fields:
+            should_advance = (value != old_value and value is not None) if normalize_empty else (value != old_value)
+            if should_advance:
+                return status, (advance_count or 0) + 1
+        return status, no_update
+
+    def _do_load(doc_id, all_ids, as_bool: bool):
+        """Shared body for load_values and load_checked.
+
+        ``as_bool=True`` coerces values to bool (BooleanWidgets).
+        """
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        print(f"[TATER:fire] load: doc={doc_id!r} {len(all_ids or [])} fields as_bool={as_bool}")
+        result = []
+        for wid in (all_ids or []):
+            field = wid["field"].replace("|", ".")
+            v = value_helpers.get_model_value(annotation, field) if annotation else None
+            if as_bool:
+                out = bool(v) if v is not None else False
+            else:
+                if v is None:
+                    v = empty_value_lookup.get(wid["field"])
+                out = v
+            print(f"[TATER:fire]   load field={field!r} → {out!r}")
+            result.append(out)
+        return result
 
     # --- Capture: value prop (all non-boolean ControlWidgets) ---
     @app.callback(
@@ -416,24 +465,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def capture_values(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered_id:
-            return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
-        value = ctx.triggered[0]["value"]
-        if value == "":
-            value = None
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return no_update, no_update
-        old_value = value_helpers.get_model_value(annotation, field_path)
-        print(f"[TATER:fire] capture_values: doc={doc_id!r} field={field_path!r} old={old_value!r} → new={value!r}")
-        value_helpers.set_model_value(annotation, field_path, value)
-        update_status_for_doc(tater_app, doc_id)
-        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-        if field_path in auto_advance_fields:
-            if value != old_value and value is not None:
-                return status, (advance_count or 0) + 1
-        return status, no_update
+        return _do_capture(doc_id, advance_count, normalize_empty=True)
 
     # --- Capture: checked prop (BooleanWidgets) ---
     @app.callback(
@@ -445,22 +477,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def capture_checked(all_values, doc_id, advance_count):
-        if not doc_id or not ctx.triggered_id:
-            return no_update, no_update
-        field_path = ctx.triggered_id["field"].replace("|", ".")  # decode pipe-encoded dot path
-        value = ctx.triggered[0]["value"]
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return no_update, no_update
-        old_value = value_helpers.get_model_value(annotation, field_path)
-        print(f"[TATER:fire] capture_checked: doc={doc_id!r} field={field_path!r} old={old_value!r} → new={value!r}")
-        value_helpers.set_model_value(annotation, field_path, value)
-        update_status_for_doc(tater_app, doc_id)
-        status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
-        if field_path in auto_advance_fields:
-            if value != old_value:
-                return status, (advance_count or 0) + 1
-        return status, no_update
+        return _do_capture(doc_id, advance_count, normalize_empty=False)
 
     # --- Load: value prop --- push annotation values to widgets on doc change
     @app.callback(
@@ -470,17 +487,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call="initial_duplicate",
     )
     def load_values(doc_id, all_ids):
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        print(f"[TATER:fire] load_values: doc={doc_id!r} {len(all_ids or [])} fields")
-        result = []
-        for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
-            v = value_helpers.get_model_value(annotation, field) if annotation else None
-            if v is None:
-                v = empty_value_lookup.get(field.split(".")[-1])
-            print(f"[TATER:fire]   load_values field={field!r} → {v!r}")
-            result.append(v)
-        return result
+        return _do_load(doc_id, all_ids, as_bool=False)
 
     # --- Load: checked prop ---
     @app.callback(
@@ -490,16 +497,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call="initial_duplicate",
     )
     def load_checked(doc_id, all_ids):
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        print(f"[TATER:fire] load_checked: doc={doc_id!r} {len(all_ids or [])} fields")
-        result = []
-        for wid in (all_ids or []):
-            field = wid["field"].replace("|", ".")  # decode pipe-encoded dot path
-            v = value_helpers.get_model_value(annotation, field) if annotation else None
-            out = bool(v) if v is not None else False
-            print(f"[TATER:fire]   load_checked field={field!r} → {out!r}")
-            result.append(out)
-        return result
+        return _do_load(doc_id, all_ids, as_bool=True)
 
 
 def setup_span_callbacks(tater_app: TaterApp) -> None:
@@ -659,8 +657,7 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
 def setup_repeater_callbacks(tater_app: TaterApp) -> None:
     """Register a single MATCH callback handling all repeaters at every nesting depth.
 
-    Also registers HierarchicalLabel repeater callbacks (which need per-ld registration)
-    and, when any SpanAnnotationWidget is present, a relay that increments
+    When any SpanAnnotationWidget is present, also registers a relay that increments
     span-any-change whenever a list item is deleted so the doc viewer re-renders.
     """
     from tater.widgets.repeater import RepeaterWidget
@@ -671,10 +668,6 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         return
 
     app = tater_app.app
-
-    # --- Register HierarchicalLabel callbacks for all HL items inside repeaters ---
-    for hl_widget, ld, field_segments in _collect_hl_in_repeaters(tater_app.widgets):
-        hl_widget.register_repeater_callbacks(app, ld, field_segments)
 
     # --- Annotation sync helpers ---
     def _sync_annotation_add(widget_template, field_path, doc_id, new_index):
@@ -816,29 +809,200 @@ def _find_by_segments(widgets: list, segments: list):
     return None
 
 
-def _collect_hl_in_repeaters(widgets: list, field_segments: list | None = None):
-    """Yield (hl_widget, ld, field_segments) for every HierarchicalLabel inside a repeater.
 
-    ``ld`` is the dash-joined schema-field path used as the MATCH discriminator in
-    ``register_repeater_callbacks``; ``field_segments`` is the list of field names
-    from the outermost list down to the HL widget.
+def setup_hl_callbacks(tater_app: TaterApp) -> None:
+    """Register a single MATCH callback handling all HierarchicalLabel instances.
+
+    Works for standalone and repeater-embedded widgets at any nesting depth.
+    Component IDs use pipe-encoded field paths so the ``field`` key uniquely
+    identifies each HL instance without per-widget registration.
     """
-    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.hierarchical_label import HierarchicalLabelWidget, _find_path, _make_buttons, _section
+
+    hl_templates = _collect_hl_templates(tater_app.widgets)
+    if not hl_templates:
+        return
+
+    app = tater_app.app
+
+    def _get_widget(field_path: str) -> Optional[HierarchicalLabelWidget]:
+        return _find_hl_template(tater_app.widgets, field_path)
+
+    def node_at(root, path: list[str]):
+        node = root
+        for name in path:
+            child = node.find(name)
+            if child is None:
+                return root
+            node = child
+        return node
+
+    # ---- 1a. Show/hide clear button ----
+    @app.callback(
+        Output({"type": "hier-search-clear", "field": MATCH}, "style"),
+        Input({"type": "hier-search", "field": MATCH}, "value"),
+        prevent_initial_call=False,
+    )
+    def toggle_clear(value):
+        return {} if value else {"display": "none"}
+
+    # ---- 1b. Clear search on button click ----
+    @app.callback(
+        Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
+        Input({"type": "hier-search-clear", "field": MATCH}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def clear_search(_):
+        return ""
+
+    # ---- 2. Reset navigation when document changes ----
+    @app.callback(
+        Output({"type": "hier-nav", "field": MATCH}, "data"),
+        Input("current-doc-id", "data"),
+        prevent_initial_call=True,
+    )
+    def reset_nav(_doc_id):
+        return []
+
+    # ---- 3. Handle node button click → update path, write if leaf ----
+    @app.callback(
+        Output({"type": "hier-nav", "field": MATCH}, "data", allow_duplicate=True),
+        Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
+        Input({"type": "hier-node-btn", "field": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
+        State({"type": "hier-nav", "field": MATCH}, "data"),
+        State("current-doc-id", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_click(node_clicks, current_path, doc_id):
+        if not ctx.triggered_id:
+            return no_update, no_update
+        triggered = ctx.triggered_id
+        if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn":
+            return no_update, no_update
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update, no_update
+
+        pipe_field = triggered["field"]
+        field_path = pipe_field.replace("|", ".")
+        depth = triggered["depth"]
+        node_name = triggered["name"]
+        path = list(current_path or [])
+
+        widget = _get_widget(field_path)
+        if widget is None:
+            return no_update, no_update
+        root = widget.root
+
+        parent = node_at(root, path[:depth])
+        clicked = parent.find(node_name)
+        is_search_result = False
+        if clicked is None:
+            clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
+            if clicked is None:
+                return no_update, no_update
+            is_search_result = True
+
+        if clicked.is_leaf:
+            current_value = None
+            annotation = None
+            if doc_id:
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation is not None:
+                    current_value = value_helpers.get_model_value(annotation, field_path)
+
+            if is_search_result:
+                full_path = _find_path(root, node_name)
+                new_path = full_path[:-1]
+            else:
+                new_path = path[:depth]
+
+            if current_value == node_name:
+                if annotation is not None:
+                    value_helpers.set_model_value(annotation, field_path, None)
+                    tater_app._save_annotations_to_file()
+            else:
+                if annotation is not None:
+                    value_helpers.set_model_value(annotation, field_path, node_name)
+                    tater_app._save_annotations_to_file()
+
+            return new_path, ("" if is_search_result else no_update)
+        else:
+            if depth < len(path) and path[depth] == node_name:
+                return path[:depth], no_update
+            return path[:depth] + [node_name], no_update
+
+    # ---- 4. Rebuild sections from nav state / search / doc change ----
+    @app.callback(
+        Output({"type": "hier-sections", "field": MATCH}, "children"),
+        Output({"type": "hier-breadcrumb", "field": MATCH}, "children"),
+        Input({"type": "hier-nav", "field": MATCH}, "data"),
+        Input({"type": "hier-search", "field": MATCH}, "value"),
+        Input("current-doc-id", "data"),
+        prevent_initial_call=False,
+    )
+    def update_display(current_path, search_query, doc_id):
+        pipe_field = ctx.outputs_list[0]["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        path = list(current_path or [])
+
+        widget = _get_widget(field_path)
+        if widget is None:
+            return no_update, no_update
+        root = widget.root
+
+        selected_value = None
+        if doc_id:
+            annotation = tater_app.annotations.get(doc_id)
+            if annotation is not None:
+                selected_value = value_helpers.get_model_value(annotation, field_path)
+
+        breadcrumb = " → ".join(path) if path else "None selected"
+
+        if search_query and search_query.strip():
+            q = search_query.strip().lower()
+            matches = [n for n in root.all_leaves() if q in n.name.lower()]
+            return [_section("Search results", _make_buttons(matches, pipe_field, 0, selected_value))], breadcrumb
+
+        return widget._render_sections(path, pipe_field, selected_value), breadcrumb
+
+
+def _collect_hl_templates(widgets: list) -> list:
+    """Recursively collect all HierarchicalLabelWidget templates at any nesting depth."""
     from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+    from tater.widgets.repeater import RepeaterWidget
     from tater.widgets.base import ContainerWidget
-    if field_segments is None:
-        field_segments = []
+    result = []
     for w in widgets:
-        if isinstance(w, RepeaterWidget):
-            outer_segments = field_segments + [w.schema_field]
-            for item_w in w.item_widgets:
-                if isinstance(item_w, HierarchicalLabelWidget):
-                    segs = outer_segments + [item_w.schema_field]
-                    yield item_w, "-".join(segs), segs
-                elif isinstance(item_w, RepeaterWidget):
-                    yield from _collect_hl_in_repeaters([item_w], outer_segments)
+        if isinstance(w, HierarchicalLabelWidget):
+            result.append(w)
+        elif isinstance(w, RepeaterWidget):
+            result.extend(_collect_hl_templates(w.item_widgets))
         elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
-            yield from _collect_hl_in_repeaters(w.children, field_segments)
+            result.extend(_collect_hl_templates(w.children))
+    return result
+
+
+def _find_hl_template(widgets: list, field_path: str):
+    """Find a HierarchicalLabelWidget template for a (possibly nested) field path.
+
+    Strips numeric segments so ``"findings.0.label"`` resolves the same template
+    as ``"findings.label"``.
+    """
+    from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    segments = [s for s in field_path.split(".") if not s.isdigit()]
+    if not segments:
+        return None
+    for w in widgets:
+        if w.schema_field == segments[0]:
+            if len(segments) == 1:
+                return w if isinstance(w, HierarchicalLabelWidget) else None
+            if isinstance(w, RepeaterWidget):
+                return _find_hl_template(w.item_widgets, ".".join(segments[1:]))
+            if isinstance(w, ContainerWidget) and hasattr(w, "children"):
+                return _find_hl_template(w.children, ".".join(segments[1:]))
+    return None
 
 
 def _has_any_span(widgets: list) -> bool:

@@ -12,19 +12,7 @@ if TYPE_CHECKING:
     from tater.widgets.base import TaterWidget
 
 
-def _has_any_span_widgets(widgets: list) -> bool:
-    """Return True if any SpanAnnotationWidget exists at any nesting depth."""
-    from tater.widgets.span import SpanAnnotationWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
-    for w in widgets:
-        if isinstance(w, SpanAnnotationWidget):
-            return True
-        if isinstance(w, RepeaterWidget) and _has_any_span_widgets(w.item_widgets):
-            return True
-        if isinstance(w, ContainerWidget) and hasattr(w, "children") and _has_any_span_widgets(w.children):
-            return True
-    return False
+from tater.ui.callbacks import _has_any_span as _has_any_span_widgets
 
 
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:

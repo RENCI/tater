@@ -58,37 +58,12 @@ class RepeaterWidget(ContainerWidget):
         self, index: int, tater_app: Optional[Any] = None, doc_id: Optional[str] = None
     ) -> list[Any]:
         """Render widgets for a single list item."""
-        from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         print(f"[TATER:render] {type(self).__name__}._render_item_widgets: field={self.field_path!r} index={index} doc={doc_id!r}")
-
-        # HierarchicalLabel uses an ld key built from schema field names only
-        # (no numeric indices) so one callback registration handles all outer rows.
-        hl_ld_prefix = "-".join(s for s in self.field_path.split(".") if not s.isdigit())
-        # path_str for HL: dot-joined index chain (parent indices + this index)
-        parent_indices = [s for s in self.field_path.split(".") if s.isdigit()]
-        path_str = ".".join(parent_indices + [str(index)])
 
         rendered = []
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
-
-            if tater_app and doc_id and doc_id in tater_app.annotations:
-                annotation = tater_app.annotations[doc_id]
-                value = tater_app._get_model_value(annotation, widget.field_path)
-                if value is not None:
-                    widget.default = value
-
-            if isinstance(template, HierarchicalLabelWidget):
-                ld = f"{hl_ld_prefix}-{template.schema_field}"
-                items = []
-                if not widget.renders_own_label:
-                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_repeater(ld, path_str))
-                if widget.description:
-                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
-                continue
 
             # For nested RepeaterWidgets use _component_with_context so initial
             # items are pre-populated from the annotation rather than empty.
