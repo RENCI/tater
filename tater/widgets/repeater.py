@@ -32,6 +32,12 @@ from dash_iconify import DashIconify
 import typing
 from .base import ContainerWidget, TaterWidget, ControlWidget, _resolve_field_info, _unwrap_optional
 
+# Component-type strings for nested (repeater-inside-repeater) IDs.
+_NESTED_ADD_TYPE    = "nested-repeater-add"
+_NESTED_DELETE_TYPE = "nested-repeater-delete"
+_NESTED_STORE_TYPE  = "nested-repeater-store"
+_NESTED_ITEMS_TYPE  = "nested-repeater-items"
+
 
 def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str) -> None:
     """Recursively set annotation values as widget defaults for ControlWidget descendants.
@@ -186,149 +192,34 @@ class RepeaterWidget(ContainerWidget):
     # ------------------------------------------------------------------
 
     def register_callbacks(self, app: Any) -> None:
-        """Register callbacks to manage list structure and capture item values."""
-        from dash import ALL, Input, Output, State, ctx
-        from dash.exceptions import PreventUpdate
-        from pydantic import BaseModel
+        """Register per-widget callbacks for child widgets.
 
+        The list structure (add/delete/load) is handled by the unified MATCH
+        callback in ``callbacks.setup_repeater_callbacks``; only register
+        callbacks that cannot be expressed generically via MATCH.
+        """
         tater_app = getattr(app, "_tater_app", None)
+        if not tater_app:
+            return
 
-        add_id = self._add_id()
-        items_id = self._items_id()
-        store_id = self._store_id()
-        delete_type = self._delete_type()
-        field_path = self.field_path
-        item_widget_templates = self.item_widgets
+        from tater.widgets.group import GroupWidget
 
-        def _sync_annotation_add(doc_id: str, new_index: int) -> None:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation is None:
-                return
-            extended = False
-            for iw in item_widget_templates:
-                if isinstance(iw, ContainerWidget):
-                    # Containers (ListableWidget, GroupWidget, …) have no empty_value;
-                    # their fields are already initialised to defaults by create_list_item.
-                    extended = True
-                    continue
-                try:
-                    tater_app._set_model_value(
-                        annotation,
-                        f"{field_path}.{new_index}.{iw.schema_field}",
-                        iw.empty_value,
-                    )
-                    extended = True
-                except Exception:
-                    pass
-            if not extended:
-                try:
-                    tater_app._set_model_value(annotation, f"{field_path}.{new_index}", None)
-                except Exception:
-                    pass
-            tater_app._save_annotations_to_file(doc_id=doc_id)
-
-        def _sync_annotation_delete(doc_id: str, del_position: int) -> None:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation is None:
-                return
-            current_list = tater_app._get_model_value(annotation, field_path)
-            if isinstance(current_list, list) and del_position < len(current_list):
-                current_list.pop(del_position)
-            tater_app._save_annotations_to_file(doc_id=doc_id)
-
-        @app.callback(
-            [Output(store_id, "data"), Output(items_id, "children")],
-            [Input(add_id, "n_clicks"),
-             Input({"type": delete_type, "index": ALL}, "n_clicks"),
-             Input("current-doc-id", "data")],
-            State(store_id, "data"),
-        )
-        def _update_items(add_clicks, delete_clicks, doc_id, store_data):
-            if not ctx.triggered_id or ctx.triggered_id == "current-doc-id":
-                indices_set = set()
-                if tater_app and doc_id and doc_id in tater_app.annotations:
-                    doc_annotations = tater_app.annotations[doc_id]
-                    if isinstance(doc_annotations, BaseModel):
-                        try:
-                            list_field = getattr(doc_annotations, field_path, None)
-                            if isinstance(list_field, list):
-                                indices_set = set(range(len(list_field)))
-                        except AttributeError:
-                            pass
-                    else:
-                        prefix = f"{field_path}."
-                        for key in doc_annotations.keys():
-                            if key.startswith(prefix):
-                                rest = key[len(prefix):]
-                                index_str = rest.split('.')[0]
-                                try:
-                                    indices_set.add(int(index_str))
-                                except ValueError:
-                                    pass
-                indices = sorted(indices_set)
-                store_data = {"indices": indices, "next_index": len(indices)}
-                return store_data, self._render_items(indices, tater_app, doc_id)
-
-            if not ctx.triggered or not ctx.triggered[0].get("value"):
-                raise PreventUpdate
-
-            if store_data is None:
-                store_data = self._empty_store_data()
-
-            indices = list(store_data.get("indices", []))
-            active_value = None
-
-            if ctx.triggered_id == add_id:
-                new_index = len(indices)
-                indices = list(range(new_index + 1))
-                active_value = str(new_index)
-                if tater_app and doc_id and doc_id in tater_app.annotations:
-                    _sync_annotation_add(doc_id, new_index)
-            elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == delete_type:
-                delete_index = ctx.triggered_id.get("index")
-                if delete_index in indices:
-                    del_position = indices.index(delete_index)
-                    if tater_app and doc_id and doc_id in tater_app.annotations:
-                        _sync_annotation_delete(doc_id, del_position)
-                    indices = list(range(len(indices) - 1))
-                    active_value = str(indices[0]) if indices else None
-
-            new_data = {"indices": indices, "next_index": len(indices)}
-            return new_data, self._render_items(
-                indices, tater_app, doc_id, active_value=active_value
-            )
-
-        if tater_app:
-            from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-            from tater.widgets.span import SpanAnnotationWidget
-            from tater.widgets.group import GroupWidget
-            # ld for MATCH-based conditional callbacks: pipe-encoded outer list field.
-            repeater_ld = self.field_path.replace(".", "|")
-            for item_widget_template in self.item_widgets:
-                if isinstance(item_widget_template, HierarchicalLabelWidget):
-                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
-                    item_widget_template.register_repeater_callbacks(
-                        app, ld, [self.field_path, item_widget_template.schema_field]
-                    )
-                elif isinstance(item_widget_template, SpanAnnotationWidget):
-                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
-                    item_widget_template.register_list_callbacks(
-                        app, ld, self.field_path, item_widget_template.schema_field
-                    )
-                elif isinstance(item_widget_template, RepeaterWidget):
-                    ld = f"{self.field_path}-{item_widget_template.schema_field}"
-                    item_widget_template.register_list_callbacks(
-                        app, ld, [self.field_path, item_widget_template.schema_field]
-                    )
-                elif isinstance(item_widget_template, GroupWidget):
+        repeater_ld = self.field_path.replace(".", "|")
+        for item_widget_template in self.item_widgets:
+            if isinstance(item_widget_template, RepeaterWidget):
+                ld = f"{self.field_path}-{item_widget_template.schema_field}"
+                item_widget_template.register_list_callbacks(
+                    app, ld, [self.field_path, item_widget_template.schema_field]
+                )
+            elif isinstance(item_widget_template, GroupWidget):
+                item_widget_template._register_repeater_conditional_callbacks(
+                    app, repeater_ld
+                )
+            elif isinstance(item_widget_template, ControlWidget):
+                if item_widget_template._condition is not None:
                     item_widget_template._register_repeater_conditional_callbacks(
-                        app, repeater_ld
+                        app, repeater_ld, self.item_widgets
                     )
-                elif isinstance(item_widget_template, ControlWidget):
-                    if item_widget_template._condition is not None:
-                        item_widget_template._register_repeater_conditional_callbacks(
-                            app, repeater_ld, self.item_widgets
-                        )
 
     # ------------------------------------------------------------------
     # Nested (repeater-inside-repeater) support (shared)
@@ -587,17 +478,13 @@ class RepeaterWidget(ContainerWidget):
             )
 
         if tater_app:
-            from tater.widgets.hierarchical_label import HierarchicalLabelWidget
             from tater.widgets.group import GroupWidget
-            # ld for ControlWidget conditional callbacks: pipe-join the list fields
-            # (field_segments without the last element which is the inner list field).
+            # ld for ControlWidget conditional callbacks: pipe-join the list fields.
             nested_ld = "|".join(field_segments)
             for iw_template in item_widget_templates:
                 child_segments = field_segments + [iw_template.schema_field]
                 child_ld = "-".join(child_segments)
-                if isinstance(iw_template, HierarchicalLabelWidget):
-                    iw_template.register_repeater_callbacks(app, child_ld, child_segments)
-                elif isinstance(iw_template, RepeaterWidget):
+                if isinstance(iw_template, RepeaterWidget):
                     iw_template.register_list_callbacks(app, child_ld, child_segments)
                 elif isinstance(iw_template, GroupWidget):
                     iw_template._register_repeater_conditional_callbacks(app, nested_ld)
