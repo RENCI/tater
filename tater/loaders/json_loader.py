@@ -111,6 +111,7 @@ from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
+from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
 from tater.widgets.repeater import TabsWidget, AccordionWidget
@@ -281,6 +282,12 @@ def parse_schema(
     widgets: list[TaterWidget] = []
 
     for spec in data.get("data_schema", []):
+        if spec.get("type") == "divider":
+            widgets.append(DividerWidget(
+                label=spec.get("label", ""),
+                description=spec.get("description"),
+            ))
+            continue
         fid = spec["id"]
         field_def, widget = _process_field(spec, fid, hierarchy_map)
         model_fields[fid] = field_def

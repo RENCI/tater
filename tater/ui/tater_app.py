@@ -143,6 +143,8 @@ class TaterApp:
         seen: set[str] = set()
         for widget in self._all_widgets:
             path = widget.field_path
+            if not path:
+                continue
             if path in seen:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
             seen.add(path)

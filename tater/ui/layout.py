@@ -137,29 +137,14 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
 
 def _build_annotation_components(widgets: list[TaterWidget]) -> list:
-    """Create annotation fields from widgets with dividers between them.
-
-    Dividers are skipped when either the current or previous widget is a
-    ContainerWidget (e.g. GroupWidget), which provides its own visual separation.
-
-    For conditional widgets the preceding divider is placed inside the
-    conditional wrapper so it is hidden together with the widget.
-    """
-    from tater.widgets.base import ContainerWidget
+    """Create annotation fields from widgets."""
     annotation_components = []
-    for i, widget in enumerate(widgets):
-        prev = widgets[i - 1] if i > 0 else None
-        has_leading_divider = (
-            i > 0
-            and not isinstance(widget, ContainerWidget)
-            and not isinstance(prev, ContainerWidget)
-        )
+    for widget in widgets:
         if widget._condition is not None:
-            children = ([dmc.Divider()] if has_leading_divider else []) + [widget._build_field_content()]
-            annotation_components.append(html.Div(children, id=widget.conditional_wrapper_id))
+            annotation_components.append(
+                html.Div([widget._build_field_content()], id=widget.conditional_wrapper_id)
+            )
         else:
-            if has_leading_divider:
-                annotation_components.append(dmc.Divider())
             annotation_components.append(widget.render_field())
     return annotation_components
 
