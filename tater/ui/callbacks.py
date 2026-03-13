@@ -403,9 +403,6 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         w.field_path.replace(".", "|"): w.empty_value
         for w in _collect_all_control_templates(tater_app.widgets)
     }
-    print(f"[TATER:register] setup_value_capture_callbacks: auto_advance_fields={auto_advance_fields!r}")
-    print(f"[TATER:register] setup_value_capture_callbacks: empty_value_lookup={empty_value_lookup!r}")
-
     # Shared helpers closed over tater_app, auto_advance_fields, empty_value_lookup.
 
     def _do_capture(doc_id, advance_count, normalize_empty: bool):
@@ -424,7 +421,6 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         if annotation is None:
             return no_update, no_update
         old_value = value_helpers.get_model_value(annotation, field_path)
-        print(f"[TATER:fire] capture: doc={doc_id!r} field={field_path!r} old={old_value!r} → new={value!r}")
         value_helpers.set_model_value(annotation, field_path, value)
         update_status_for_doc(tater_app, doc_id)
         status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
@@ -440,7 +436,6 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         ``as_bool=True`` coerces values to bool (BooleanWidgets).
         """
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        print(f"[TATER:fire] load: doc={doc_id!r} {len(all_ids or [])} fields as_bool={as_bool}")
         result = []
         for wid in (all_ids or []):
             field = wid["field"].replace("|", ".")
@@ -451,7 +446,6 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
                 if v is None:
                     v = empty_value_lookup.get(wid["field"])
                 out = v
-            print(f"[TATER:fire]   load field={field!r} → {out!r}")
             result.append(out)
         return result
 

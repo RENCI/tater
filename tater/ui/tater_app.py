@@ -128,19 +128,16 @@ class TaterApp:
             widgets: List of TaterWidget instances
         """
         self.widgets = widgets
-        print(f"[TATER:create] set_annotation_widgets: {len(widgets)} top-level widgets")
 
         # Store reference to TaterApp in Dash app so widgets can access it
         self.app._tater_app = self
 
         # Finalize all field paths for nested widgets
-        print(f"[TATER:create] --- Phase 1: _finalize_paths ---")
         for widget in self.widgets:
             widget._finalize_paths()
 
         # Collect all widgets (including nested) for lookup by field_path
         self._all_widgets = self._collect_all_widgets(self.widgets)
-        print(f"[TATER:create] _all_widgets collected: {[w.field_path for w in self._all_widgets]}")
 
         # Duplicate field check
         seen: set[str] = set()
@@ -164,24 +161,20 @@ class TaterApp:
 
         # Bind widgets against the schema model (validates types, derives options)
         if self.schema_model is not None:
-            print(f"[TATER:create] --- Phase 2: bind_schema ({self.schema_model.__name__}) ---")
             for widget in self.widgets:
                 widget.bind_schema(self.schema_model)
 
         # Register any widget-specific callbacks
-        print(f"[TATER:register] --- Phase 3: register_callbacks + _register_conditional_callbacks ---")
         for widget in self.widgets:
             widget.register_callbacks(self.app)
             widget._register_conditional_callbacks(self.app)
 
-        print(f"[TATER:register] --- Phase 4: setup_value_capture_callbacks ---")
         self._setup_layout()
         self._setup_callbacks()
         self._setup_value_capture_callbacks()
         self._setup_span_callbacks()
         self._setup_repeater_callbacks()
         self._setup_hl_callbacks()
-        print(f"[TATER:register] --- All callbacks registered ---")
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""

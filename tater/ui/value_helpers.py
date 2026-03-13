@@ -13,7 +13,6 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
 
     For paths like "pets.0.kind", creates model instances in lists as needed.
     """
-    print(f"[TATER:schema] set_model_value: path={path!r} value={value!r}")
     if isinstance(model, dict):
         set_nested_value(model, path, value)
         return
