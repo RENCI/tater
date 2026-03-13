@@ -1,0 +1,51 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - list of lists",
+  "description": "Each finding contains a nested list of supporting evidence items.",
+  "instructions": "## Steps\n\n1. Click **Add Finding** to create a new finding entry\n2. Select the finding **Category** and **Severity**\n3. Within each finding, click **Add Evidence** to attach supporting quotes\n4. For each evidence item, paste the quote and select where in the document it appears\n5. Delete entries at either level by clicking the × icon\n",
+  "data_schema": [
+    {
+      "id": "findings",
+      "type": "listable",
+      "label": "Findings",
+      "description": "Annotate each clinical finding and its supporting evidence.",
+      "widget": {"item_label": "Finding"},
+      "item_fields": [
+        {
+          "id": "category",
+          "type": "choice",
+          "options": ["diagnosis", "treatment", "outcome", "risk_factor"],
+          "label": "Category"
+        },
+        {
+          "id": "severity",
+          "type": "choice",
+          "options": ["mild", "moderate", "severe"],
+          "label": "Severity",
+          "widget": {"type": "radio_group", "orientation": "horizontal"}
+        },
+        {
+          "id": "evidence",
+          "type": "listable",
+          "label": "Supporting Evidence",
+          "description": "Add quotes from the document that support this finding.",
+          "widget": {"item_label": "Evidence"},
+          "item_fields": [
+            {
+              "id": "quote",
+              "type": "text",
+              "label": "Quote",
+              "widget": {"type": "text_area", "placeholder": "Paste the relevant passage..."}
+            },
+            {
+              "id": "location",
+              "type": "choice",
+              "options": ["title", "abstract", "methods", "results", "discussion"],
+              "label": "Location"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -98,7 +98,10 @@ Object.assign(window.dash_clientside.tater, {
 
 
 // ---------- active-entity tracking + span styling ----------
-// component_id of the most recently clicked SpanAnnotationWidget, or null.
+// Pipe-encoded field path of the most recently clicked SpanAnnotationWidget,
+// or null.  data-tater-field on button containers and data-field on marks both
+// hold the full pipe-encoded path (e.g. "findings|0|spans"), so no separate
+// data-tater-index is needed.
 
 window._taterActiveWidget = window._taterActiveWidget || null;
 
@@ -115,23 +118,18 @@ function hexToRgba(hex, alpha) {
  * Apply filled or faded styling to every <mark data-start> in the document.
  *
  * For each mark:
- *   - If no active widget is recorded, OR its key matches the active widget
+ *   - If no active widget is recorded, OR its data-field matches the active key
  *     → filled (remove class).
  *   - Otherwise → faded background (add class + set --tater-mark-faded).
- *
- * Widgets without a recorded active widget are unaffected (all filled).
  */
 function applySpanStyles() {
     var active = window._taterActiveWidget;
 
-    // Collect all button containers and build their keys.
+    // Collect all button containers; key = data-tater-field (full pipe-encoded path).
     var containers = document.querySelectorAll('[data-tater-field]');
     var containerKeys = [];
     for (var j = 0; j < containers.length; j++) {
-        var c  = containers[j];
-        var cf = c.getAttribute('data-tater-field');
-        var ci = c.getAttribute('data-tater-index');
-        containerKeys.push(ci !== null ? cf + '|' + ci : cf);
+        containerKeys.push(containers[j].getAttribute('data-tater-field'));
     }
 
     // If the active key no longer exists (e.g. after navigating to a document
@@ -143,11 +141,9 @@ function applySpanStyles() {
 
     var marks = document.querySelectorAll('mark[data-start]');
     for (var i = 0; i < marks.length; i++) {
-        var mark      = marks[i];
-        var field     = mark.getAttribute('data-field');
-        var indexAttr = mark.getAttribute('data-index');
-        var color     = mark.getAttribute('data-color') || '#ffe066';
-        var key = indexAttr !== null ? field + '|' + indexAttr : field;
+        var mark  = marks[i];
+        var key   = mark.getAttribute('data-field');   // full pipe-encoded path
+        var color = mark.getAttribute('data-color') || '#ffe066';
 
         if (!active || key === active) {
             mark.classList.remove('tater-span-outlined');
@@ -181,9 +177,7 @@ function applySpanStyles() {
         if (!window._taterActiveWidget) {
             var first = document.querySelector('[data-tater-field]');
             if (first) {
-                var f = first.getAttribute('data-tater-field');
-                var i = first.getAttribute('data-tater-index');
-                window._taterActiveWidget = i !== null ? f + '|' + i : f;
+                window._taterActiveWidget = first.getAttribute('data-tater-field');
             }
         }
         applySpanStyles();
@@ -224,18 +218,15 @@ function applySpanStyles() {
 
 
 // ---------- click listener for entity buttons ----------
-// Each button group is wrapped in an html.Div with data-tater-field (and
-// data-tater-index for list items).  We detect clicks via these attributes,
+// Each button group is wrapped in an html.Div with data-tater-field carrying
+// the full pipe-encoded field path.  We detect clicks via this attribute,
 // independent of the Dash callback chain, so the active widget is updated
 // even when no text is selected.
 
 document.addEventListener('click', function (e) {
     var container = e.target.closest('[data-tater-field]');
     if (!container) { return; }
-    var field     = container.getAttribute('data-tater-field');
-    var indexAttr = container.getAttribute('data-tater-index');
-    // List button groups carry data-tater-index; non-list groups do not.
-    var activeKey = indexAttr !== null ? field + '|' + indexAttr : field;
+    var activeKey = container.getAttribute('data-tater-field');
     if (activeKey) {
         window._taterActiveWidget = activeKey;
         applySpanStyles();
@@ -320,17 +311,16 @@ var _savedDocScroll = null;
         btn.className = 'tater-tooltip-delete';
         btn.textContent = 'x';
         btn.addEventListener('click', function () {
-            var indexAttr = mark.getAttribute('data-index');
+            var docEl = document.getElementById('document-content');
+            if (docEl) { _savedDocScroll = docEl.scrollTop; }
+            // field is the full pipe-encoded path (e.g. "findings|0|spans")
             window._taterDeletePending = {
                 field: field,
-                index: indexAttr !== null ? parseInt(indexAttr, 10) : -1,
                 start: parseInt(start, 10),
                 end:   parseInt(end,   10),
                 ts:    Date.now()
             };
-            var docEl = document.getElementById('document-content');
-            if (docEl) { _savedDocScroll = docEl.scrollTop; }
-            var proxy = document.getElementById('span-delete-proxy-' + field);
+            var proxy = document.getElementById('span-delete-proxy');
             if (proxy) { proxy.click(); }
             t.style.display = 'none';
         });

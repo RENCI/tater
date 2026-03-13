@@ -7,27 +7,30 @@ of sub-form items (a ``List[ItemModel]`` schema field).  Subclasses implement
 - ``ListableWidget``   — vertical stack of bordered cards (default)
 - ``TabsWidget``       — items as switchable tabs
 - ``AccordionWidget``  — items as collapsible accordion sections
+
+All repeater components use pipe-encoded field-path dict IDs:
+
+    {"type": "repeater-add",    "field": "findings|0|annotations"}
+    {"type": "repeater-delete", "field": "findings|0|annotations", "index": i}
+    {"type": "repeater-store",  "field": "findings|0|annotations"}
+    {"type": "repeater-items",  "field": "findings|0|annotations"}
+    {"type": "repeater-change", "field": "findings|0|annotations"}
+
+A single MATCH callback in ``callbacks.setup_repeater_callbacks`` handles every
+repeater instance at every nesting depth without per-widget registration.
 """
 from __future__ import annotations
 
 import copy
-import json
 from dataclasses import dataclass, field
 from typing import Optional, Any
 
-from dash import dcc, html, Input, Output, State, ctx, ALL, MATCH
-from dash.exceptions import PreventUpdate
+from dash import dcc, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 import typing
 from .base import ContainerWidget, TaterWidget, ControlWidget, _resolve_field_info, _unwrap_optional
-
-# Dict-ID type strings used for nested (repeater-inside-repeater) components.
-_NESTED_ADD_TYPE = "listable-add-list"
-_NESTED_DELETE_TYPE = "listable-delete-list"
-_NESTED_STORE_TYPE = "listable-store-list"
-_NESTED_ITEMS_TYPE = "listable-items-list"
 
 
 def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str) -> None:
@@ -64,22 +67,6 @@ class RepeaterWidget(ContainerWidget):
     item_widgets: list[TaterWidget] = field(kw_only=True, default_factory=list)
     item_label: str = field(kw_only=True, default="Item")
 
-    # ------------------------------------------------------------------
-    # Component IDs
-    # ------------------------------------------------------------------
-
-    def _store_id(self) -> str:
-        return f"{self.component_id}-list-store"
-
-    def _items_id(self) -> str:
-        return f"{self.component_id}-items"
-
-    def _add_id(self) -> str:
-        return f"{self.component_id}-add"
-
-    def _delete_type(self) -> str:
-        return f"{self.component_id}-delete"
-
     def _empty_store_data(self) -> dict[str, Any]:
         return {"indices": [], "next_index": 0}
 
@@ -99,43 +86,12 @@ class RepeaterWidget(ContainerWidget):
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
 
-            if tater_app and doc_id and doc_id in tater_app.annotations:
-                annotation = tater_app.annotations[doc_id]
-                value = tater_app._get_model_value(annotation, widget.field_path)
-                if value is not None:
-                    widget.default = value
-
-            # Nested RepeaterWidget (ListableWidget, TabsWidget, …)
+            # For nested RepeaterWidgets use _component_with_context so initial
+            # items are pre-populated from the annotation rather than empty.
             if isinstance(template, RepeaterWidget):
-                ld = f"{self.field_path}-{template.schema_field}"
-                rendered.append(widget.component_in_list(
-                    ld, index, self.field_path, template.schema_field, tater_app, doc_id
-                ))
-                continue
-
-            # HierarchicalLabel uses MATCH-based dict IDs
-            if isinstance(template, HierarchicalLabelWidget):
-                ld = f"{self.field_path}-{template.schema_field}"
-                items = []
-                if not widget.renders_own_label:
-                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_repeater(ld, str(index)))
-                if widget.description:
-                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
-                continue
-
-            # SpanAnnotationWidget uses MATCH-based dict IDs
-            if isinstance(template, SpanAnnotationWidget):
-                ld = f"{self.field_path}-{template.schema_field}"
-                items = []
-                if widget.label:
-                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_list(ld, index))
-                if widget.description:
-                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
-                continue
+                comp = widget._component_with_context(tater_app, doc_id)
+            else:
+                comp = widget.component()
 
             # GroupWidget: propagate repeater context to children so their
             # schema_ids use MATCH-compatible ld/path/tf keys, then render normally.
@@ -153,8 +109,8 @@ class RepeaterWidget(ContainerWidget):
             items = []
             if not widget.renders_own_label:
                 items.append(dmc.Text(widget.label, fw=500, size="sm"))
-            items.append(widget.component())
-            if widget.description:
+            items.append(comp)
+            if widget.description and not widget.renders_own_label:
                 items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
             stack = dmc.Stack(items, gap="xs", mt="sm")
             if widget._condition is not None:
@@ -174,12 +130,7 @@ class RepeaterWidget(ContainerWidget):
         doc_id: Optional[str] = None,
         active_value: Optional[str] = None,
     ) -> list[Any]:
-        """Return the children list for the items container.
-
-        ``active_value`` is a hint for tab-style subclasses indicating which
-        item should be active after an add/delete operation; card-style
-        subclasses may ignore it.
-        """
+        """Return the children list for the items container."""
         raise NotImplementedError
 
     # ------------------------------------------------------------------
@@ -188,13 +139,33 @@ class RepeaterWidget(ContainerWidget):
 
     def component(self) -> dmc.Stack:
         """Return the Dash component.  Shared by all subclasses."""
-        store_data = self._empty_store_data()
+        return self._component_with_context()
+
+    def _component_with_context(
+        self, tater_app: Optional[Any] = None, doc_id: Optional[str] = None
+    ) -> dmc.Stack:
+        """Like component() but pre-populates items from the annotation when available.
+
+        Called directly (with context) when rendering a nested repeater inside
+        another repeater's ``_render_item_widgets``, so existing items are shown
+        immediately without waiting for a subsequent callback round-trip.
+        """
+        from tater.ui import value_helpers
+        pipe_field = self.field_path.replace(".", "|")
+        indices: list[int] = []
+        if tater_app and doc_id:
+            annotation = tater_app.annotations.get(doc_id)
+            if annotation is not None:
+                lst = value_helpers.get_model_value(annotation, self.field_path)
+                if isinstance(lst, list):
+                    indices = list(range(len(lst)))
+        store_data = {"indices": indices, "next_index": len(indices)}
         return dmc.Stack([
             dmc.Group([
                 dmc.Text(self.label, fw=500, size="sm"),
                 dmc.Button(
                     f"Add {self.item_label}",
-                    id=self._add_id(),
+                    id={"type": "repeater-add", "field": pipe_field},
                     variant="outline",
                     size="xs",
                     leftSection=DashIconify(icon="tabler:plus", width=14),
@@ -202,11 +173,12 @@ class RepeaterWidget(ContainerWidget):
             ], justify="space-between"),
             dmc.Text(self.description or "", size="xs", c="dimmed") if self.description else None,
             dmc.Stack(
-                self._render_items(store_data["indices"], None, None),
-                id=self._items_id(),
+                self._render_items(indices, tater_app, doc_id),
+                id={"type": "repeater-items", "field": pipe_field},
                 gap="md",
             ),
-            dcc.Store(id=self._store_id(), data=store_data),
+            dcc.Store(id={"type": "repeater-store", "field": pipe_field}, data=store_data),
+            dcc.Store(id={"type": "repeater-change", "field": pipe_field}, data=0),
         ], gap="sm", mt="md")
 
     # ------------------------------------------------------------------
@@ -675,6 +647,7 @@ class ListableWidget(RepeaterWidget):
         doc_id: Optional[str] = None,
         active_value: Optional[str] = None,
     ) -> list[Any]:
+        pipe_field = self.field_path.replace(".", "|")
         items = []
         for index in indices:
             items.append(
@@ -683,7 +656,7 @@ class ListableWidget(RepeaterWidget):
                         dmc.Text(f"{self.item_label} {index + 1}", size="xs", c="dimmed"),
                         dmc.ActionIcon(
                             DashIconify(icon="tabler:x", width=14),
-                            id={"type": self._delete_type(), "index": index},
+                            id={"type": "repeater-delete", "field": pipe_field, "index": index},
                             variant="subtle",
                             color="gray",
                             size="sm",
@@ -716,6 +689,7 @@ class TabsWidget(RepeaterWidget):
         if active_value is None:
             active_value = str(indices[0])
 
+        pipe_field = self.field_path.replace(".", "|")
         tabs = []
         panels = []
         for index in indices:
@@ -726,7 +700,7 @@ class TabsWidget(RepeaterWidget):
                         dmc.Text(f"{self.item_label} {index + 1}", size="sm"),
                         html.Span(
                             DashIconify(icon="tabler:x", width=14),
-                            id={"type": self._delete_type(), "index": index},
+                            id={"type": "repeater-delete", "field": pipe_field, "index": index},
                             n_clicks=0,
                             className="tater-delete-x",
                         ),
@@ -769,6 +743,7 @@ class AccordionWidget(RepeaterWidget):
         if active_value is None:
             active_value = str(indices[0])
 
+        pipe_field = self.field_path.replace(".", "|")
         items = []
         for index in indices:
             item_value = str(index)
@@ -780,7 +755,7 @@ class AccordionWidget(RepeaterWidget):
                                 dmc.Text(f"{self.item_label} {index + 1}", size="sm"),
                                 html.Span(
                                     DashIconify(icon="tabler:x", width=14),
-                                    id={"type": self._delete_type(), "index": index},
+                                    id={"type": "repeater-delete", "field": pipe_field, "index": index},
                                     n_clicks=0,
                                     className="tater-delete-x",
                                 ),

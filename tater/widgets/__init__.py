@@ -14,6 +14,7 @@ from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.text_input import TextInputWidget
 
+from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import RepeaterWidget, ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.multiselect import MultiSelectWidget
@@ -31,6 +32,7 @@ from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
     HierarchicalLabelFullWidget,
     HierarchicalLabelCompactWidget,
+    HierarchicalLabelTagsWidget,
     Node,
     build_tree,
     load_hierarchy_from_yaml,
@@ -49,6 +51,7 @@ __all__ = [
     "RadioGroupWidget",
     "CheckboxWidget",
     "TextInputWidget",
+    "DividerWidget",
     "GroupWidget",
     "RepeaterWidget",
     "ListableWidget",
@@ -69,6 +72,7 @@ __all__ = [
     "HierarchicalLabelWidget",
     "HierarchicalLabelFullWidget",
     "HierarchicalLabelCompactWidget",
+    "HierarchicalLabelTagsWidget",
     "Node",
     "build_tree",
     "load_hierarchy_from_yaml",

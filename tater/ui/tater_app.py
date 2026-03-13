@@ -143,6 +143,8 @@ class TaterApp:
         seen: set[str] = set()
         for widget in self._all_widgets:
             path = widget.field_path
+            if not path:
+                continue
             if path in seen:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
             seen.add(path)
@@ -168,10 +170,13 @@ class TaterApp:
         for widget in self.widgets:
             widget.register_callbacks(self.app)
             widget._register_conditional_callbacks(self.app)
-        
+
         self._setup_layout()
         self._setup_callbacks()
         self._setup_value_capture_callbacks()
+        self._setup_span_callbacks()
+        self._setup_repeater_callbacks()
+        self._setup_hl_callbacks()
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""
@@ -262,6 +267,19 @@ class TaterApp:
     def _setup_value_capture_callbacks(self) -> None:
         """Setup callbacks to capture widget value changes to annotations store."""
         callbacks.setup_value_capture_callbacks(self)
+
+    def _setup_span_callbacks(self) -> None:
+        """Setup unified span annotation callbacks."""
+        callbacks.setup_span_callbacks(self)
+
+    def _setup_repeater_callbacks(self) -> None:
+        """Setup unified MATCH-based repeater callbacks."""
+        callbacks.setup_repeater_callbacks(self)
+
+    def _setup_hl_callbacks(self) -> None:
+        """Setup unified MATCH-based HierarchicalLabel callbacks."""
+        callbacks.setup_hl_callbacks(self)
+        callbacks.setup_hl_tags_callbacks(self)
 
     def _collect_value_capture_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
         """

@@ -1,0 +1,45 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - deep nested",
+  "description": "Two levels of GroupWidget nesting demonstrating deep schema paths.",
+  "instructions": "Fill in the document mood. Expand 'Address' then 'Location' to reach nested fields.",
+  "data_schema": [
+    {
+      "id": "document_mood",
+      "type": "choice",
+      "options": ["positive", "negative", "neutral"],
+      "label": "Document Mood",
+      "description": "Top-level field"
+    },
+    {
+      "id": "address",
+      "type": "group",
+      "label": "Address",
+      "description": "First level of nesting",
+      "fields": [
+        {
+          "id": "pet_type",
+          "type": "choice",
+          "options": ["cat", "dog", "fish"],
+          "label": "Pet Type at Address",
+          "widget": {"type": "radio_group", "orientation": "vertical"}
+        },
+        {
+          "id": "location",
+          "type": "group",
+          "label": "Location Details",
+          "description": "Second level of nesting",
+          "fields": [
+            {
+              "id": "location_mood",
+              "type": "choice",
+              "options": ["cheerful", "stressful", "peaceful"],
+              "label": "Location Atmosphere",
+              "description": "Three levels deep!"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
