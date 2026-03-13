@@ -305,7 +305,7 @@ class RepeaterWidget(ContainerWidget):
                 items = []
                 if widget.label:
                     items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component_in_repeater(nested_ld, f"{outer_li}.{inner_index}"))
+                items.append(widget.component())
                 if widget.description:
                     items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
                 rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
