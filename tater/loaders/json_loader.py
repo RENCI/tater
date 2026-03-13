@@ -69,17 +69,24 @@ Field types:
   ``group``             — nested sub-model with ``fields``
   ``listable``          — repeatable list of sub-items with ``item_fields``
                           (widget type override: ``tabs`` or ``accordion``)
+  ``divider``           — labeled section break; no ``id`` required; supports ``label``,
+                          ``description``
 
 Widget override types (``"widget": {"type": "..."}``):
-  ``radio_group``             — for ``choice`` fields
-  ``select``                  — for ``choice`` fields
-  ``chip_radio``              — for ``choice`` fields
-  ``checkbox_group``          — for ``multi_choice`` fields
-  ``text_area``               — for ``text`` fields
-  ``switch``                  — for ``boolean`` fields
-  ``chip_boolean``            — for ``boolean`` fields
-  ``slider``                  — for ``numeric`` fields
-  ``hierarchical_label_full`` — for ``hierarchical_label`` fields
+  ``radio_group``              — for ``choice`` fields
+  ``select``                   — for ``choice`` fields
+  ``chip_radio``               — for ``choice`` fields
+  ``checkbox_group``           — for ``multi_choice`` fields
+  ``text_area``                — for ``text`` fields
+  ``switch``                   — for ``boolean`` fields
+  ``chip_boolean``             — for ``boolean`` fields
+  ``slider``                   — for ``numeric`` fields
+  ``hierarchical_label_full``  — for ``hierarchical_label`` fields
+  ``hierarchical_label_tags``  — for ``hierarchical_label`` fields
+
+Widget options (``"widget": {"option": value}``):
+  ``auto_advance``  — ``true`` on ``choice`` or ``boolean`` fields to advance to the next
+                      document on selection/toggle
 
 For ``hierarchical_label`` fields, ``hierarchy_ref`` must match a key in the
 top-level ``hierarchies`` dict. File paths in ``hierarchies`` are resolved
@@ -118,6 +125,7 @@ from tater.widgets.repeater import TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
+    HierarchicalLabelTagsWidget,
     build_tree,
     load_hierarchy_from_yaml,
     Node,
@@ -377,6 +385,8 @@ def _process_field(
         local_id, ftype, required, label, description, widget_type, widget_spec, spec,
         hierarchy_map,
     )
+    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean"):
+        widget.auto_advance = True
     condition = spec.get("conditional_on")
     if condition is not None:
         widget.conditional_on(condition["field"], bool(condition["value"]))
@@ -473,6 +483,11 @@ def _build_widget(
         searchable = widget_spec.get("searchable", True)
         if widget_type == "hierarchical_label_full":
             return HierarchicalLabelFullWidget(
+                fid, label=label, description=description,
+                hierarchy=hierarchy, searchable=searchable,
+            )
+        if widget_type == "hierarchical_label_tags":
+            return HierarchicalLabelTagsWidget(
                 fid, label=label, description=description,
                 hierarchy=hierarchy, searchable=searchable,
             )
