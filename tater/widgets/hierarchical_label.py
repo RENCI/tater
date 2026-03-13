@@ -286,6 +286,17 @@ class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
         return [dmc.Stack(items, gap=2)]
 
 
+_PILL_STYLE = {
+    "borderRadius": "var(--mantine-radius-xl)",
+    "padding": "2px 10px",
+    "fontSize": "var(--mantine-font-size-xs)",
+    "display": "inline-flex",
+    "alignItems": "center",
+    "gap": "4px",
+    "whiteSpace": "nowrap",
+}
+
+
 def _make_tags_option_buttons(nodes, pipe_field, depth, selected_name=None):
     """Option pill buttons for HierarchicalLabelTagsWidget, styled like TagsInput pills."""
     buttons = []
@@ -298,10 +309,27 @@ def _make_tags_option_buttons(nodes, pipe_field, depth, selected_name=None):
                 children,
                 id={"type": "hl-tags-node-btn", "field": pipe_field, "depth": depth, "name": node.name},
                 n_clicks=0,
-                style={"cursor": "pointer", "backgroundColor": "var(--mantine-color-gray-1)", "borderRadius": "var(--mantine-radius-xl)", "padding": "10px 10px", "fontSize": "var(--mantine-font-size-xs)", "height": "var(--mantine-spacing-lg)", "display": "inline-flex", "alignItems": "center", "gap": "4px"},
+                style={**_PILL_STYLE, "cursor": "pointer", "backgroundColor": "var(--mantine-color-gray-1)"},
             )
         )
     return buttons
+
+
+def _make_tags_pill(name: str, pipe_field: str, idx: int, is_selected: bool = False):
+    """A single dismissible navigation/selection pill for the tags input."""
+    bg = "var(--mantine-color-gray-2)"
+    return html.Div(
+        [
+            name,
+            html.Span(
+                "×",
+                id={"type": "hl-tags-pill-remove", "field": pipe_field, "idx": idx},
+                n_clicks=0,
+                style={"cursor": "pointer", "marginLeft": "3px", "lineHeight": 1, "opacity": "0.6"},
+            ),
+        ],
+        style={**_PILL_STYLE, "backgroundColor": bg, "cursor": "default"},
+    )
 
 
 @dataclass(eq=False)
@@ -317,19 +345,46 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
-
         return dmc.Stack(
             description + [
-                dmc.TagsInput(
-                    id={"type": "hl-tags-input", "field": pipe_field},
-                    value=[],
-                    searchValue="",
-                    data=[],
-                    placeholder="Search…",
-                    size="sm",
-                    splitChars=[],
-                    acceptValueOnBlur=False,
-                    style={} if self.searchable else {"pointerEvents": "none"},
+                html.Div(
+                    [
+                        html.Div(
+                            [],
+                            id={"type": "hl-tags-pills", "field": pipe_field},
+                            style={"display": "contents"},
+                        ),
+                        dcc.Input(
+                            id={"type": "hl-tags-search", "field": pipe_field},
+                            type="text",
+                            value="",
+                            placeholder="Search…" if self.searchable else "",
+                            debounce=False,
+                            style={
+                                "border": "none",
+                                "outline": "none",
+                                "flex": "1 1 60px",
+                                "minWidth": "60px",
+                                "background": "transparent",
+                                "color": "inherit",
+                                "fontSize": "var(--mantine-font-size-xs)",
+                                "alignSelf": "center",
+                                "padding": "0",
+                                "height": "22px",
+                            } if self.searchable else {"display": "none"},
+                        ),
+                    ],
+                    style={
+                        "display": "flex",
+                        "flexWrap": "wrap",
+                        "alignItems": "center",
+                        "gap": "4px",
+                        "padding": "4px 2px",
+                        "border": "1px solid var(--mantine-color-default-border)",
+                        "borderRadius": "var(--mantine-radius-sm)",
+                        "backgroundColor": "var(--mantine-color-default)",
+                        "cursor": "text",
+                    },
                 ),
                 dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
                 dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
