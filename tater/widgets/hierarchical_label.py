@@ -5,7 +5,7 @@ from dataclasses import dataclass, field as dc_field
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from dash import dcc
+from dash import dcc, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
@@ -284,6 +284,61 @@ class HierarchicalLabelCompactWidget(HierarchicalLabelWidget):
     ) -> list:
         items = _build_sections_compact(self.root, path, pipe_field, selected_value=selected_value)
         return [dmc.Stack(items, gap=2)]
+
+
+def _make_tags_option_buttons(nodes, pipe_field, depth, selected_name=None):
+    """Option pill buttons for HierarchicalLabelTagsWidget, styled like TagsInput pills."""
+    buttons = []
+    for node in nodes:
+        children = [node.name]
+        if not node.is_leaf:
+            children.append(DashIconify(icon="tabler:chevron-down", width=10))
+        buttons.append(
+            html.Div(
+                children,
+                id={"type": "hl-tags-node-btn", "field": pipe_field, "depth": depth, "name": node.name},
+                n_clicks=0,
+                style={"cursor": "pointer", "backgroundColor": "var(--mantine-color-gray-1)", "borderRadius": "var(--mantine-radius-xl)", "padding": "10px 10px", "fontSize": "var(--mantine-font-size-xs)", "height": "var(--mantine-spacing-lg)", "display": "inline-flex", "alignItems": "center", "gap": "4px"},
+            )
+        )
+    return buttons
+
+
+@dataclass(eq=False)
+class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
+    """Tags-style hierarchical widget.
+
+    The navigation path and selected leaf are shown as dismissible pill tags
+    inside a TagsInput.  Typing filters the option tags shown below.
+    Single-value selection; behaviour is otherwise identical to
+    HierarchicalLabelCompactWidget.
+    """
+
+    def component(self) -> Any:
+        pipe_field = self.field_path.replace(".", "|")
+        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
+
+        return dmc.Stack(
+            description + [
+                dmc.TagsInput(
+                    id={"type": "hl-tags-input", "field": pipe_field},
+                    value=[],
+                    searchValue="",
+                    data=[],
+                    placeholder="Search…",
+                    size="sm",
+                    splitChars=[],
+                    acceptValueOnBlur=False,
+                    style={} if self.searchable else {"pointerEvents": "none"},
+                ),
+                dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
+                dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
+            ],
+            gap="xs",
+        )
+
+    def _render_sections(self, path, pipe_field, selected_value):
+        return []  # Tags widget renders via callbacks, not _render_sections
 
 
 # ---------------------------------------------------------------------------
