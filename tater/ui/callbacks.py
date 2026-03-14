@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Optional
 
-import json
 import time
 from datetime import datetime
 
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 
 
 def setup_callbacks(tater_app: TaterApp) -> None:
-    # Removed clientside keyboard navigation callback
     """Register document and navigation callbacks on the Dash app."""
     app = tater_app.app
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
@@ -951,11 +949,11 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             if current_value == node_name:
                 if annotation is not None:
                     value_helpers.set_model_value(annotation, field_path, None)
-                    tater_app._save_annotations_to_file()
+                    tater_app._save_annotations_to_file(doc_id=doc_id)
             else:
                 if annotation is not None:
                     value_helpers.set_model_value(annotation, field_path, node_name)
-                    tater_app._save_annotations_to_file()
+                    tater_app._save_annotations_to_file(doc_id=doc_id)
 
             return new_path, ("" if is_search_result else no_update)
         else:
@@ -1049,7 +1047,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-node-btn":
             return no_update, no_update
-        if not ctx.triggered or not any(t.get("value") for t in ctx.triggered):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
             return no_update, no_update
 
         pipe_field = triggered["field"]
@@ -1085,11 +1083,11 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             if current_value == node_name:
                 if annotation is not None:
                     value_helpers.set_model_value(annotation, field_path, None)
-                    tater_app._save_annotations_to_file()
+                    tater_app._save_annotations_to_file(doc_id=doc_id)
             else:
                 if annotation is not None:
                     value_helpers.set_model_value(annotation, field_path, node_name)
-                    tater_app._save_annotations_to_file()
+                    tater_app._save_annotations_to_file(doc_id=doc_id)
 
             return new_path, ""
         else:
@@ -1111,7 +1109,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-pill-remove":
             return no_update
-        if not ctx.triggered or not any(t.get("value") for t in ctx.triggered):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
             return no_update
 
         idx = triggered["idx"]
@@ -1122,7 +1120,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         if annotation is not None:
             value_helpers.set_model_value(annotation, field_path, None)
-            tater_app._save_annotations_to_file()
+            tater_app._save_annotations_to_file(doc_id=doc_id)
 
         if idx < len(path):
             return path[:idx]
