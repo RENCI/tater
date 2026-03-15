@@ -33,6 +33,13 @@ class Finding(BaseModel):
     evidence: List[SpanAnnotation] = Field(default_factory=list)
 
 
+class Measurements(BaseModel):
+    weight: Optional[float] = None
+    range_float: Optional[list[float]] = None
+    range_int: Optional[list[int]] = None
+    range_str: Optional[list[str]] = None
+
+
 class Schema(BaseModel):
     pets: List[Pet] = Field(default_factory=list)
     findings: List[Finding] = Field(default_factory=list)
@@ -40,6 +47,7 @@ class Schema(BaseModel):
     overall: Optional[str] = None
     score: Optional[int] = None
     flags: List[Literal["urgent", "review"]] = Field(default_factory=list)
+    measurements: Optional[Measurements] = None
 
 
 # ---------------------------------------------------------------------------
