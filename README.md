@@ -143,16 +143,17 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 
 | `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
 |--------|-------------|----------------|----------------------------------|
-| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_group` |
-| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `chip_group` |
+| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_radio` |
+| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `checkbox_group` |
 | `text` | `str` | `TextInputWidget` | `text_area` |
-| `boolean` | `bool` | `CheckboxWidget` | `switch` |
+| `boolean` | `bool` | `CheckboxWidget` | `switch`, `chip_boolean` |
 | `numeric` | `float` | `NumberInputWidget` | `slider` |
 | `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
 | `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
-| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full` |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full`, `hierarchical_label_tags` |
 | `group` | nested model | `GroupWidget` | — |
-| `listable` | `list[model]` | `ListableWidget` | — |
+| `listable` | `list[model]` | `ListableWidget` | `tabs`, `accordion` |
+| `divider` | — | `DividerWidget` | — |
 
 **`choice` / `multi_choice`** — requires `options` array.
 
@@ -168,7 +169,9 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 
 **`group`** — requires `fields` array of child field definitions.
 
-**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`.
+**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`. Use `widget.type: "tabs"` or `"accordion"` for alternative layouts.
+
+**`divider`** — no `id` required. Optional `label` and `description`. Does not contribute to the annotation model.
 
 ## Widgets
 
@@ -177,6 +180,14 @@ inferred from the field's `Literal` type — no manual list needed.
 
 All widgets accept `label`, `description`, and most accept `required`.
 
+### Boolean
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `CheckboxWidget` | `bool` | |
+| `SwitchWidget` | `bool` | Toggle switch |
+| `ChipWidget` | `bool` | Single toggleable chip |
+
 ### Single choice
 
 | Widget | Schema type | Notes |
@@ -184,20 +195,14 @@ All widgets accept `label`, `description`, and most accept `required`.
 | `SegmentedControlWidget` | `Literal[...]` | Horizontal button group |
 | `RadioGroupWidget` | `Literal[...]` | Radio buttons; `vertical=True` supported |
 | `SelectWidget` | `Literal[...]` | Searchable dropdown |
+| `ChipRadioWidget` | `Literal[...]` | Chip-style radio buttons; `vertical=True` supported |
 
 ### Multiple choice
 
 | Widget | Schema type | Notes |
 |--------|-------------|-------|
 | `MultiSelectWidget` | `list[Literal[...]]` | Searchable multi-select dropdown |
-| `ChipGroupWidget` | `list[Literal[...]]` | Clickable chip group; `vertical=True` supported |
-
-### Boolean
-
-| Widget | Schema type |
-|--------|-------------|
-| `CheckboxWidget` | `bool` |
-| `SwitchWidget` | `bool` |
+| `CheckboxGroupWidget` | `list[Literal[...]]` | Checkbox group; `vertical=True` supported |
 
 ### Numeric
 
@@ -231,11 +236,23 @@ GroupWidget("address", label="Location", children=[
 ])
 ```
 
-**`ListableWidget`** — repeatable list of sub-widgets for `list[SomeModel]` fields:
+**`ListableWidget`** — repeatable list of sub-widgets for `list[SomeModel]` fields, rendered as a vertical stack of cards:
 ```python
-ListableWidget("tags", label="Tags", item_widgets=[
-    TextInputWidget("tags.$.value", label="Tag"),
+ListableWidget("findings", label="Findings", item_label="Finding", item_widgets=[
+    RadioGroupWidget("label", label="Label"),
 ])
+```
+
+**`TabsWidget`** — same as `ListableWidget` but items are shown as switchable tabs.
+
+**`AccordionWidget`** — same as `ListableWidget` but items are shown as collapsible accordion panels.
+
+### Divider
+
+**`DividerWidget`** — a labeled horizontal rule for visually separating sections. Has no schema field and contributes nothing to the annotation model:
+```python
+DividerWidget(label="Clinical Findings")
+DividerWidget(label="Demographics", description="Patient background info")
 ```
 
 ### Span annotation
@@ -262,15 +279,26 @@ SpanAnnotationWidget(
 Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`.
 
 ```python
-from tater.widgets import HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, load_hierarchy_from_yaml
+from tater.widgets import (
+    HierarchicalLabelCompactWidget,
+    HierarchicalLabelFullWidget,
+    HierarchicalLabelTagsWidget,
+    load_hierarchy_from_yaml,
+)
 
 ontology = load_hierarchy_from_yaml("data/ontology.yaml")
 
-HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
-HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
+# Shows only the selected node at each level (compact breadcrumb-style)
+HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
+
+# Shows all siblings at every expanded level with a breadcrumb below the search bar
+HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
+
+# Multi-select: chosen leaves appear as removable pills (field must be Optional[str] per tag)
+HierarchicalLabelTagsWidget("tags", label="Tags", hierarchy=ontology)
 ```
 
-Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+All three accept `searchable=True` (default). Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
 
 ## Document format
 
