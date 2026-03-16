@@ -1,10 +1,29 @@
 """Shared fixtures for tater tests."""
+import os
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
 import pytest
 
 from tater import SpanAnnotation
+
+
+# ---------------------------------------------------------------------------
+# Browser driver setup — use webdriver-manager to fetch a matching chromedriver
+# for the installed google-chrome, and register it via pytest_setup_options.
+# ---------------------------------------------------------------------------
+
+def pytest_setup_options():
+    from selenium.webdriver.chrome.options import Options
+    from webdriver_manager.chrome import ChromeDriverManager
+
+    options = Options()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    # Install/cache the correct chromedriver and put it on PATH
+    driver_path = ChromeDriverManager().install()
+    os.environ["PATH"] = os.path.dirname(driver_path) + ":" + os.environ.get("PATH", "")
+    return options
 
 
 # ---------------------------------------------------------------------------
