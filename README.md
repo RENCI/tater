@@ -7,7 +7,7 @@ A Python library for building document annotation interfaces with [Pydantic](htt
 Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
 ## Installation
-Install via `uv` (recommended) or `pip`.
+Install via [uv](https://docs.astral.sh/uv/) (recommended) or `pip`.
 
 ### uv
 
