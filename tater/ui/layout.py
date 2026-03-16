@@ -204,9 +204,9 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
 def _build_app_footer() -> dmc.AppShellFooter:
     """Sticky footer: save status + timer (left), navigation controls (right)."""
     return dmc.AppShellFooter(
-        dmc.Group(
+        dmc.Flex(
             [
-                # Left: timer + save status
+                # Timer (fixed width)
                 dmc.Group([
                     dmc.ActionIcon(
                         DashIconify(icon="tabler:player-pause", width=16),
@@ -215,15 +215,17 @@ def _build_app_footer() -> dmc.AppShellFooter:
                         variant="outline",
                     ),
                     dmc.Text(id="timing-text", size="sm", c="dimmed"),
-                    dmc.Divider(orientation="vertical"),
-                    dmc.Text(id="save-status-text", size="sm", c="dimmed"),
-                ], gap="xs"),
-                # Right: navigation
+                ], gap="xs", wrap="nowrap"),
+                dmc.Divider(orientation="vertical"),
+                # Prev (grows)
+                dmc.Button(
+                    "Previous", id="btn-prev", variant="outline", size="sm",
+                    fullWidth=True,
+                    leftSection=DashIconify(icon="tabler:arrow-left", width=16),
+                    style={"flex": "1"},
+                ),
+                # Selector + flag (grows)
                 dmc.Group([
-                    dmc.Button(
-                        "Previous", id="btn-prev", variant="outline", size="sm",
-                        leftSection=DashIconify(icon="tabler:arrow-left", width=16),
-                    ),
                     dmc.Menu([
                         dmc.MenuTarget(
                             dmc.Button(
@@ -231,31 +233,47 @@ def _build_app_footer() -> dmc.AppShellFooter:
                                 id="document-selector-button",
                                 variant="outline",
                                 size="sm",
-                                rightSection=DashIconify(icon="tabler:chevron-down", width=16),
+                                fullWidth=True,
+                                rightSection=DashIconify(icon="tabler:selector", width=16),
+                                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)"},
                             ),
-                            boxWrapperProps={"className": "menu-target-wrapper"},
+                            boxWrapperProps={"className": "menu-target-wrapper", "style": {"flex": "1", "minWidth": 0}},
                         ),
                         dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
-                    ], position="top-start", withArrow=True, withinPortal=True, width=300, zIndex=600),
-                    dmc.Checkbox(id="filter-flagged", label="Flagged", size="xs", checked=False),
-                    dmc.ButtonGroup([
-                        dmc.Button(
-                            "Next", id="btn-next", variant="outline", size="sm",
-                            rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                        ),
-                        dmc.Button(
-                            DashIconify(icon="tabler:device-floppy", width=16),
-                            id="btn-save",
-                            variant="outline",
-                            size="sm",
-                            px="xs",
-                        ),
-                    ]),
-                ], gap="sm"),
+                    ], position="top-start", withArrow=True, withinPortal=True, width="target", zIndex=600),
+                    dmc.Button(
+                        DashIconify(icon="tabler:flag", width=16),
+                        id="filter-flagged",
+                        size="sm",
+                        variant="outline",
+                        px="xs",
+                        style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                    ),
+                ], gap=0, wrap="nowrap", style={"flex": "1"}),
+                # Next + save (grows)
+                dmc.Group([
+                    dmc.Button(
+                        "Next", id="btn-next", variant="outline", size="sm",
+                        fullWidth=True,
+                        rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                        style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+                    ),
+                    dmc.Button(
+                        DashIconify(icon="tabler:device-floppy", width=16),
+                        id="btn-save",
+                        variant="outline",
+                        size="sm",
+                        px="xs",
+                        style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                    ),
+                ], gap=0, wrap="nowrap", style={"flex": "1"}),
+                dmc.Divider(orientation="vertical"),
+                # Save status (fixed width)
+                dmc.Text(id="save-status-text", size="sm", c="dimmed", ta="right"),
             ],
             px="md",
             align="center",
-            justify="space-between",
+            gap="sm",
             style={"height": "100%"},
         ),
         style={"borderTop": "1px solid #e9ecef", "backgroundColor": "#f8f9fa"},
