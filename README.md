@@ -95,7 +95,7 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | Name | Required | Description |
 |------|----------|-------------|
 | `Schema` | **yes** | Pydantic `BaseModel` subclass defining the annotation fields |
-| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest |
+| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget` and hierarchical label widgets cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
 | `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
@@ -143,14 +143,14 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 
 | `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
 |--------|-------------|----------------|----------------------------------|
+| `boolean` | `bool` | `CheckboxWidget` | `switch`, `chip_boolean` |
 | `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_radio` |
 | `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `checkbox_group` |
-| `text` | `str` | `TextInputWidget` | `text_area` |
-| `boolean` | `bool` | `CheckboxWidget` | `switch`, `chip_boolean` |
 | `numeric` | `float` | `NumberInputWidget` | `slider` |
 | `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
+| `text` | `str` | `TextInputWidget` | `text_area` |
 | `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
-| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full`, `hierarchical_label_tags` |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelTagsWidget` | `hierarchical_label_compact`, `hierarchical_label_full` |
 | `group` | nested model | `GroupWidget` | — |
 | `listable` | `list[model]` | `ListableWidget` | `tabs`, `accordion` |
 | `divider` | — | `DividerWidget` | — |
@@ -257,7 +257,7 @@ DividerWidget(label="Demographics", description="Patient background info")
 
 ### Span annotation
 
-**`SpanAnnotationWidget`** — highlight text spans and assign entity types. Schema field must be `list[SpanAnnotation]`:
+**`SpanAnnotationWidget`** — highlight text spans and assign entity types. Schema field must be `list[SpanAnnotation]`. **Must always be specified explicitly in `widgets`** — auto-generation produces a widget with no entity types.
 
 ```python
 from tater import SpanAnnotation
@@ -276,7 +276,7 @@ SpanAnnotationWidget(
 
 ### Hierarchical label
 
-Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`.
+Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`. **Must always be specified explicitly in `widgets`** — `Optional[str]` is indistinguishable from a plain text field during auto-generation.
 
 ```python
 from tater.widgets import (
