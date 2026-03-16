@@ -80,7 +80,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     )
 
     return dmc.MantineProvider(
-        theme={"colorScheme": tater_app.theme},
+        defaultColorScheme=tater_app.theme,
         children=[
             dmc.NotificationContainer(
                 id="notification-container",
@@ -160,6 +160,7 @@ def _build_document_controls() -> dmc.Stack:
     ], gap="sm")
 
 
+
 def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShellHeader:
     """Sticky header: app title (left) + document title / status badge (right)
     with a full-width progress bar flush to the bottom edge."""
@@ -183,8 +184,20 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
         style={"flex": "1"},
     )
 
+    theme_toggle = dmc.ColorSchemeToggle(
+        computedColorScheme=tater_app.theme,
+        lightIcon=DashIconify(icon="tabler:sun", width=20),
+        darkIcon=DashIconify(icon="tabler:moon", width=20),
+        size="sm",
+    )
+
+    right_children = [theme_toggle]
+    if help_button:
+        right_children.append(help_button)
+
     right = dmc.Group(
-        [help_button] if help_button else [],
+        right_children,
+        gap="xs",
         style={"flex": "1"},
         justify="flex-end",
     )
@@ -284,5 +297,5 @@ def _build_app_footer() -> dmc.AppShellFooter:
             px="md",
             py="xs",
         ),
-        style={"borderTop": "1px solid #e9ecef", "backgroundColor": "#f8f9fa"},
+        style={"borderTop": "1px solid var(--mantine-color-default-border)", "backgroundColor": "var(--mantine-color-body)"},
     )
