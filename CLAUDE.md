@@ -110,20 +110,25 @@ Widget base class hierarchy in `base.py`:
 - `TaterWidget` — abstract root; all widgets inherit from this
 - `ControlWidget(TaterWidget)` — leaf widgets that capture a value; adds `required`, `auto_advance`, `value_prop`, `empty_value`
   - `ChoiceWidget` — single `Literal[...]` field; derives `options` from schema
-    - `SegmentedControlWidget`, `RadioGroupWidget`, `SelectWidget`, `ChipGroupWidget`
+    - `SegmentedControlWidget`, `RadioGroupWidget`, `SelectWidget`, `ChipRadioWidget`
   - `MultiChoiceWidget` — `List[Literal[...]]` field; derives `options` from schema
-    - `MultiSelectWidget`
+    - `MultiSelectWidget`, `CheckboxGroupWidget`
   - `BooleanWidget` — `bool` field; `value_prop = "checked"`
-    - `CheckboxWidget`, `SwitchWidget`
+    - `CheckboxWidget`, `SwitchWidget`, `ChipWidget`
   - `NumericWidget` — numeric field
     - `NumberInputWidget`, `SliderWidget`, `RangeSliderWidget`
   - `TextWidget` — string field
     - `TextInputWidget`, `TextAreaWidget`
+  - `SpanAnnotationWidget` — `List[SpanAnnotation]` field (in `span.py`)
+  - `HierarchicalLabelWidget` (abstract, in `hierarchical_label.py`) — `str` / `Optional[str]` field
+    - `HierarchicalLabelTagsWidget`, `HierarchicalLabelCompactWidget`, `HierarchicalLabelFullWidget`
 - `ContainerWidget(TaterWidget)` — widgets that contain other widgets
   - `GroupWidget` — groups widgets for a nested sub-model (`schema_field` is a dot-path prefix)
   - `RepeaterWidget` (abstract, in `repeater.py`) — manages a `List[ItemModel]` field; subclasses:
     - `ListableWidget` — items as a vertical stack of bordered cards
     - `TabsWidget` — items as switchable tabs
+    - `AccordionWidget` — items as collapsible accordion panels
+- `DividerWidget` — structural only; no schema field, no value capture
 
 - Constructor signature: `(schema_field, label="", description=None, ...)`.
 - `renders_own_label` property: if `True`, the widget renders its own label (skips the outer
@@ -158,14 +163,16 @@ Widget base class hierarchy in `base.py`:
 - All widgets listed in README
 - Manual widget definition (user provides widget list)
 - Nested models via GroupWidget (dot-path `schema_field`)
-- Repeatable lists via ListableWidget (card stack) and TabsWidget (tab UI)
+- Repeatable lists via ListableWidget (card stack), TabsWidget (tabs), AccordionWidget (accordion)
 - Span annotation, including SpanAnnotationWidget nested inside ListableWidget/TabsWidget
-- Hierarchical label (compact + full)
+- Hierarchical label (tags, compact, full)
 - Auto-save, progress tracking, flag/notes, annotation timing
 - Conditional visibility (`conditional_on`)
-- Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
-  MultiSelectWidget, CheckboxWidget, SwitchWidget, NumberInputWidget, SliderWidget,
-  RangeSliderWidget, TextInputWidget, TextAreaWidget
+- Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipRadioWidget,
+  MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
+  NumberInputWidget, SliderWidget, RangeSliderWidget, TextInputWidget, TextAreaWidget,
+  SpanAnnotationWidget, HierarchicalLabelTagsWidget, HierarchicalLabelCompactWidget,
+  HierarchicalLabelFullWidget, DividerWidget
 
 ## Tests
 
