@@ -7,6 +7,9 @@ A Python library for building document annotation interfaces with [Pydantic](htt
 Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
 ## Installation
+Install via `pip`, or `uv` (recommended)
+
+### pip
 
 ```bash
 pip install .
@@ -18,10 +21,14 @@ For development (editable install):
 pip install -e .
 ```
 
-— or with uv —
+### uv
 
 ```bash
 uv sync
+```
+By default, uv will create a virtual environment in `.venv`. To activiate it:
+```
+source .venv/bin/activate
 ```
 
 ## Quick Start
@@ -315,3 +322,40 @@ tater --schema SCHEMA --documents PATH [options]
 | `--debug` | Enable debug/hot-reload mode |
 
 Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
+
+## Testing
+
+### Setup
+
+Install dev dependencies (includes `pytest`, `dash[testing]`, and `webdriver-manager`):
+
+```bash
+uv sync --group dev
+source .venv/bin/activate
+```
+
+Browser tests require Google Chrome. Install it once via the `.deb` package:
+
+```bash
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+sudo apt-get install -f   # resolve any missing dependencies
+```
+
+`webdriver-manager` automatically downloads a matching ChromeDriver on first run — no manual driver install needed.
+
+### Running tests
+
+```bash
+# Unit and integration tests (fast, no browser)
+python -m pytest tests/ --ignore=tests/test_browser.py
+
+# Browser tests (headless Chrome, ~45s)
+python -m pytest tests/test_browser.py --headless
+
+# Full suite
+python -m pytest tests/ --headless
+
+# With coverage
+python -m pytest tests/ --ignore=tests/test_browser.py --cov=tater --cov-report=term-missing
+```

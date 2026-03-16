@@ -57,6 +57,10 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
   Format: `{doc_id: {annotations: {...}, metadata: {...}}}`.
 - **value_helpers**: `get_model_value` / `set_model_value` in `tater/ui/value_helpers.py`
   handle dot-path reads/writes into nested Pydantic model instances.
+- **Flag/notes loading**: `load_flag_and_notes` in `callbacks.py` fires on `current-doc-id`
+  change and populates both `flag-document` (checked) and `document-notes` (value) from
+  `tater_app.metadata`. This is the only callback that writes to these outputs on navigation —
+  the corresponding `save_flag` / `save_notes` callbacks only write on user interaction.
 
 ## DMC version constraints
 
@@ -162,6 +166,29 @@ Widget base class hierarchy in `base.py`:
 - Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
   MultiSelectWidget, CheckboxWidget, SwitchWidget, NumberInputWidget, SliderWidget,
   RangeSliderWidget, TextInputWidget, TextAreaWidget
+
+## Tests
+
+Tests live in `tests/`. Run with:
+
+```bash
+python -m pytest tests/ --ignore=tests/test_browser.py   # fast, no browser
+python -m pytest tests/test_browser.py --headless         # browser tests
+python -m pytest tests/ --headless                        # full suite
+```
+
+**Test files:**
+- `test_value_helpers.py` — `get_model_value` / `set_model_value` and dict variants
+- `test_has_value.py` — `_has_value` predicate
+- `test_bind_schema.py` — `bind_schema` for all widget types (happy path + error cases)
+- `test_component_id.py` — `component_id` and `conditional_wrapper_id` derivation
+- `test_decode_field_path.py` — `_decode_field_path` for standalone, single-repeater, and doubly-nested cases
+- `test_save_load.py` — `TaterApp` save/load round-trip (no browser): flat fields, nested models, `SpanAnnotation` lists, metadata, schema-mismatch warnings
+- `test_browser.py` — `dash.testing` browser tests: navigation, flag, notes
+
+**Browser test setup** requires Google Chrome (`.deb`, not snap) and `webdriver-manager`. The `pytest_setup_options` hook in `conftest.py` auto-installs a matching ChromeDriver via `webdriver-manager` on first run.
+
+**`conftest.py`** defines shared Pydantic model fixtures (`Schema`, `Pet`, `Finding`, `Measurements`, etc.) used across unit tests, and the `pytest_setup_options` hook for browser driver configuration.
 
 ## spec/ files
 
