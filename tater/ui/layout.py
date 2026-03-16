@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 from tater.ui.callbacks import _has_any_span as _has_any_span_widgets
 
-# Header: 52px content row + 4px progress bar
-_HEADER_HEIGHT = 56
+# Header: 48px content row + 4px progress bar
+_HEADER_HEIGHT = 52
 # Footer: single row of nav controls + status
 _FOOTER_HEIGHT = 60
 
@@ -66,6 +66,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
             dmc.AppShellMain(
                 dmc.Container([
                     dmc.Stack([
+                        dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
                         dmc.Text(id="document-metadata", size="sm", c="dimmed"),
                         content_grid,
                     ], gap="lg"),
@@ -171,32 +172,29 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
         ) if has_instructions else None
     )
 
-    title_children = [dmc.Title(tater_app.title, order=4)]
-    if help_button:
-        title_children.append(help_button)
-
-    left = dmc.Stack(
-        [
-            dmc.Group(title_children, gap="xs"),
-            dmc.Text(tater_app.description, size="xs", c="dimmed"),
-        ] if tater_app.description else [
-            dmc.Group(title_children, gap="xs"),
-        ],
-        gap=2,
-        justify="center",
-    )
-
-    right = dmc.Group([
+    left = dmc.Group([
         dmc.Text(id="document-title", fw=500, size="sm"),
         dmc.Badge(id="status-badge", variant="light", size="sm"),
-    ], gap="sm")
+    ], gap="sm", style={"flex": "1"})
+
+    center = dmc.Group(
+        [dmc.Title(tater_app.title, order=3)],
+        justify="center",
+        style={"flex": "1"},
+    )
+
+    right = dmc.Group(
+        [help_button] if help_button else [],
+        style={"flex": "1"},
+        justify="flex-end",
+    )
 
     return dmc.AppShellHeader([
         dmc.Group(
-            [left, right],
+            [left, center, right],
             px="md",
             align="center",
-            justify="space-between",
+            wrap="nowrap",
             style={"height": f"{_HEADER_HEIGHT - 4}px"},
         ),
         dmc.Progress(id="document-progress", value=0, size="xs", radius=0),
