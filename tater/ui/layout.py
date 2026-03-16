@@ -70,13 +70,13 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                         dmc.Text(id="document-metadata", size="sm", c="dimmed"),
                         content_grid,
                     ], gap="lg"),
-                ], size="xl", py="md", fluid=True),
+                ], size="xl", pt="xs", px="xs", fluid=True),
             ),
             _build_app_footer(),
         ],
         header={"height": _HEADER_HEIGHT},
         footer={"height": _FOOTER_HEIGHT},
-        padding="md",
+        padding="xs",
     )
 
     return dmc.MantineProvider(
