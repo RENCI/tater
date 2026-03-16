@@ -57,6 +57,10 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
   Format: `{doc_id: {annotations: {...}, metadata: {...}}}`.
 - **value_helpers**: `get_model_value` / `set_model_value` in `tater/ui/value_helpers.py`
   handle dot-path reads/writes into nested Pydantic model instances.
+- **Flag/notes loading**: `load_flag_and_notes` in `callbacks.py` fires on `current-doc-id`
+  change and populates both `flag-document` (checked) and `document-notes` (value) from
+  `tater_app.metadata`. This is the only callback that writes to these outputs on navigation —
+  the corresponding `save_flag` / `save_notes` callbacks only write on user interaction.
 
 ## DMC version constraints
 
@@ -106,20 +110,25 @@ Widget base class hierarchy in `base.py`:
 - `TaterWidget` — abstract root; all widgets inherit from this
 - `ControlWidget(TaterWidget)` — leaf widgets that capture a value; adds `required`, `auto_advance`, `value_prop`, `empty_value`
   - `ChoiceWidget` — single `Literal[...]` field; derives `options` from schema
-    - `SegmentedControlWidget`, `RadioGroupWidget`, `SelectWidget`, `ChipGroupWidget`
+    - `SegmentedControlWidget`, `RadioGroupWidget`, `SelectWidget`, `ChipRadioWidget`
   - `MultiChoiceWidget` — `List[Literal[...]]` field; derives `options` from schema
-    - `MultiSelectWidget`
+    - `MultiSelectWidget`, `CheckboxGroupWidget`
   - `BooleanWidget` — `bool` field; `value_prop = "checked"`
-    - `CheckboxWidget`, `SwitchWidget`
+    - `CheckboxWidget`, `SwitchWidget`, `ChipWidget`
   - `NumericWidget` — numeric field
     - `NumberInputWidget`, `SliderWidget`, `RangeSliderWidget`
   - `TextWidget` — string field
     - `TextInputWidget`, `TextAreaWidget`
+  - `SpanAnnotationWidget` — `List[SpanAnnotation]` field (in `span.py`)
+  - `HierarchicalLabelWidget` (abstract, in `hierarchical_label.py`) — `str` / `Optional[str]` field
+    - `HierarchicalLabelTagsWidget`, `HierarchicalLabelCompactWidget`, `HierarchicalLabelFullWidget`
 - `ContainerWidget(TaterWidget)` — widgets that contain other widgets
   - `GroupWidget` — groups widgets for a nested sub-model (`schema_field` is a dot-path prefix)
   - `RepeaterWidget` (abstract, in `repeater.py`) — manages a `List[ItemModel]` field; subclasses:
     - `ListableWidget` — items as a vertical stack of bordered cards
     - `TabsWidget` — items as switchable tabs
+    - `AccordionWidget` — items as collapsible accordion panels
+- `DividerWidget` — structural only; no schema field, no value capture
 
 - Constructor signature: `(schema_field, label="", description=None, ...)`.
 - `renders_own_label` property: if `True`, the widget renders its own label (skips the outer
@@ -154,14 +163,39 @@ Widget base class hierarchy in `base.py`:
 - All widgets listed in README
 - Manual widget definition (user provides widget list)
 - Nested models via GroupWidget (dot-path `schema_field`)
-- Repeatable lists via ListableWidget (card stack) and TabsWidget (tab UI)
+- Repeatable lists via ListableWidget (card stack), TabsWidget (tabs), AccordionWidget (accordion)
 - Span annotation, including SpanAnnotationWidget nested inside ListableWidget/TabsWidget
-- Hierarchical label (compact + full)
+- Hierarchical label (tags, compact, full)
 - Auto-save, progress tracking, flag/notes, annotation timing
 - Conditional visibility (`conditional_on`)
-- Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipGroupWidget,
-  MultiSelectWidget, CheckboxWidget, SwitchWidget, NumberInputWidget, SliderWidget,
-  RangeSliderWidget, TextInputWidget, TextAreaWidget
+- Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipRadioWidget,
+  MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
+  NumberInputWidget, SliderWidget, RangeSliderWidget, TextInputWidget, TextAreaWidget,
+  SpanAnnotationWidget, HierarchicalLabelTagsWidget, HierarchicalLabelCompactWidget,
+  HierarchicalLabelFullWidget, DividerWidget
+
+## Tests
+
+Tests live in `tests/`. Run with:
+
+```bash
+python -m pytest tests/ --ignore=tests/test_browser.py   # fast, no browser
+python -m pytest tests/test_browser.py --headless         # browser tests
+python -m pytest tests/ --headless                        # full suite
+```
+
+**Test files:**
+- `test_value_helpers.py` — `get_model_value` / `set_model_value` and dict variants
+- `test_has_value.py` — `_has_value` predicate
+- `test_bind_schema.py` — `bind_schema` for all widget types (happy path + error cases)
+- `test_component_id.py` — `component_id` and `conditional_wrapper_id` derivation
+- `test_decode_field_path.py` — `_decode_field_path` for standalone, single-repeater, and doubly-nested cases
+- `test_save_load.py` — `TaterApp` save/load round-trip (no browser): flat fields, nested models, `SpanAnnotation` lists, metadata, schema-mismatch warnings
+- `test_browser.py` — `dash.testing` browser tests: navigation, flag, notes
+
+**Browser test setup** requires Google Chrome (`.deb`, not snap) and `webdriver-manager`. The `pytest_setup_options` hook in `conftest.py` auto-installs a matching ChromeDriver via `webdriver-manager` on first run.
+
+**`conftest.py`** defines shared Pydantic model fixtures (`Schema`, `Pet`, `Finding`, `Measurements`, etc.) used across unit tests, and the `pytest_setup_options` hook for browser driver configuration.
 
 ## spec/ files
 

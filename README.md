@@ -7,6 +7,28 @@ A Python library for building document annotation interfaces with [Pydantic](htt
 Define your annotation schema as a Pydantic model, pick widgets, and get a web-based annotation app with auto-save, progress tracking, and document navigation.
 
 ## Installation
+Install via `uv` (recommended) or `pip`.
+
+### uv
+
+```bash
+uv sync
+```
+By default, uv will create a virtual environment in `.venv`. To activate it:
+```bash
+source .venv/bin/activate
+```
+
+### pip
+
+Optionally create and activate a virtual environment first, e.g.:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Then install:
 
 ```bash
 pip install .
@@ -16,12 +38,6 @@ For development (editable install):
 
 ```bash
 pip install -e .
-```
-
-— or with uv —
-
-```bash
-uv sync
 ```
 
 ## Quick Start
@@ -88,12 +104,143 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | Name | Required | Description |
 |------|----------|-------------|
 | `Schema` | **yes** | Pydantic `BaseModel` subclass defining the annotation fields |
-| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest |
+| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget` and hierarchical label widgets cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
 | `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
 | `on_save` | no | Callable `(doc_id: str, annotation: BaseModel) -> None` called after each auto-save |
 | `configure` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks |
+
+## Widgets
+
+Widgets are linked to Pydantic model fields by `schema_field`. Options for choice widgets are
+inferred from the field's `Literal` type — no manual list needed.
+
+All widgets accept `label`, `description`, and most accept `required`.
+
+### Boolean
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `CheckboxWidget` | `bool` | |
+| `SwitchWidget` | `bool` | Toggle switch |
+| `ChipWidget` | `bool` | Single toggleable chip |
+
+### Single choice
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `SegmentedControlWidget` | `Literal[...]` | Horizontal button group; `vertical=True` supported |
+| `RadioGroupWidget` | `Literal[...]` | Radio buttons; `vertical=True` supported |
+| `SelectWidget` | `Literal[...]` | Searchable dropdown |
+| `ChipRadioWidget` | `Literal[...]` | Chip-style radio buttons; `vertical=True` supported |
+
+### Multiple choice
+
+| Widget | Schema type | Notes |
+|--------|-------------|-------|
+| `MultiSelectWidget` | `list[Literal[...]]` | Searchable multi-select dropdown |
+| `CheckboxGroupWidget` | `list[Literal[...]]` | Checkbox group; `vertical=True` supported |
+
+### Numeric
+
+| Widget | Schema type | Extra params |
+|--------|-------------|--------------|
+| `NumberInputWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+| `SliderWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
+| `RangeSliderWidget` | `Optional[list[float]]` | `min_value`, `max_value`, `step` |
+
+### Text
+
+| Widget | Schema type | Extra params |
+|--------|-------------|--------------|
+| `TextInputWidget` | `str` | `placeholder` |
+| `TextAreaWidget` | `str` | `placeholder` |
+
+### Specialized
+
+These widgets require explicit configuration and **must always be included in your `widgets` list** — they cannot be usefully auto-generated.
+
+#### Span annotation
+
+**`SpanAnnotationWidget`** — highlight text spans and assign entity types. Schema field must be `list[SpanAnnotation]`. Auto-generation produces a widget with no entity types.
+
+```python
+from tater import SpanAnnotation
+from tater.widgets import SpanAnnotationWidget, EntityType
+
+SpanAnnotationWidget(
+    "entities",
+    label="Entities",
+    entity_types=[
+        EntityType("Medication"),
+        EntityType("Diagnosis"),
+        EntityType("Symptom"),
+    ],
+)
+```
+
+#### Hierarchical label
+
+Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
+
+```python
+from tater.widgets import (
+    HierarchicalLabelCompactWidget,
+    HierarchicalLabelFullWidget,
+    HierarchicalLabelTagsWidget,
+    load_hierarchy_from_yaml,
+)
+
+ontology = load_hierarchy_from_yaml("data/ontology.yaml")
+
+# Chosen leaves appear as removable pills
+HierarchicalLabelTagsWidget("tags", label="Tags", hierarchy=ontology)
+
+# Shows only the selected node at each level (compact breadcrumb-style)
+HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
+
+# Shows all siblings at every expanded level with a breadcrumb below the search bar
+HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
+```
+
+All three accept `searchable=True` (default). Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+
+### Containers
+
+**`GroupWidget`** — groups child widgets under a nested Pydantic model field:
+```python
+class Address(BaseModel):
+    city: str
+    country: str
+
+class Doc(BaseModel):
+    address: Address
+
+GroupWidget("address", label="Location", children=[
+    TextInputWidget("address.city", label="City"),
+    TextInputWidget("address.country", label="Country"),
+])
+```
+
+**`ListableWidget`** — repeatable list of sub-widgets for `list[SomeModel]` fields, rendered as a vertical stack of cards:
+```python
+ListableWidget("findings", label="Findings", item_label="Finding", item_widgets=[
+    RadioGroupWidget("label", label="Label"),
+])
+```
+
+**`TabsWidget`** — same as `ListableWidget` but items are shown as switchable tabs.
+
+**`AccordionWidget`** — same as `ListableWidget` but items are shown as collapsible accordion panels.
+
+### Divider
+
+**`DividerWidget`** — a labeled horizontal rule for visually separating sections. Has no schema field and does not contribute to the annotation model:
+```python
+DividerWidget(label="Clinical Findings")
+DividerWidget(label="Demographics", description="Patient background info")
+```
 
 ## JSON schema reference
 
@@ -136,16 +283,17 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 
 | `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
 |--------|-------------|----------------|----------------------------------|
-| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_group` |
-| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `chip_group` |
-| `text` | `str` | `TextInputWidget` | `text_area` |
-| `boolean` | `bool` | `CheckboxWidget` | `switch` |
+| `boolean` | `bool` | `CheckboxWidget` | `switch`, `chip_boolean` |
+| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_radio` |
+| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `checkbox_group` |
 | `numeric` | `float` | `NumberInputWidget` | `slider` |
 | `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
+| `text` | `str` | `TextInputWidget` | `text_area` |
 | `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
-| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelCompactWidget` | `hierarchical_label_full` |
+| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelTagsWidget` | `hierarchical_label_compact`, `hierarchical_label_full` |
 | `group` | nested model | `GroupWidget` | — |
-| `listable` | `list[model]` | `ListableWidget` | — |
+| `listable` | `list[model]` | `ListableWidget` | `tabs`, `accordion` |
+| `divider` | — | `DividerWidget` | — |
 
 **`choice` / `multi_choice`** — requires `options` array.
 
@@ -161,123 +309,26 @@ Every entry in `data_schema` (and `item_fields` / `fields` for list/group types)
 
 **`group`** — requires `fields` array of child field definitions.
 
-**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`.
+**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`. Use `widget.type: "tabs"` or `"accordion"` for alternative layouts.
 
-## Widgets
-
-Widgets are linked to Pydantic model fields by `schema_field`. Options for choice widgets are
-inferred from the field's `Literal` type — no manual list needed.
-
-All widgets accept `label`, `description`, and most accept `required`.
-
-### Single choice
-
-| Widget | Schema type | Notes |
-|--------|-------------|-------|
-| `SegmentedControlWidget` | `Literal[...]` | Horizontal button group |
-| `RadioGroupWidget` | `Literal[...]` | Radio buttons; `vertical=True` supported |
-| `SelectWidget` | `Literal[...]` | Searchable dropdown |
-
-### Multiple choice
-
-| Widget | Schema type | Notes |
-|--------|-------------|-------|
-| `MultiSelectWidget` | `list[Literal[...]]` | Searchable multi-select dropdown |
-| `ChipGroupWidget` | `list[Literal[...]]` | Clickable chip group; `vertical=True` supported |
-
-### Boolean
-
-| Widget | Schema type |
-|--------|-------------|
-| `CheckboxWidget` | `bool` |
-| `SwitchWidget` | `bool` |
-
-### Numeric
-
-| Widget | Schema type | Extra params |
-|--------|-------------|--------------|
-| `NumberInputWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
-| `SliderWidget` | `int` / `float` | `min_value`, `max_value`, `step` |
-| `RangeSliderWidget` | `Optional[list[float]]` | `min_value`, `max_value`, `step` |
-
-### Text
-
-| Widget | Schema type | Extra params |
-|--------|-------------|--------------|
-| `TextInputWidget` | `str` | `placeholder` |
-| `TextAreaWidget` | `str` | `placeholder` |
-
-### Containers
-
-**`GroupWidget`** — groups child widgets under a nested Pydantic model field:
-```python
-class Address(BaseModel):
-    city: str
-    country: str
-
-class Doc(BaseModel):
-    address: Address
-
-GroupWidget("address", label="Location", children=[
-    TextInputWidget("address.city", label="City"),
-    TextInputWidget("address.country", label="Country"),
-])
-```
-
-**`ListableWidget`** — repeatable list of sub-widgets for `list[SomeModel]` fields:
-```python
-ListableWidget("tags", label="Tags", item_widgets=[
-    TextInputWidget("tags.$.value", label="Tag"),
-])
-```
-
-### Span annotation
-
-**`SpanAnnotationWidget`** — highlight text spans and assign entity types. Schema field must be `list[SpanAnnotation]`:
-
-```python
-from tater import SpanAnnotation
-from tater.widgets import SpanAnnotationWidget, EntityType
-
-SpanAnnotationWidget(
-    "entities",
-    label="Entities",
-    entity_types=[
-        EntityType("Medication"),
-        EntityType("Diagnosis"),
-        EntityType("Symptom"),
-    ],
-)
-```
-
-### Hierarchical label
-
-Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`.
-
-```python
-from tater.widgets import HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, load_hierarchy_from_yaml
-
-ontology = load_hierarchy_from_yaml("data/ontology.yaml")
-
-HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
-HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, searchable=True)
-```
-
-Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+**`divider`** — no `id` required. Optional `label` and `description`. Does not contribute to the annotation model.
 
 ## Document format
 
-JSON file listing documents to annotate:
+JSON file listing documents to annotate. Document text can be provided inline or via a file path (exactly one is required):
 
 ```json
 [
+  {"text": "Inline document text goes here."},
+  {"text": "Inline document text also goes here.", "name": "Patient 1", "info": {"date": "2024-01-15"}},
   {"file_path": "data/note_001.txt"},
-  {"file_path": "data/note_002.txt", "name": "Patient 2", "info": {"date": "2024-01-15"}}
+  {"file_path": "data/note_002.txt", "name": "Patient 2", "info": {"date": "2024-01-16"}}
 ]
 ```
 
 Each document may have:
-- `file_path` (required) — path to a `.txt` file
+- `text` — inline document text (use this or `file_path`, not both)
+- `file_path` — path to a `.txt` file (use this or `text`, not both)
 - `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
 - `name` — display name
 - `info` — arbitrary metadata dict shown in the UI
@@ -315,3 +366,40 @@ tater --schema SCHEMA --documents PATH [options]
 | `--debug` | Enable debug/hot-reload mode |
 
 Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
+
+## Testing
+
+### Setup
+
+Install dev dependencies (includes `pytest`, `dash[testing]`, and `webdriver-manager`):
+
+```bash
+uv sync --group dev
+source .venv/bin/activate
+```
+
+Browser tests require Google Chrome. Install it once via the `.deb` package:
+
+```bash
+wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+sudo apt-get install -f   # resolve any missing dependencies
+```
+
+`webdriver-manager` automatically downloads a matching ChromeDriver on first run — no manual driver install needed.
+
+### Running tests
+
+```bash
+# Unit and integration tests (fast, no browser)
+python -m pytest tests/ --ignore=tests/test_browser.py
+
+# Browser tests (headless Chrome, ~45s)
+python -m pytest tests/test_browser.py --headless
+
+# Full suite
+python -m pytest tests/ --headless
+
+# With coverage
+python -m pytest tests/ --ignore=tests/test_browser.py --cov=tater --cov-report=term-missing
+```

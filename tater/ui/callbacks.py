@@ -155,6 +155,20 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     def update_menu_items(timing_data, status_data, flagged_only):
         return _build_menu_items(tater_app, flagged_only=bool(flagged_only))
 
+    # Load flag and notes from metadata when the document changes.
+    @app.callback(
+        Output("flag-document", "checked"),
+        Output("document-notes", "value"),
+        Input("current-doc-id", "data"),
+    )
+    def load_flag_and_notes(doc_id):
+        if not doc_id:
+            return False, ""
+        meta = tater_app.metadata.get(doc_id)
+        if meta is None:
+            return False, ""
+        return meta.flagged, meta.notes or ""
+
     # Handle flag-document changes
     # Outputs to timing-store so update_menu_items re-runs after metadata is updated.
     @app.callback(

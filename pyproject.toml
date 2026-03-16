@@ -27,3 +27,9 @@ packages = ["tater"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "dash[testing]>=4.0.0",
+    "webdriver-manager>=4.0.2",
+]

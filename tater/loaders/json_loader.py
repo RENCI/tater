@@ -65,7 +65,7 @@ Field types:
   ``numeric``           — number (default: NumberInputWidget)
   ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
   ``span_annotation``   — text span labelling (SpanAnnotationWidget)
-  ``hierarchical_label``— tree-based label (default: HierarchicalLabelCompactWidget)
+  ``hierarchical_label``— tree-based label (default: HierarchicalLabelTagsWidget)
   ``group``             — nested sub-model with ``fields``
   ``listable``          — repeatable list of sub-items with ``item_fields``
                           (widget type override: ``tabs`` or ``accordion``)
@@ -123,7 +123,6 @@ from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
 from tater.widgets.repeater import TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
-    HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
     HierarchicalLabelTagsWidget,
     build_tree,
@@ -234,9 +233,13 @@ def widgets_from_model(
     Args:
         model: A Pydantic ``BaseModel`` subclass.
         overrides: Widgets to use in place of the generated defaults. Matched
-                   by field name. Useful for fields whose type is ambiguous
-                   (e.g. ``hierarchical`` fields appear as ``Optional[str]``)
-                   or where a non-default widget is desired.
+                   by field name. Two widget types **must** always be supplied
+                   via overrides and cannot be usefully auto-generated:
+                   ``HierarchicalLabel*`` widgets (``Optional[str]`` is
+                   indistinguishable from a plain text field) and
+                   ``SpanAnnotationWidget`` (auto-generation produces a widget
+                   with no entity types). Use overrides for any other field
+                   where a non-default widget is desired.
 
     Returns:
         A list of ``TaterWidget`` instances ready to pass to
@@ -491,7 +494,7 @@ def _build_widget(
                 fid, label=label, description=description,
                 hierarchy=hierarchy, searchable=searchable,
             )
-        return HierarchicalLabelCompactWidget(
+        return HierarchicalLabelTagsWidget(
             fid, label=label, description=description,
             hierarchy=hierarchy, searchable=searchable,
         )
