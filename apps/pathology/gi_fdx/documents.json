@@ -1,0 +1,42 @@
+[
+  {
+    "id": "gi_001",
+    "info": {"source": "Colon, sigmoid, biopsy"},
+    "text": "COLON, SIGMOID, BIOPSY\n\nClinical History: 58-year-old male presenting for screening colonoscopy. No prior polyp history.\n\nMacroscopic Description: Received in formalin, one fragment of tan-pink tissue measuring 0.3 x 0.2 x 0.1 cm.\n\nMicroscopic Description: Sections show colonic mucosa with preserved crypt architecture. There is no increase in lamina propria cellularity. Goblet cells are numerous and well-formed. No dysplasia, no granulomata, no significant inflammation, and no evidence of malignancy.\n\nFinal Diagnosis: Colonic mucosa, within normal limits."
+  },
+  {
+    "id": "gi_002",
+    "info": {"source": "Stomach, antrum, biopsy"},
+    "text": "STOMACH, ANTRUM, BIOPSY\n\nClinical History: 44-year-old female with epigastric pain and dyspepsia. Endoscopy reveals erythematous antral mucosa.\n\nMacroscopic Description: Two fragments of tan-pink gastric mucosa, each measuring approximately 0.4 cm.\n\nMicroscopic Description: Sections show gastric antral mucosa with a mild to moderate chronic active inflammatory infiltrate in the lamina propria. Numerous curved bacilli consistent with Helicobacter pylori are identified overlying the surface epithelium. Intestinal metaplasia is not identified. No dysplasia or malignancy.\n\nFinal Diagnosis:\n1. Gastric antral mucosa with chronic active gastritis.\n2. Helicobacter pylori organisms identified (see note).\n\nNote: Recommend treatment per clinical protocol."
+  },
+  {
+    "id": "gi_003",
+    "info": {"source": "Colon, transverse, polypectomy"},
+    "text": "COLON, TRANSVERSE, POLYPECTOMY\n\nClinical History: 63-year-old female, surveillance colonoscopy following prior adenoma resection.\n\nMacroscopic Description: One polypoid fragment of tan-pink tissue measuring 0.8 x 0.6 x 0.4 cm. Submitted entirely.\n\nMicroscopic Description: Sections show a tubular adenoma with low-grade dysplasia. The crypts are elongated with pseudostratified nuclei showing mild nuclear enlargement and hyperchromasia. Mitotic figures are present but not atypical. No high-grade dysplasia. No evidence of invasive carcinoma. Excision appears complete.\n\nFinal Diagnosis: Colon, transverse, polypectomy — Tubular adenoma with low-grade dysplasia. Margins negative."
+  },
+  {
+    "id": "gi_004",
+    "info": {"source": "Colon, sigmoid, resection"},
+    "text": "SIGMOID COLON RESECTION\n\nClinical History: 71-year-old male presenting with rectal bleeding and change in bowel habits. CT scan demonstrated a sigmoid mass with no evidence of distant metastases.\n\nMacroscopic Description: Sigmoid colon segment measuring 22 cm in length. An ulcerated, circumferential mass measuring 4.5 x 4.0 cm is identified 8 cm from the distal resection margin. Cut surface shows grey-white tumor penetrating through the bowel wall into the pericolic fat.\n\nMicroscopic Description: Sections confirm a moderately differentiated adenocarcinoma of the colon (Grade 2). The tumor infiltrates through the muscularis propria into the pericolic adipose tissue (pT3). Lymphovascular invasion is identified. Perineural invasion is present focally. All surgical margins are free of tumor. Eleven lymph nodes identified, two of which contain metastatic adenocarcinoma (2/11).\n\nFinal Diagnosis:\n1. Sigmoid colon: Moderately differentiated adenocarcinoma, pT3 N1b Mx.\n2. Lymphovascular and perineural invasion present.\n3. Two of eleven lymph nodes positive for metastatic carcinoma (2/11).\n4. All resection margins negative."
+  },
+  {
+    "id": "gi_005",
+    "info": {"source": "Duodenum, second portion, biopsy"},
+    "text": "DUODENUM, SECOND PORTION, BIOPSY\n\nClinical History: 29-year-old female with iron deficiency anemia and diarrhea. Serology positive for anti-tTG IgA antibodies. Endoscopy shows scalloping of duodenal folds.\n\nMacroscopic Description: Four fragments of tan-pink duodenal mucosa, each 0.2–0.4 cm.\n\nMicroscopic Description: Sections show duodenal mucosa with marked villous blunting and crypt hyperplasia. Intraepithelial lymphocytosis is prominent (>25 IELs per 100 enterocytes). The lamina propria shows a moderate increase in plasma cells and lymphocytes. Goblet cells are reduced. Features are consistent with Marsh grade 3b celiac disease.\n\nFinal Diagnosis: Duodenal mucosa with villous atrophy and intraepithelial lymphocytosis, consistent with celiac disease (Marsh grade 3b). Clinical and serologic correlation recommended."
+  },
+  {
+    "id": "gi_006",
+    "info": {"source": "Colon, ascending, polypectomy"},
+    "text": "COLON, ASCENDING, POLYPECTOMY\n\nClinical History: 67-year-old male, routine surveillance colonoscopy. 5 mm sessile polyp in ascending colon.\n\nMacroscopic Description: Single fragment of tan-pink polypoid tissue measuring 0.5 x 0.4 x 0.3 cm.\n\nMicroscopic Description: Sections show a hyperplastic polyp. The crypts are elongated with serrated luminal architecture in the upper portions. The epithelium shows mature goblet cells with no dysplasia. There is no evidence of sessile serrated lesion morphology — the crypts lack basal dilation or horizontal growth. No malignancy.\n\nFinal Diagnosis: Colon, ascending, polypectomy — Hyperplastic polyp. No dysplasia identified."
+  },
+  {
+    "id": "gi_007",
+    "info": {"source": "Colon, cecum, biopsy"},
+    "text": "COLON, CECUM, BIOPSY\n\nClinical History: 52-year-old female with longstanding Crohn's disease, presenting with exacerbation of right lower quadrant pain.\n\nMacroscopic Description: Two fragments of tan-pink colonic mucosa, 0.5 and 0.3 cm.\n\nMicroscopic Description: Sections show colonic mucosa with a focally active chronic inflammatory infiltrate. There is architectural distortion with irregular crypt branching and crypt dropout. Non-caseating granulomata are identified in the lamina propria. Paneth cell metaplasia is present. No dysplasia. No malignancy.\n\nFinal Diagnosis:\n1. Cecal mucosa with chronic active colitis, architectural distortion, and granulomata.\n2. Features consistent with Crohn's disease involvement.\n3. No dysplasia identified."
+  },
+  {
+    "id": "gi_008",
+    "info": {"source": "Stomach, body, biopsy"},
+    "text": "STOMACH, BODY, BIOPSY\n\nClinical History: 61-year-old male with incidental gastric submucosal nodule detected on upper endoscopy. Endoscopic ultrasound suggests a hypoechoic lesion arising from the muscularis propria.\n\nMacroscopic Description: Core biopsy fragments of tan-grey tissue, aggregate 1.1 cm.\n\nMicroscopic Description: Sections show a cellular spindle cell neoplasm with fascicular growth pattern. Cells have elongate nuclei with mild atypia and a low mitotic rate (< 1 per 50 HPF). No necrosis. Immunohistochemical studies show diffuse strong positivity for CD117 (c-Kit) and DOG1. CD34 focally positive. S100 and SMA negative. Ki67 proliferation index approximately 2%.\n\nFinal Diagnosis: Gastric body biopsy — Gastrointestinal stromal tumor (GIST), low mitotic rate. See comment.\n\nComment: Based on size (radiologically estimated 2.1 cm) and mitotic rate, this falls into the very low risk category per AFIP criteria. Recommend oncology referral."
+  }
+]

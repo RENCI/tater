@@ -22,6 +22,8 @@ class Schema(BaseModel):
 title = "tater - deep nested"
 description = "Two levels of GroupWidget nesting demonstrating deep schema paths."
 
+instructions = "Fill in the document mood. Expand 'Address' then 'Location' to reach nested fields."
+
 widgets = [
     SegmentedControlWidget(
         schema_field="document_mood",

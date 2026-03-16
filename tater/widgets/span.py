@@ -114,34 +114,49 @@ class SpanAnnotationWidget(TaterWidget):
         return False
 
     def component(self) -> Any:
-        """Render the entity-type button row shown in the annotation panel."""
-        from dash import html
-        return html.Div(
-            id=f"span-entity-buttons-{self.component_id}",
-            children=self._make_buttons({}),
-        )
+        """Render the entity-type button row with inline stores."""
+        from dash import html, dcc
+        pipe_field = self.field_path.replace(".", "|")
+        return html.Div([
+            html.Div(
+                id={"type": "span-entity-buttons", "field": pipe_field},
+                children=self._make_buttons(pipe_field, {}),
+            ),
+            dcc.Store(id={"type": "span-selection", "field": pipe_field}, data=None),
+            dcc.Store(id={"type": "span-trigger", "field": pipe_field}, data=0),
+        ])
 
-    def _make_buttons(self, counts: dict) -> Any:
-        """Build the entity-type button group with per-entity span counts."""
+    def _make_buttons(self, pipe_field: str, counts: dict) -> Any:
+        """Build the entity-type button group with per-entity span counts.
+
+        ``pipe_field`` is the dot-path of this widget's field with dots replaced
+        by pipes (e.g. ``"findings|0|spans"``), used as the shared key in all
+        component dict IDs so that MATCH callbacks route correctly.
+        """
+        from dash import html
         buttons = [
-            dmc.Button(
-                et.name,
-                id={"type": "span-add-btn", "field": self.component_id, "tag": et.name},
-                size="xs",
-                variant="outline",
-                fw=600,
-                style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
-                       "color": "var(--mantine-color-gray-9)"},
-                rightSection=dmc.Badge(
-                    str(counts.get(et.name, 0)),
-                    size="sm",
-                    variant="filled",
-                    style={"backgroundColor": _lighten_hex(et.color, 0.7), "color": "var(--mantine-color-gray-9)", "lineHeight": "1"},
+            dmc.Indicator(
+                dmc.Button(
+                    et.name,
+                    id={"type": "span-add-btn", "field": pipe_field, "tag": et.name},
+                    size="xs",
+                    variant="outline",
+                    fw=600,
+                    style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
+                           "color": "var(--mantine-color-gray-9)"},
                 ),
+                label=str(counts.get(et.name, 0)),
+                color=et.color,
+                size=16,
+                disabled=counts.get(et.name, 0) == 0,
+                inline=True,
             )
             for et in self.entity_types
         ]
-        return dmc.Group(buttons, gap="xs", wrap="wrap")
+        return html.Div(
+            dmc.Group(buttons, gap="xs", wrap="wrap"),
+            **{"data-tater-field": pipe_field},
+        )
 
     def to_python_type(self) -> type:
         return list
@@ -156,142 +171,3 @@ class SpanAnnotationWidget(TaterWidget):
             if et.name == tag:
                 return _lighten_hex(et.color)
         return _lighten_hex("#ffe066")
-
-    # ------------------------------------------------------------------
-    # Callbacks
-    # ------------------------------------------------------------------
-
-    def register_callbacks(self, app: Any) -> None:
-        from dash import Input, Output, State, ALL, no_update
-        from tater.models.span import SpanAnnotation
-        from tater.ui import value_helpers
-
-        field_path = self.field_path
-        component_id = self.component_id
-        selection_store_id = f"span-selection-{component_id}"
-        trigger_store_id = f"span-trigger-{component_id}"
-        buttons_container_id = f"span-entity-buttons-{component_id}"
-
-        delete_store_id = f"span-delete-{component_id}"
-        delete_proxy_id = f"span-delete-proxy-{component_id}"
-        _make_buttons = self._make_buttons
-
-        # ---- 0. Update per-entity span counts on the buttons ----
-        @app.callback(
-            Output(buttons_container_id, "children"),
-            Input(trigger_store_id, "data"),
-            Input("current-doc-id", "data"),
-        )
-        def update_entity_counts(trigger, doc_id):
-            counts = {}
-            if doc_id:
-                tater_app = app._tater_app
-                annotation = tater_app.annotations.get(doc_id)
-                if annotation:
-                    spans = value_helpers.get_model_value(annotation, field_path) or []
-                    for span in spans:
-                        counts[span.tag] = counts.get(span.tag, 0) + 1
-            return _make_buttons(counts)
-
-        # ---- 1. Clientside: capture text selection when an entity button is clicked ----
-        # captureSelection and captureDelete are defined in tater/ui/assets/span_annotations.js,
-        # which Dash serves automatically from the assets/ directory.
-        app.clientside_callback(
-            "window.dash_clientside.tater.captureSelection",
-            Output(selection_store_id, "data"),
-            Input({"type": "span-add-btn", "field": component_id, "tag": ALL}, "n_clicks"),
-            prevent_initial_call=True,
-        )
-
-        # ---- 2b. Clientside: relay pending delete from global to delete store ----
-        app.clientside_callback(
-            "window.dash_clientside.tater.captureDelete",
-            Output(delete_store_id, "data"),
-            Input(delete_proxy_id, "n_clicks"),
-            prevent_initial_call=True,
-        )
-
-        # ---- 2. Server: add the captured span to annotations ----
-        @app.callback(
-            Output(trigger_store_id, "data"),
-            Input(selection_store_id, "data"),
-            State("current-doc-id", "data"),
-            State(trigger_store_id, "data"),
-            prevent_initial_call=True,
-        )
-        def add_span(selection, doc_id, trigger_count):
-            if not selection or not doc_id:
-                return no_update
-
-            start_js = selection.get("start")
-            end_js = selection.get("end")
-            tag = selection.get("tag")
-
-            if start_js is None or end_js is None or not tag:
-                return no_update
-
-            tater_app = app._tater_app
-
-            # Load the actual document text and derive tight start/end from it.
-            # This mirrors src_old: use full_text[start_js:end_js] rather than the
-            # JS selectedText string, then strip surrounding whitespace and adjust
-            # offsets so that span.text == full_text[start:end] exactly.
-            doc = next((d for d in tater_app.documents if d.id == doc_id), None)
-            if not doc:
-                return no_update
-
-            full_text = doc.load_content()
-            if not (0 <= start_js < end_js <= len(full_text)):
-                return no_update
-
-            raw_slice = full_text[start_js:end_js]
-            text = raw_slice.strip()
-            if not text:
-                return no_update
-
-            trim_start = raw_slice.find(text)
-            start = start_js + trim_start
-            end = start + len(text)
-
-            annotation = tater_app.annotations[doc_id]
-            current_spans: list[SpanAnnotation] = value_helpers.get_model_value(annotation, field_path) or []
-
-            # Skip if overlapping with any existing span (includes exact duplicates)
-            for existing in current_spans:
-                if start < existing.end and end > existing.start:
-                    return no_update
-
-            new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
-            new_spans = list(current_spans) + [new_span]
-            value_helpers.set_model_value(annotation, field_path, new_spans)
-            tater_app._save_annotations_to_file(doc_id=doc_id)
-
-            return (trigger_count or 0) + 1
-
-        # ---- 3. Server: delete a span when the tooltip's × button was clicked ----
-        @app.callback(
-            Output(trigger_store_id, "data", allow_duplicate=True),
-            Input(delete_store_id, "data"),
-            State("current-doc-id", "data"),
-            State(trigger_store_id, "data"),
-            prevent_initial_call=True,
-        )
-        def delete_span(delete_data, doc_id, trigger_count):
-            if not delete_data or not doc_id:
-                return no_update
-
-            del_start = delete_data.get("start")
-            del_end = delete_data.get("end")
-            if del_start is None or del_end is None:
-                return no_update
-
-            tater_app = app._tater_app
-            annotation = tater_app.annotations[doc_id]
-            current_spans = value_helpers.get_model_value(annotation, field_path) or []
-            new_spans = [s for s in current_spans if not (s.start == del_start and s.end == del_end)]
-            value_helpers.set_model_value(annotation, field_path, new_spans)
-            tater_app._save_annotations_to_file(doc_id=doc_id)
-
-            return (trigger_count or 0) + 1
-
-

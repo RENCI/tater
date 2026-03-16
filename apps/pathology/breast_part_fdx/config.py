@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget,
-    HierarchicalLabelCompactWidget, GroupWidget, ListableWidget
+    HierarchicalLabelCompactWidget, GroupWidget, ListableWidget, AccordionWidget,
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
@@ -100,7 +100,7 @@ specimen_children = [
 ]
 
 widgets = [
-    ListableWidget(
+    AccordionWidget(
         schema_field="specimens",
         label="Specimen Parts",
         description="Annotate each specimen part discussed in the final diagnosis section. Order by appearance.",

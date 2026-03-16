@@ -30,6 +30,9 @@ def load_config_module(path: str) -> dict[str, Any]:
     ``description``
         Optional subtitle shown below the title (optional).
 
+    ``instructions``
+        Optional markdown help text shown in the app instructions drawer.
+
     ``theme``
         ``"light"`` or ``"dark"`` (optional, defaults to ``"light"``).
 
@@ -62,6 +65,7 @@ def load_config_module(path: str) -> dict[str, Any]:
         "widgets": getattr(module, "widgets", None),
         "title": getattr(module, "title", None),
         "description": getattr(module, "description", None),
+        "instructions": getattr(module, "instructions", None),
         "theme": getattr(module, "theme", "light"),
         "on_save": getattr(module, "on_save", None),
         "configure": getattr(module, "configure", None),

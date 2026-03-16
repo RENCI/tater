@@ -11,7 +11,7 @@ class SelectWidget(ChoiceWidget):
 
     def component(self) -> dmc.Select:
         return dmc.Select(
-            id=self.component_id,
+            id=self.schema_id,
             data=[{"label": opt, "value": opt} for opt in self.options],
             value=self.default,
             clearable=True,

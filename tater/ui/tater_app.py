@@ -23,6 +23,7 @@ class TaterApp:
         self,
         title: Optional[str] = None,
         description: Optional[str] = None,
+        instructions: Optional[str] = None,
         theme: str = "light",
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
@@ -34,12 +35,14 @@ class TaterApp:
         Args:
             title: Application title
             description: Optional subtitle shown below the title
+            instructions: Optional markdown instructions shown in a help drawer
             theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
         """
         self.title = title or "tater - document annotation"
         self.description = description
+        self.instructions = instructions
         self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model
@@ -140,6 +143,8 @@ class TaterApp:
         seen: set[str] = set()
         for widget in self._all_widgets:
             path = widget.field_path
+            if not path:
+                continue
             if path in seen:
                 raise ValueError(f"Duplicate widget for schema field '{path}'")
             seen.add(path)
@@ -165,10 +170,13 @@ class TaterApp:
         for widget in self.widgets:
             widget.register_callbacks(self.app)
             widget._register_conditional_callbacks(self.app)
-        
+
         self._setup_layout()
         self._setup_callbacks()
         self._setup_value_capture_callbacks()
+        self._setup_span_callbacks()
+        self._setup_repeater_callbacks()
+        self._setup_hl_callbacks()
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""
@@ -259,6 +267,19 @@ class TaterApp:
     def _setup_value_capture_callbacks(self) -> None:
         """Setup callbacks to capture widget value changes to annotations store."""
         callbacks.setup_value_capture_callbacks(self)
+
+    def _setup_span_callbacks(self) -> None:
+        """Setup unified span annotation callbacks."""
+        callbacks.setup_span_callbacks(self)
+
+    def _setup_repeater_callbacks(self) -> None:
+        """Setup unified MATCH-based repeater callbacks."""
+        callbacks.setup_repeater_callbacks(self)
+
+    def _setup_hl_callbacks(self) -> None:
+        """Setup unified MATCH-based HierarchicalLabel callbacks."""
+        callbacks.setup_hl_callbacks(self)
+        callbacks.setup_hl_tags_callbacks(self)
 
     def _collect_value_capture_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
         """

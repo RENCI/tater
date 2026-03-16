@@ -1,0 +1,63 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - doubly nested span and hierarchy widgets",
+  "description": "Pet record observations in accordion sections; each observation has a list of breed mentions with span evidence and hierarchical breed labels.",
+  "instructions": "## Annotation workflow\n\n1. Click **Add Observation** to create a new accordion section\n2. Select the **Observation Type** (breed mention, behavior, health condition, owner note)\n3. Inside the observation, click **Add Mention** for each time a breed or animal is referenced\n4. For each mention:\n   - Highlight the text in the document and click **Span** to tag it\n   - Use the **Breed / Species** hierarchy to identify the animal\n   - Set your **Confidence** in the identification\n5. Collapse completed observations with the accordion controls\n6. Set the **Overall Assessment** at the bottom\n",
+  "hierarchies": {
+    "ontology": "../../data/pet_ontology.yaml"
+  },
+  "data_schema": [
+    {
+      "id": "observations",
+      "type": "listable",
+      "label": "Observations",
+      "description": "Annotate each observation in the pet record.",
+      "widget": {"type": "accordion", "item_label": "Observation"},
+      "item_fields": [
+        {
+          "id": "observation_type",
+          "type": "choice",
+          "options": ["breed mention", "behavior", "health condition", "owner note"],
+          "label": "Observation Type"
+        },
+        {
+          "id": "mentions",
+          "type": "listable",
+          "label": "Breed Mentions",
+          "description": "Each time a breed or species is referenced in this observation.",
+          "widget": {"item_label": "Mention"},
+          "item_fields": [
+            {
+              "id": "spans",
+              "type": "span_annotation",
+              "label": "Span",
+              "description": "Highlight the text that names or describes the breed.",
+              "entity_types": ["Breed", "Species"]
+            },
+            {
+              "id": "breed",
+              "type": "hierarchical_label",
+              "hierarchy_ref": "ontology",
+              "label": "Breed / Species",
+              "description": "Navigate the pet ontology to select the breed or species.",
+              "widget": {"searchable": true}
+            },
+            {
+              "id": "confidence",
+              "type": "choice",
+              "options": ["definite", "likely", "uncertain"],
+              "label": "Confidence"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overall_assessment",
+      "type": "choice",
+      "options": ["routine", "follow-up needed", "urgent"],
+      "required": true,
+      "label": "Overall Assessment"
+    }
+  ]
+}

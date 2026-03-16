@@ -21,6 +21,13 @@ class Schema(BaseModel):
 title = "tater - nested"
 description = "Single level of nesting via GroupWidget for owner information."
 
+instructions = """1. Set the **Document Mood** (top level)
+2. Expand **Owner Information** to reveal:
+   - Owner name
+   - Contact info
+   - Address details
+"""
+
 widgets = [
     SegmentedControlWidget(
         schema_field="document_mood",

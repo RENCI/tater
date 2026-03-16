@@ -65,18 +65,28 @@ Field types:
   ``numeric``           — number (default: NumberInputWidget)
   ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
   ``span_annotation``   — text span labelling (SpanAnnotationWidget)
-  ``hierarchical_label``— tree-based label (default: HierarchicalLabelCompactWidget)
+  ``hierarchical_label``— tree-based label (default: HierarchicalLabelTagsWidget)
   ``group``             — nested sub-model with ``fields``
   ``listable``          — repeatable list of sub-items with ``item_fields``
+                          (widget type override: ``tabs`` or ``accordion``)
+  ``divider``           — labeled section break; no ``id`` required; supports ``label``,
+                          ``description``
 
 Widget override types (``"widget": {"type": "..."}``):
-  ``radio_group``             — for ``choice`` fields
-  ``select``                  — for ``choice`` fields
-  ``chip_group``              — for ``choice`` or ``multi_choice`` fields
-  ``text_area``               — for ``text`` fields
-  ``switch``                  — for ``boolean`` fields
-  ``slider``                  — for ``numeric`` fields
-  ``hierarchical_label_full`` — for ``hierarchical_label`` fields
+  ``radio_group``              — for ``choice`` fields
+  ``select``                   — for ``choice`` fields
+  ``chip_radio``               — for ``choice`` fields
+  ``checkbox_group``           — for ``multi_choice`` fields
+  ``text_area``                — for ``text`` fields
+  ``switch``                   — for ``boolean`` fields
+  ``chip_boolean``             — for ``boolean`` fields
+  ``slider``                   — for ``numeric`` fields
+  ``hierarchical_label_full``  — for ``hierarchical_label`` fields
+  ``hierarchical_label_tags``  — for ``hierarchical_label`` fields
+
+Widget options (``"widget": {"option": value}``):
+  ``auto_advance``  — ``true`` on ``choice`` or ``boolean`` fields to advance to the next
+                      document on selection/toggle
 
 For ``hierarchical_label`` fields, ``hierarchy_ref`` must match a key in the
 top-level ``hierarchies`` dict. File paths in ``hierarchies`` are resolved
@@ -96,21 +106,25 @@ from tater.widgets.base import TaterWidget
 from tater.widgets.segmented_control import SegmentedControlWidget
 from tater.widgets.radio_group import RadioGroupWidget
 from tater.widgets.select import SelectWidget
-from tater.widgets.chip_group import ChipGroupWidget
 from tater.widgets.multiselect import MultiSelectWidget
+from tater.widgets.checkbox_group import CheckboxGroupWidget
+from tater.widgets.chip_radio import ChipRadioWidget
 from tater.widgets.text_input import TextInputWidget
 from tater.widgets.checkbox import CheckboxWidget
 from tater.widgets.switch import SwitchWidget
+from tater.widgets.chip import ChipWidget
 from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
+from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.listable import ListableWidget
+from tater.widgets.repeater import TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
-    HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
+    HierarchicalLabelTagsWidget,
     build_tree,
     load_hierarchy_from_yaml,
     Node,
@@ -219,9 +233,13 @@ def widgets_from_model(
     Args:
         model: A Pydantic ``BaseModel`` subclass.
         overrides: Widgets to use in place of the generated defaults. Matched
-                   by field name. Useful for fields whose type is ambiguous
-                   (e.g. ``hierarchical`` fields appear as ``Optional[str]``)
-                   or where a non-default widget is desired.
+                   by field name. Two widget types **must** always be supplied
+                   via overrides and cannot be usefully auto-generated:
+                   ``HierarchicalLabel*`` widgets (``Optional[str]`` is
+                   indistinguishable from a plain text field) and
+                   ``SpanAnnotationWidget`` (auto-generation produces a widget
+                   with no entity types). Use overrides for any other field
+                   where a non-default widget is desired.
 
     Returns:
         A list of ``TaterWidget`` instances ready to pass to
@@ -275,6 +293,12 @@ def parse_schema(
     widgets: list[TaterWidget] = []
 
     for spec in data.get("data_schema", []):
+        if spec.get("type") == "divider":
+            widgets.append(DividerWidget(
+                label=spec.get("label", ""),
+                description=spec.get("description"),
+            ))
+            continue
         fid = spec["id"]
         field_def, widget = _process_field(spec, fid, hierarchy_map)
         model_fields[fid] = field_def
@@ -319,12 +343,15 @@ def _process_field(
             item_widgets.append(child_widget)
         item_model = create_model(_to_classname(local_id) + "Item", **item_model_fields)
         widget_spec: dict = spec.get("widget") or {}
-        return (list[item_model], Field(default_factory=list)), ListableWidget(
+        widget_type = widget_spec.get("type")
+        item_label = widget_spec.get("item_label", "Item")
+        repeater_cls = {"tabs": TabsWidget, "accordion": AccordionWidget}.get(widget_type, ListableWidget)
+        return (list[item_model], Field(default_factory=list)), repeater_cls(
             local_id,
             label=label,
             description=description,
             item_widgets=item_widgets,
-            item_label=widget_spec.get("item_label", "Item"),
+            item_label=item_label,
         )
 
     # --- Leaf field types ---
@@ -361,6 +388,8 @@ def _process_field(
         local_id, ftype, required, label, description, widget_type, widget_spec, spec,
         hierarchy_map,
     )
+    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean"):
+        widget.auto_advance = True
     condition = spec.get("conditional_on")
     if condition is not None:
         widget.conditional_on(condition["field"], bool(condition["value"]))
@@ -386,13 +415,22 @@ def _build_widget(
             )
         if widget_type == "select":
             return SelectWidget(fid, label=label, description=description, required=required)
-        if widget_type == "chip_group":
-            return ChipGroupWidget(fid, label=label, description=description, required=required)
-        return SegmentedControlWidget(fid, label=label, description=description, required=required)
+        if widget_type == "chip_radio":
+            return ChipRadioWidget(
+                fid, label=label, description=description, required=required,
+                vertical=widget_spec.get("orientation") == "vertical",
+            )
+        return SegmentedControlWidget(
+            fid, label=label, description=description, required=required,
+            vertical=widget_spec.get("orientation") == "vertical",
+        )
 
     if ftype == "multi_choice":
-        if widget_type == "chip_group":
-            return ChipGroupWidget(fid, label=label, description=description, required=required)
+        if widget_type == "checkbox_group":
+            return CheckboxGroupWidget(
+                fid, label=label, description=description, required=required,
+                vertical=widget_spec.get("orientation") == "vertical",
+            )
         return MultiSelectWidget(fid, label=label, description=description, required=required)
 
     if ftype == "text":
@@ -409,6 +447,8 @@ def _build_widget(
     if ftype == "boolean":
         if widget_type == "switch":
             return SwitchWidget(fid, label=label, description=description)
+        if widget_type == "chip_boolean":
+            return ChipWidget(fid, label=label, description=description)
         return CheckboxWidget(fid, label=label, description=description)
 
     if ftype == "numeric":
@@ -449,7 +489,12 @@ def _build_widget(
                 fid, label=label, description=description,
                 hierarchy=hierarchy, searchable=searchable,
             )
-        return HierarchicalLabelCompactWidget(
+        if widget_type == "hierarchical_label_tags":
+            return HierarchicalLabelTagsWidget(
+                fid, label=label, description=description,
+                hierarchy=hierarchy, searchable=searchable,
+            )
+        return HierarchicalLabelTagsWidget(
             fid, label=label, description=description,
             hierarchy=hierarchy, searchable=searchable,
         )
@@ -477,4 +522,5 @@ def load_schema(path: str | Path) -> dict:
         "widgets": widgets,
         "title": data.get("title"),
         "description": data.get("description"),
+        "instructions": data.get("instructions"),
     }

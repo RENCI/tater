@@ -2,6 +2,7 @@
   "spec_version": "1.0",
   "title": "tater - simple",
   "description": "All widgets specified explicitly.",
+  "instructions": "**Annotate the pet's current mood** using the segmented control.\n\n**Mark 'Needs Attention'** if this pet requires immediate care.",
   "data_schema": [
     {
       "id": "pet_mood",

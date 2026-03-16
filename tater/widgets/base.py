@@ -3,6 +3,7 @@ import typing
 from dataclasses import dataclass, field
 from typing import Any, Optional
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +43,55 @@ def _resolve_field_info(model: type, field_path: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
+# Shared callback helper
+# ---------------------------------------------------------------------------
+
+def _build_conditional_callbacks(
+    app: Any,
+    target_value: Any,
+    *,
+    wrapper_id: Any,
+    controlling_id: Any,
+    controlling_prop: str,
+    self_id: Any,
+    value_prop: str,
+    empty_value: Any,
+) -> None:
+    """Register the clientside visibility toggle and server-side value-clear callbacks.
+
+    Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
+    dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
+    MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
+    """
+    from dash import Output, Input, no_update
+
+    if isinstance(target_value, bool):
+        target_js = "true" if target_value else "false"
+    else:
+        target_js = f'"{target_value}"'
+
+    app.clientside_callback(
+        f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
+        Output(wrapper_id, "style"),
+        Input(controlling_id, controlling_prop),
+        prevent_initial_call=False,
+    )
+
+    _empty = empty_value
+    _target = target_value
+
+    @app.callback(
+        Output(self_id, value_prop, allow_duplicate=True),
+        Input(controlling_id, controlling_prop),
+        prevent_initial_call=True,
+    )
+    def _clear_when_hidden(v):
+        if v != _target:
+            return _empty
+        return no_update
+
+
+# ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
 
@@ -56,21 +106,29 @@ class TaterWidget:
     _full_path: Optional[str] = field(init=False, default=None, repr=False)
     _condition: Optional[tuple] = field(init=False, default=None, repr=False)
 
-    def conditional_on(self, controlling_field: str, value: Any) -> "TaterWidget":
+    def conditional_on(self, controlling_field: "str | list[str] | tuple[str, ...]", value: Any) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
 
         Args:
-            controlling_field: The schema_field of the controlling widget (boolean or option).
+            controlling_field: The field of the controlling widget. Either a
+                dot-joined path string (``"is_indoor"`` / ``"booleans.is_indoor"``)
+                or a sequence of path segments (``["booleans", "is_indoor"]``).
+                Use a sequence to avoid writing dot-joined group prefixes by hand.
             value: Show this widget when the controlling field equals this value.
                    For booleans: True or False. For options: string value (e.g., "dog").
 
-        Example::
+        Examples::
 
-            TextInputWidget("indoor_location", label="Location").conditional_on("is_indoor", True)
-            TextInputWidget("breed_notes", label="Breed").conditional_on("pet_type", "dog")
+            # flat schema
+            TextInputWidget("location").conditional_on("is_indoor", True)
+
+            # inside a GroupWidget — sequence avoids hard-coding the prefix
+            TextInputWidget("location").conditional_on(["booleans", "is_indoor"], True)
 
         Note: Controlling widget must be declared before this widget in the widget list.
         """
+        if isinstance(controlling_field, (list, tuple)):
+            controlling_field = ".".join(controlling_field)
         self._condition = (controlling_field, value)
         return self
 
@@ -93,8 +151,25 @@ class TaterWidget:
         return f"annotation-{self.field_path.replace('.', '-')}"
 
     @property
-    def conditional_wrapper_id(self) -> str:
-        return f"visibility-wrapper-{self.field_path.replace('.', '-')}"
+    def conditional_wrapper_id(self) -> dict:
+        ld = getattr(self, "_repeater_ld", "")
+        path = getattr(self, "_repeater_path", "")
+        # ControlWidgets supply _item_relative_tf which handles group-child paths.
+        _irtf = getattr(self, "_item_relative_tf", None)
+        if _irtf is not None:
+            tf = _irtf
+        else:
+            tf = self.schema_field if ld else self.field_path.replace(".", "|")
+        return {"type": "tater-cond-wrapper", "ld": ld, "path": path, "tf": tf}
+
+    def _set_repeater_context(self, ld: str, path: str) -> None:
+        """Propagate repeater list-field path and row index to this widget.
+
+        Called by RepeaterWidget before rendering an item so that MATCH-based
+        component IDs can be generated with the correct ``ld`` and ``path``.
+        Default is a no-op; ControlWidget and GroupWidget override it.
+        """
+        pass
 
     def component_id_dict(self, pattern_type: str = "widget") -> dict:
         return {"type": pattern_type, "field": self.field_path}
@@ -109,24 +184,37 @@ class TaterWidget:
     def _build_field_content(self, mt: str = "md") -> Any:
         required = getattr(self, "required", False)
         if self.renders_own_label:
+            comp = self.component()
             if required:
-                return dmc.Group(
-                    [dmc.Text("*", size="sm", c="red"), self.component()],
-                    gap=4,
-                    align="self-start",
-                    mt=mt,
-                )
-            return self.component()
+                row = dmc.Group([dmc.Text("*", size="sm", c="red"), comp], gap=4, align="self-start")
+                items = [row]
+            else:
+                items = [comp]
+            # ContainerWidget subclasses render their own description inside component();
+            # only leaf (ControlWidget) widgets need it appended here.
+            if self.description and not isinstance(self, ContainerWidget):
+                items.append(dmc.Text(self.description, size="xs", c="dimmed"))
+            return dmc.Stack(items, gap="xs", mt=mt)
         else:
+            auto_advance = getattr(self, "auto_advance", False)
             label_row = dmc.Group(
                 [
                     *([dmc.Text("*", size="sm", c="red")] if required else []),
                     dmc.Text(self.label, fw=500, size="sm"),
+                    *(
+                        [dmc.Tooltip(
+                            DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
+                            label="Auto-advances to next document",
+                            position="right",
+                            withArrow=True,
+                        )]
+                        if auto_advance else []
+                    ),
                 ],
                 gap=4,
             )
             items = [label_row]
-            if self.description:
+            if self.description and not getattr(self, "_description_in_component", False):
                 items.append(dmc.Text(self.description, size="xs", c="dimmed"))
             items.append(self.component())
             return dmc.Stack(items, gap="xs", mt=mt)
@@ -137,63 +225,52 @@ class TaterWidget:
         The clientside callback immediately toggles display style (no round-trip).
         The server callback clears the widget value when it becomes hidden, so
         stale values are not saved. Supports boolean and option-based conditions.
+
+        This method handles standalone (non-repeater) widgets only.  For widgets
+        inside a RepeaterWidget call ``_register_repeater_conditional_callbacks``
+        from the repeater's ``register_callbacks``.
         """
         if self._condition is None:
             return
         from dash import Output, Input, no_update
 
         controlling_field, target_value = self._condition
-        controlling_id = f"annotation-{controlling_field.replace('.', '-')}"
+        controlling_widget, controlling_prop = self._get_controlling_widget(app, controlling_field)
 
-        # Determine which property the controlling widget uses.
-        # For simplicity: assume it's "checked" for BooleanWidget, "value" for all others.
-        # This will be refined via the app's widget registry if needed.
-        controlling_prop = self._get_controlling_property(app, controlling_field)
-
-        # Serialize target_value for JavaScript comparison.
-        # For booleans: use true/false; for strings: use quoted "value".
-        if isinstance(target_value, bool):
-            target_js = "true" if target_value else "false"
+        # Use the controlling widget's own schema_id (new 3-key format).
+        if controlling_widget is not None:
+            controlling_schema_id = controlling_widget.schema_id
         else:
-            target_js = f'"{target_value}"'
+            # Fallback: assume non-boolean standalone widget.
+            controlling_schema_id = {
+                "type": "tater-control",
+                "ld": "",
+                "path": "",
+                "tf": controlling_field.replace(".", "|"),
+            }
 
-        # Clientside: toggle display instantly without a server round-trip.
-        app.clientside_callback(
-            f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
-            Output(self.conditional_wrapper_id, "style"),
-            Input(controlling_id, controlling_prop),
-            prevent_initial_call=False,
+        _build_conditional_callbacks(
+            app, target_value,
+            wrapper_id=self.conditional_wrapper_id,
+            controlling_id=controlling_schema_id,
+            controlling_prop=controlling_prop,
+            self_id=self.schema_id,
+            value_prop=self.value_prop,
+            empty_value=self.empty_value,
         )
 
-        # Server: clear value when widget is hidden so stale data is not saved.
-        _empty = self.empty_value
-        _value_prop = self.value_prop
-        _target = target_value
+    def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
+        """Look up the controlling widget and its value property.
 
-        @app.callback(
-            Output(self.component_id, _value_prop, allow_duplicate=True),
-            Input(controlling_id, controlling_prop),
-            prevent_initial_call=True,
-        )
-        def _clear_when_hidden(v):
-            if v != _target:
-                return _empty
-            return no_update
-
-    def _get_controlling_property(self, app: Any, controlling_field: str) -> str:
-        """Determine which property (checked/value) the controlling widget uses.
-
-        Returns "checked" for BooleanWidget, "value" for all others.
+        Returns ``(widget, prop)`` where ``prop`` is ``"checked"`` for
+        BooleanWidgets and ``"value"`` for all others.  ``widget`` may be
+        ``None`` if the registry is not yet available.
         """
-        # Try to look up the controlling widget from the app's registry.
-        # If not found, default to "value" (which works for most option widgets).
         if hasattr(app, "_tater_app") and hasattr(app._tater_app, "_all_widgets"):
             for widget in app._tater_app._all_widgets:
                 if widget.field_path == controlling_field:
-                    # BooleanWidget has value_prop="checked"
-                    return getattr(widget, "value_prop", "value")
-        # Default: assume option/choice widget uses "value"
-        return "value"
+                    return widget, getattr(widget, "value_prop", "value")
+        return None, "value"
 
     # Subclasses must override these three methods.
     # Without ABC enforcement, forgetting to do so will cause a runtime error
@@ -221,6 +298,48 @@ class ControlWidget(TaterWidget):
     required: bool = False
     auto_advance: bool = False
 
+    # Set by RepeaterWidget before rendering an item to enable MATCH-based
+    # pattern callbacks.  ``_repeater_ld`` is the pipe-joined list-field path
+    # (e.g. ``"pets"`` or ``"findings|annotations"``); ``_repeater_path`` is the
+    # dot-joined index chain (e.g. ``"0"`` or ``"0.2"``).  Both default to ``""``
+    # for standalone (non-repeater) widgets.
+    _repeater_ld: str = field(init=False, default="", repr=False)
+    _repeater_path: str = field(init=False, default="", repr=False)
+
+    def _set_repeater_context(self, ld: str, path: str) -> None:
+        self._repeater_ld = ld
+        self._repeater_path = path
+
+    @property
+    def _item_relative_tf(self) -> str:
+        """Pipe-encoded item-relative path for the ``tf`` key in schema_id / conditional_wrapper_id.
+
+        For standalone widgets (``_repeater_ld == ""``), returns the full
+        pipe-encoded ``field_path`` (globally unique; no MATCH needed).
+
+        For template widgets (``_repeater_path`` not yet set) and for rendered
+        row widgets, returns the path relative to the repeater item root, so
+        the value is the same across all rows and matches what was registered.
+
+        A GroupWidget child of a repeater will have a path like
+        ``"booleans|is_indoor"`` rather than the bare ``"is_indoor"`` of a
+        direct repeater child; this ensures uniqueness within an item and
+        correct MATCH pairing between controlling and controlled widgets.
+        """
+        if not self._repeater_ld or not self._repeater_path:
+            # standalone or template (pre-render): field_path is already the right scope
+            return self.field_path.replace(".", "|")
+        # Rendered row: strip the "list_field.index." prefix from field_path.
+        list_fields = self._repeater_ld.split("|")
+        indices = self._repeater_path.split(".")
+        prefix_parts: list[str] = []
+        for seg, idx in zip(list_fields, indices):
+            prefix_parts.extend([seg, idx])
+        prefix = ".".join(prefix_parts) + "."
+        if self.field_path.startswith(prefix):
+            return self.field_path[len(prefix):].replace(".", "|")
+        return self.schema_field.replace(".", "|")
+
     @property
     def renders_own_label(self) -> bool:
         return False
@@ -232,6 +351,66 @@ class ControlWidget(TaterWidget):
     @property
     def empty_value(self) -> Any:
         return None
+
+    @property
+    def schema_id(self) -> dict:
+        # ``tf`` (template field) is the item-relative pipe-encoded path.
+        # For direct repeater children: same as schema_field.
+        # For group children inside a repeater: group-prefixed (e.g. "booleans|is_indoor").
+        # For standalone widgets: full pipe-encoded field_path (no MATCH needed).
+        # Dots in dict ID values break Dash 4's client-side dependency parser;
+        # pipes are used instead (callbacks decode "|" → ".").
+        return {"type": "tater-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
+
+    def _register_repeater_conditional_callbacks(
+        self, app: Any, ld: str, sibling_widgets: list
+    ) -> None:
+        """Register MATCH-based conditional callbacks for this widget inside a repeater.
+
+        ``ld`` is the pipe-joined outer list-field path (e.g. ``"pets"``).
+        ``sibling_widgets`` is the repeater's ``item_widgets`` list (templates),
+        used to look up the controlling widget's type and schema_field.
+        """
+        if self._condition is None:
+            return
+        from dash import MATCH
+
+        controlling_field, target_value = self._condition
+
+        # Find the controlling widget among siblings by schema_field.
+        # Use only the last dot-segment so "booleans.is_indoor" → "is_indoor"
+        # still matches a sibling with schema_field "is_indoor".
+        controlling_schema_field = controlling_field.split(".")[-1]
+        controlling_widget = next(
+            (w for w in sibling_widgets if w.schema_field == controlling_schema_field),
+            None,
+        )
+        if controlling_widget is None:
+            return  # cannot register without knowing the controlling widget's type
+
+        is_bool = isinstance(controlling_widget, BooleanWidget)
+        controlling_type = "tater-bool-control" if is_bool else "tater-control"
+        controlling_prop = "checked" if is_bool else "value"
+
+        # Use _item_relative_tf so group children encode their group prefix
+        # (e.g. "booleans|is_indoor") matching what the rendered components emit.
+        self_tf = self._item_relative_tf
+        controlling_tf = controlling_widget._item_relative_tf
+        self_type = self.schema_id["type"]
+
+        wrapper_match_id = {"type": "tater-cond-wrapper", "ld": ld, "path": MATCH, "tf": self_tf}
+        controlling_match_id = {"type": controlling_type, "ld": ld, "path": MATCH, "tf": controlling_tf}
+        self_match_id = {"type": self_type, "ld": ld, "path": MATCH, "tf": self_tf}
+
+        _build_conditional_callbacks(
+            app, target_value,
+            wrapper_id=wrapper_match_id,
+            controlling_id=controlling_match_id,
+            controlling_prop=controlling_prop,
+            self_id=self_match_id,
+            value_prop=self.value_prop,
+            empty_value=self.empty_value,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -303,6 +482,15 @@ class MultiChoiceWidget(ControlWidget):
 @dataclass(eq=False)
 class BooleanWidget(ControlWidget):
     """Base for boolean widgets. Schema field must be ``bool`` or ``Optional[bool]``."""
+
+    @property
+    def empty_value(self) -> bool:
+        return False
+
+    @property
+    def schema_id(self) -> dict:
+        # See ControlWidget.schema_id / _item_relative_tf for the encoding rationale.
+        return {"type": "tater-bool-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)

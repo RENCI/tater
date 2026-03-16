@@ -19,7 +19,7 @@ class TextInputWidget(TextWidget):
 
     def component(self) -> dmc.TextInput:
         return dmc.TextInput(
-            id=self.component_id,
+            id=self.schema_id,
             value=self.default if self.default is not None else self.empty_value,
             placeholder=self.placeholder,
         )

@@ -1,18 +1,27 @@
 {
   "spec_version": "1.0",
   "title": "tater - hierarchical",
-  "description": "Pet/animal ontology with compact and full hierarchical label widgets.",
+  "description": "Pet/animal ontology with tags, compact, and full hierarchical label widgets.",
+  "instructions": "## Navigation\n\n- Use **chevron buttons** (→) to explore the ontology\n- Use **search** to find breeds by name\n- Expand/collapse branches with the tree UI\n\n**Tags Breed** uses tags view (path shown as dismissible pills).\n**Primary Breed** uses compact view (shows only selected).\n**Secondary Breed** uses full view (shows all siblings).\n",
   "hierarchies": {
     "ontology": "../../data/pet_ontology.yaml"
   },
   "data_schema": [
+    {
+      "id": "tags_breed",
+      "type": "hierarchical_label",
+      "hierarchy_ref": "ontology",
+      "label": "Tags Breed",
+      "description": "Navigate via pill tags — click a tag to go back, × to deselect.",
+      "widget": {"type": "hierarchical_label_tags", "searchable": true}
+    },
     {
       "id": "primary_breed",
       "type": "hierarchical_label",
       "hierarchy_ref": "ontology",
       "label": "Primary Breed",
       "description": "Navigate the ontology to select a breed or type.",
-      "widget": {"type": "compact", "searchable": true}
+      "widget": {"searchable": true}
     },
     {
       "id": "secondary_breed",

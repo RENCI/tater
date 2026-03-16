@@ -13,6 +13,10 @@ class Schema(BaseModel):
 title = "tater - simple"
 description = "All widgets specified explicitly."
 
+instructions = """**Annotate the pet's current mood** using the segmented control.
+
+**Mark 'Needs Attention'** if this pet requires immediate care."""
+
 widgets = [
     SegmentedControlWidget(
         schema_field="pet_mood",

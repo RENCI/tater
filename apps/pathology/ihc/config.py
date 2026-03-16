@@ -12,6 +12,7 @@ Supports three test types with type-specific fields shown via conditional visibi
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
+from tater import SpanAnnotation
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget, SpanAnnotationWidget,
     ListableWidget, EntityType
@@ -32,7 +33,7 @@ class IHCTest(BaseModel):
     block_run_on: Optional[str] = None
     test_results_not_reported: bool = False
     results_not_from_this_tissue: bool = False
-    relevant_spans: List[dict] = Field(default_factory=list)
+    relevant_spans: List[SpanAnnotation] = Field(default_factory=list)
 
 
 class Schema(BaseModel):

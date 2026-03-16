@@ -1,0 +1,42 @@
+[
+  {
+    "id": "deid_001",
+    "text": "COLON, SIGMOID, BIOPSY\n\nClinical History: Patient is a 58-year-old with rectal bleeding.\n\nFinal Diagnosis: Colonic mucosa with mild chronic inflammation. No dysplasia or malignancy."
+  },
+  {
+    "id": "deid_002",
+    "text": "BREAST, LEFT, CORE NEEDLE BIOPSY\n\nClinical History: Jane Smith, DOB 03/14/1971, MRN 8473920, presents with a 1.5 cm palpable mass. Referred by Dr. Robert Chen, MGH Breast Surgery, 617-555-0182.\n\nFinal Diagnosis: Invasive ductal carcinoma, grade 2. ER positive, PR positive, HER2 negative."
+  },
+  {
+    "id": "deid_003",
+    "text": "LUNG, RIGHT UPPER LOBE, WEDGE RESECTION\n\nClinical History: Patient is a 67-year-old with a history of smoking and a 2.1 cm right upper lobe mass on CT.\n\nFinal Diagnosis: Invasive adenocarcinoma, acinar predominant, grade 2. Margins negative. pT1c Nx Mx."
+  },
+  {
+    "id": "deid_004",
+    "text": "PROSTATE, NEEDLE BIOPSY\n\nClinical History: 71-year-old male with rising PSA (8.2 ng/mL). Previous biopsy negative.\n\nFinal Diagnosis:\n- Cores 1–3 (right base): Benign prostatic tissue.\n- Cores 4–6 (right mid): Acinar adenocarcinoma, Gleason 3+4=7, involving 2 of 3 cores, 20% involvement.\n- Cores 7–12 (left side): Benign prostatic tissue and benign prostatic hyperplasia."
+  },
+  {
+    "id": "deid_005",
+    "text": "SKIN, BACK, SHAVE BIOPSY\n\nPatient: [PATIENT NAME], seen at Memorial Hospital on 2019-04-12. Medical record: 00294710.\n\nFinal Diagnosis: Superficial basal cell carcinoma. Margins positive at base. Re-excision recommended."
+  },
+  {
+    "id": "deid_006",
+    "text": "GASTRIC BIOPSY — ANTRUM\n\nClinical History: 49-year-old with dyspepsia and positive urea breath test.\n\nFinal Diagnosis: Chronic active gastritis with Helicobacter pylori. No intestinal metaplasia. No dysplasia."
+  },
+  {
+    "id": "deid_007",
+    "text": "THYROID, FINE NEEDLE ASPIRATION, RIGHT LOBE NODULE\n\nSubmitting physician: Dr. Amanda Torres, Endocrinology, [HOSPITAL NAME], email: atorres@hospital.org\nPatient contact: 555-204-9917\n\nDiagnosis: Bethesda category V — Suspicious for papillary thyroid carcinoma. Recommend surgical excision."
+  },
+  {
+    "id": "deid_008",
+    "text": "LIVER, CORE NEEDLE BIOPSY\n\nClinical History: 55-year-old with known hepatitis C cirrhosis and a 2.8 cm arterially enhancing lesion on MRI.\n\nFinal Diagnosis: Hepatocellular carcinoma, moderately differentiated. Background liver shows established cirrhosis (Metavir F4)."
+  },
+  {
+    "id": "deid_009",
+    "text": "KIDNEY, RIGHT, PARTIAL NEPHRECTOMY\n\nClinical History: Incidental 3.2 cm right renal mass in a 62-year-old.\n\nFinal Diagnosis: Clear cell renal cell carcinoma, ISUP grade 2. Tumor confined to kidney (pT1b). Margins negative. No sarcomatoid differentiation. No necrosis."
+  },
+  {
+    "id": "deid_010",
+    "text": "CERVICAL BIOPSY AND ENDOCERVICAL CURETTAGE\n\nPatient ID: 19-C-04421. Specimen collected: January 8, 2019. Patient date of birth: July 22, 1989. Ordering provider: Dr. Lisa Park, 404-555-0093.\n\nFinal Diagnosis:\n- Cervical biopsy: High-grade squamous intraepithelial lesion (HSIL/CIN3).\n- Endocervical curettage: Fragments of high-grade squamous intraepithelial lesion."
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "coarse_001",
+    "text": "BREAST, LEFT, CORE NEEDLE BIOPSY\n\nFinal Diagnosis: Invasive carcinoma of no special type (NST), grade 2. ER positive (95%), PR positive (80%), HER2 negative. Ki67 approximately 15%."
+  },
+  {
+    "id": "coarse_002",
+    "text": "BREAST, RIGHT, EXCISIONAL BIOPSY\n\nFinal Diagnosis: Ductal carcinoma in situ (DCIS), high nuclear grade with comedo necrosis. No invasive carcinoma identified. Margins negative."
+  },
+  {
+    "id": "coarse_003",
+    "text": "BREAST, LEFT, STEREOTACTIC CORE BIOPSY\n\nFinal Diagnosis: Atypical ductal hyperplasia (ADH). No in-situ or invasive carcinoma identified. Recommend excision for further evaluation."
+  },
+  {
+    "id": "coarse_004",
+    "text": "BREAST, RIGHT, ULTRASOUND-GUIDED CORE BIOPSY\n\nFinal Diagnosis: Fibroadenoma with focal adenosis. No atypia, no in-situ or invasive carcinoma."
+  },
+  {
+    "id": "coarse_005",
+    "text": "BREAST, LEFT, LUMPECTOMY\n\nFinal Diagnosis: Invasive lobular carcinoma, grade 1, classic type. Tumor size 1.4 cm. All surgical margins negative (minimum clearance 4 mm). Three sentinel lymph nodes negative."
+  },
+  {
+    "id": "coarse_006",
+    "text": "BREAST, RIGHT, CORE NEEDLE BIOPSY\n\nFinal Diagnosis: Metastatic melanoma to breast parenchyma. Immunostains positive for S100, SOX10, and Melan-A. Negative for cytokeratins and GATA3. Clinical correlation recommended for primary site."
+  },
+  {
+    "id": "coarse_007",
+    "text": "BREAST, LEFT, EXCISIONAL BIOPSY\n\nFinal Diagnosis: Spindle cell neoplasm, cannot exclude phyllodes tumor. Features overlap between cellular fibroadenoma and low-grade phyllodes tumor. Recommend re-excision with wider margins and specialist review."
+  },
+  {
+    "id": "coarse_008",
+    "text": "BREAST, BILATERAL, REDUCTION MAMMOPLASTY\n\nFinal Diagnosis: Bilateral breast tissue with fibrocystic changes, columnar cell change, and mild usual ductal hyperplasia. No atypia or malignancy identified."
+  },
+  {
+    "id": "coarse_009",
+    "text": "AXILLARY LYMPH NODE, RIGHT, SENTINEL NODE BIOPSY\n\nFinal Diagnosis: One sentinel lymph node negative for malignancy (0/1). No evidence of metastatic carcinoma on H&E or cytokeratin immunostain."
+  },
+  {
+    "id": "coarse_010",
+    "text": "BREAST, LEFT, CORE NEEDLE BIOPSY\n\nFinal Diagnosis: Lobular carcinoma in situ (LCIS), classic type. No invasive carcinoma identified. Clinical and radiologic correlation required for management."
+  },
+  {
+    "id": "coarse_011",
+    "text": "BREAST, RIGHT, MASTECTOMY\n\nFinal Diagnosis: Diffuse large B-cell lymphoma (DLBCL), non-germinal center subtype, involving breast parenchyma. CD20 positive, BCL2 positive, MYC positive in 60% of cells. Ki67 80%. No invasive carcinoma."
+  },
+  {
+    "id": "coarse_012",
+    "text": "BREAST, RIGHT, ULTRASOUND-GUIDED BIOPSY\n\nFinal Diagnosis: Core biopsy of breast — see comment.\n\nComment: Sections show fibrocollagenous tissue with no epithelial elements identified. The findings are discordant with the imaging impression of a 1.5 cm hypoechoic mass. Repeat biopsy strongly recommended."
+  }
+]

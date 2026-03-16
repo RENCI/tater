@@ -15,10 +15,14 @@ class NumberInputWidget(NumericWidget):
     max_value: Optional[float] = None
     step: Optional[float] = None
 
+    @property
+    def empty_value(self):
+        return ""
+
     def component(self) -> dmc.NumberInput:
         return dmc.NumberInput(
-            id=self.component_id,
-            value=self.default,
+            id=self.schema_id,
+            value=self.default if self.default is not None else "",
             min=self.min_value,
             max=self.max_value,
             step=self.step,

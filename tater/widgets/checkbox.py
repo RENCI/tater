@@ -1,6 +1,7 @@
 """Checkbox widget for boolean annotations."""
 from dataclasses import dataclass
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 from .base import BooleanWidget
 
@@ -11,11 +12,21 @@ class CheckboxWidget(BooleanWidget):
 
     default: bool = False
 
-    def component(self) -> dmc.Stack:
-        parts = [dmc.Checkbox(id=self.component_id, label=self.label, checked=self.default)]
-        if self.description:
-            parts.append(dmc.Text(self.description, size="xs", c="dimmed"))
-        return dmc.Stack(parts, gap="xs", mt="md")
+    def component(self) -> dmc.Checkbox:
+        if self.auto_advance:
+            from dash import html
+            label = dmc.Group([
+                dmc.Text(self.label, size="sm"),
+                dmc.Tooltip(
+                    DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
+                    label="Auto-advances to next document",
+                    position="right",
+                    withArrow=True,
+                ),
+            ], gap=4)
+        else:
+            label = self.label
+        return dmc.Checkbox(id=self.schema_id, label=label, checked=self.default)
 
     @property
     def renders_own_label(self) -> bool:

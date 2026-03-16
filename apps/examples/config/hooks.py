@@ -30,6 +30,13 @@ class Schema(BaseModel):
 title = "tater - hooks"
 description = "Demonstrates the on_save hook and escape-hatch Dash callback pattern."
 
+instructions = """## Auto-Update Features
+
+**Pet Mood** → Logs the selection via hook callback.
+
+**Needs Attention** → Checking this box triggers an escape-hatch callback that auto-clears the mood field.
+"""
+
 pet_mood = SegmentedControlWidget(
     schema_field="pet_mood",
     label="Pet Mood",
@@ -63,8 +70,8 @@ def configure(app) -> None:
     from dash import Input, Output, no_update
 
     @app.app.callback(
-        Output(pet_mood.component_id, "value", allow_duplicate=True),
-        Input(needs_attention.component_id, "checked"),
+        Output(pet_mood.schema_id, "value", allow_duplicate=True),
+        Input(needs_attention.schema_id, "checked"),
         prevent_initial_call=True,
     )
     def clear_mood_when_no_attention(needs_attention):
