@@ -180,6 +180,33 @@ SpanAnnotationWidget(
 )
 ```
 
+Colors are assigned automatically from the palette. To use a specific color for an entity, pass a hex string to `EntityType`:
+
+```python
+EntityType("Medication", color="#4e79a7")
+EntityType("Diagnosis", color="#e15759")
+```
+
+The `palette` parameter controls auto-assigned colors (default: `"tableau10"`). Palettes are from [D3's categorical schemes](https://d3js.org/d3-scale-chromatic/categorical):
+
+| Palette | Description |
+|---------|-------------|
+| `category10` | D3's category10 |
+| `accent` | ColorBrewer Accent — mixed tones |
+| `dark2` | ColorBrewer Dark2 — dark, saturated |
+| `observable10` | Observable's 10-color palette |
+| `paired` | ColorBrewer Paired — 12 colors in light/dark pairs |
+| `pastel1` | ColorBrewer Pastel1 — soft tones |
+| `pastel2` | ColorBrewer Pastel2 — soft tones |
+| `set1` | ColorBrewer Set1 — bold, high-contrast |
+| `set2` | ColorBrewer Set2 — medium saturation |
+| `set3` | ColorBrewer Set3 — light, 12 colors |
+| `tableau10` | Tableau's 10-color categorical palette (default) |
+
+```python
+SpanAnnotationWidget("entities", label="Entities", palette="set1", entity_types=[...])
+```
+
 #### Hierarchical label
 
 Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
