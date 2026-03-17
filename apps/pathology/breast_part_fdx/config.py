@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget,
-    HierarchicalLabelCompactWidget, GroupWidget, ListableWidget, AccordionWidget,
+    HierarchicalLabelTagsWidget, GroupWidget, ListableWidget, AccordionWidget,
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
@@ -45,7 +45,7 @@ ontology = load_hierarchy_from_yaml("apps/examples/data/breast_fdx_ontology.yaml
 
 # Build the diagnosis concept widget (reusable for each list item)
 diagnosis_concept_children = [
-    HierarchicalLabelCompactWidget(
+    HierarchicalLabelTagsWidget(
         schema_field="label",
         label="Diagnosis Concept",
         description="Navigate to select the most specific diagnosis concept",

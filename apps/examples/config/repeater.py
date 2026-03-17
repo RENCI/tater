@@ -18,6 +18,7 @@ class Pet(BaseModel):
     neutered: Optional[bool] = None
     indoor: Optional[bool] = None
     breed: Optional[str] = None
+    test: Optional[str] = None
 
 
 class Schema(BaseModel):

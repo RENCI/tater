@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from tater import SpanAnnotation
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget, SpanAnnotationWidget,
-    ListableWidget, EntityType
+    AccordionWidget, EntityType
 )
 
 
@@ -45,7 +45,7 @@ title = "tater - IHC test results"
 description = "Annotate immunohistochemical (IHC) test results with stain, result, block location, and spans."
 
 widgets = [
-    ListableWidget(
+    AccordionWidget(
         schema_field="tests",
         label="IHC Test Results",
         description="Add and annotate each IHC test mentioned in the report",
