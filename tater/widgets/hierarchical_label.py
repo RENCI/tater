@@ -227,7 +227,7 @@ class HierarchicalLabelWidget(TaterWidget):
             description + [
                 dmc.TextInput(
                     id={"type": "hier-search", "field": pipe_field},
-                    placeholder="Search…",
+                    placeholder="Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…",
                     size="xs",
                     style={} if self.searchable else {"display": "none"},
                     rightSection=dmc.ActionIcon(
@@ -378,7 +378,7 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
                             id={"type": "hl-tags-search", "field": pipe_field},
                             type="text",
                             value="",
-                            placeholder="Search…" if self.searchable else "",
+                            placeholder=("Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…") if self.searchable else "",
                             debounce=False,
                             style={
                                 "border": "none",
