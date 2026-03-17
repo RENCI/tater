@@ -304,12 +304,14 @@ def _make_tags_option_buttons(nodes, pipe_field, depth, selected_name=None):
         children = [node.name]
         if not node.is_leaf:
             children.append(DashIconify(icon="tabler:chevron-down", width=10))
+        is_selected = selected_name is not None and node.name == selected_name
+        bg = "var(--mantine-primary-color-light)" if is_selected else "var(--mantine-primary-color-light-hover)"
         buttons.append(
             html.Div(
                 children,
                 id={"type": "hl-tags-node-btn", "field": pipe_field, "depth": depth, "name": node.name},
                 n_clicks=0,
-                style={**_PILL_STYLE, "cursor": "pointer", "backgroundColor": "var(--mantine-color-gray-1)"},
+                style={**_PILL_STYLE, "cursor": "pointer", "backgroundColor": bg},
             )
         )
     return buttons
@@ -317,7 +319,6 @@ def _make_tags_option_buttons(nodes, pipe_field, depth, selected_name=None):
 
 def _make_tags_pill(name: str, pipe_field: str, idx: int, is_selected: bool = False):
     """A single dismissible navigation/selection pill for the tags input."""
-    bg = "var(--mantine-color-gray-2)"
     return html.Div(
         [
             name,
@@ -325,10 +326,15 @@ def _make_tags_pill(name: str, pipe_field: str, idx: int, is_selected: bool = Fa
                 "×",
                 id={"type": "hl-tags-pill-remove", "field": pipe_field, "idx": idx},
                 n_clicks=0,
-                style={"cursor": "pointer", "marginLeft": "3px", "lineHeight": 1, "opacity": "0.6"},
+                style={"cursor": "pointer", "marginLeft": "3px", "lineHeight": 1, "opacity": "0.7"},
             ),
         ],
-        style={**_PILL_STYLE, "backgroundColor": bg, "cursor": "default"},
+        style={
+            **_PILL_STYLE,
+            "backgroundColor": "var(--mantine-primary-color-light-hover)",
+            "color": "var(--mantine-primary-color-default-color)",
+            "cursor": "default",
+        },
     )
 
 

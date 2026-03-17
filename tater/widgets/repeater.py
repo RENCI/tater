@@ -87,30 +87,42 @@ class RepeaterWidget(ContainerWidget):
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
+        from tater.ui import value_helpers
         rendered = []
+        pipe_ld = self.field_path.replace(".", "|")
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
+
+            # GroupWidget: set context before render_field so child schema_ids
+            # use MATCH-compatible ld/path/tf keys.
+            if isinstance(template, GroupWidget):
+                widget._set_repeater_context(pipe_ld, str(index))
+                _load_defaults_from_annotation(widget, tater_app, doc_id)
+                rendered.append(widget.render_field(mt="sm"))
+                continue
 
             # For nested RepeaterWidgets use _component_with_context so initial
             # items are pre-populated from the annotation rather than empty.
             if isinstance(template, RepeaterWidget):
                 comp = widget._component_with_context(tater_app, doc_id)
             else:
+                # Set repeater context BEFORE component() so the rendered
+                # component gets MATCH-compatible schema_id (ld/path/tf) rather
+                # than the standalone full-path encoding.  This is required for
+                # conditional-visibility MATCH callbacks to find the component,
+                # and ensures the component renders with correct annotation
+                # values on doc navigation (prevents React controlled→uncontrolled
+                # warnings when the same component ID is reused across docs).
+                if isinstance(template, ControlWidget):
+                    widget._set_repeater_context(pipe_ld, str(index))
+                    if tater_app and doc_id:
+                        annotation = tater_app.annotations.get(doc_id)
+                        if annotation is not None:
+                            v = value_helpers.get_model_value(annotation, widget.field_path)
+                            if v is not None:
+                                widget.default = v
                 comp = widget.component()
-
-            # GroupWidget: propagate repeater context to children so their
-            # schema_ids use MATCH-compatible ld/path/tf keys, then render normally.
-            if isinstance(template, GroupWidget):
-                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
-                _load_defaults_from_annotation(widget, tater_app, doc_id)
-                rendered.append(widget.render_field(mt="sm"))
-                continue
-
-            # Set repeater context on ControlWidget so schema_id uses MATCH-
-            # compatible ld/path keys instead of the full pipe-encoded path.
-            if isinstance(template, ControlWidget):
-                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
 
             items = []
             if not widget.renders_own_label:

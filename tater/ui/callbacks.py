@@ -148,12 +148,14 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Refresh menu dropdown with status badges after any navigation or status change
     @app.callback(
         Output("document-menu-dropdown", "children"),
+        Output("filter-flagged", "variant"),
         Input("timing-store", "data"),
         Input("status-store", "data"),
-        Input("filter-flagged", "checked"),
+        Input("filter-flagged", "n_clicks"),
     )
-    def update_menu_items(timing_data, status_data, flagged_only):
-        return _build_menu_items(tater_app, flagged_only=bool(flagged_only))
+    def update_menu_items(timing_data, status_data, n_clicks):
+        flagged_only = bool((n_clicks or 0) % 2)
+        return _build_menu_items(tater_app, flagged_only=flagged_only), "filled" if flagged_only else "outline"
 
     # Load flag and notes from metadata when the document changes.
     @app.callback(
