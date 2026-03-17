@@ -209,7 +209,7 @@ SpanAnnotationWidget("entities", label="Entities", palette="set1", entity_types=
 
 #### Hierarchical label
 
-Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
+Navigate a tree hierarchy to select a node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
 
 ```python
 from tater.widgets import (
@@ -232,6 +232,12 @@ HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
 ```
 
 All three accept `searchable=True` (default). Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+
+By default only leaf nodes can be selected. Pass `allow_non_leaf=True` to allow selecting any node — clicking a non-leaf selects it as the annotation value and also navigates into it to show its children. The selected node is indicated by a dark border regardless of depth:
+
+```python
+HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, allow_non_leaf=True)
+```
 
 ### Containers
 

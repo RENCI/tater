@@ -28,13 +28,16 @@ instructions = """## Navigation
 
 ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 
+allow_non_leaf = True
+
 widgets = [
     HierarchicalLabelTagsWidget(
         schema_field="tags_breed",
         label="Tags Breed",
-        description="Navigate via pill tags — click a tag to go back, × to deselect.",
+        description="Navigate via pill tags to select a breed or type.",
         hierarchy=ontology,
         searchable=True,
+        allow_non_leaf=allow_non_leaf,
     ),
     HierarchicalLabelCompactWidget(
         schema_field="primary_breed",
@@ -42,6 +45,7 @@ widgets = [
         description="Navigate the ontology to select a breed or type.",
         hierarchy=ontology,
         searchable=True,
+        allow_non_leaf=allow_non_leaf,
     ),
     HierarchicalLabelFullWidget(
         schema_field="secondary_breed",
@@ -49,5 +53,6 @@ widgets = [
         description="Select a secondary breed if the pet is a mix.",
         hierarchy=ontology,
         searchable=True,
+        allow_non_leaf=allow_non_leaf,
     ),
 ]
