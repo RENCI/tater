@@ -1023,7 +1023,8 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
         if search_query and search_query.strip():
             q = search_query.strip().lower()
-            matches = [n for n in root.all_leaves() if q in n.name.lower()]
+            candidates = root.all_nodes()[1:] if widget.allow_non_leaf else root.all_leaves()
+            matches = [n for n in candidates if q in n.name.lower()]
             return [_section("Search results", _make_buttons(matches, pipe_field, 0, selected_value=selected_value))], breadcrumb
 
         return widget._render_sections(path, pipe_field, selected_value), breadcrumb
@@ -1192,7 +1193,8 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         use_search = clear_search is no_update and bool(search_query and search_query.strip())
         if use_search:
             q = search_query.strip().lower()
-            matches = [n for n in root.all_nodes() if n is not root and q in n.name.lower()]
+            candidates = root.all_nodes()[1:] if widget.allow_non_leaf else root.all_leaves()
+            matches = [n for n in candidates if q in n.name.lower()]
             option_tags = _make_tags_option_buttons(matches, pipe_field, len(path), selected_value)
         else:
             current_node = _node_at(root, path)

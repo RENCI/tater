@@ -28,7 +28,7 @@ instructions = """## Navigation
 
 ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 
-allow_non_leaf = True
+allow_non_leaf = False
 
 widgets = [
     HierarchicalLabelTagsWidget(
