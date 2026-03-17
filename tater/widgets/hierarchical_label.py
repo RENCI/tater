@@ -488,20 +488,12 @@ def _build_sections_full(
     selected_value: Optional[str] = None,
 ) -> list:
     """Full mode: show all sibling nodes at every revealed level."""
-    def make_btns(nodes, depth, nav_name, selected_value=None):
-        return _make_buttons(nodes, pipe_field, depth, nav_name, selected_value)
-    return _build_sections_full_impl(root, path, selected_value, make_btns)
+    def btns(nodes, depth, nav_name, sv=None):
+        return _make_buttons(nodes, pipe_field, depth, nav_name, sv)
 
-
-def _build_sections_full_impl(
-    root: Node,
-    path: list[str],
-    selected_value: Optional[str],
-    make_btns_fn,
-) -> list:
     sections = []
     selected_at = path[0] if path else None
-    sections.append(_section("Top level categories", make_btns_fn(root.children, 0, selected_at, selected_value)))
+    sections.append(_section("Top level categories", btns(root.children, 0, selected_at, selected_value)))
 
     current_node = root
     for depth, name in enumerate(path):
@@ -510,7 +502,7 @@ def _build_sections_full_impl(
             break
         current_node = child
         selected_at = path[depth + 1] if depth + 1 < len(path) else None
-        sections.append(_section(current_node.name, make_btns_fn(current_node.children, depth + 1, selected_at, selected_value)))
+        sections.append(_section(current_node.name, btns(current_node.children, depth + 1, selected_at, selected_value)))
 
     return sections
 
@@ -522,18 +514,9 @@ def _build_sections_compact(
     selected_value: Optional[str] = None,
 ) -> list:
     """Compact mode: collapse navigated levels to a single button each."""
-    def make_btns(nodes, depth, nav_name, selected_value=None):
-        return _make_buttons(nodes, pipe_field, depth, nav_name, selected_value)
-    return _build_sections_compact_impl(root, path, selected_value, make_btns)
+    def btns(nodes, depth, nav_name, sv=None):
+        return _make_buttons(nodes, pipe_field, depth, nav_name, sv)
 
-
-def _build_sections_compact_impl(
-    root: Node,
-    path: list[str],
-    selected_value: Optional[str],
-    make_btns_fn,
-) -> list:
-    """Compact mode: collapse navigated levels to a single button each."""
     sections = []
     current_node = root
 
@@ -545,9 +528,9 @@ def _build_sections_compact_impl(
     for depth, name in enumerate(path):
         child = current_node.find(name)
         if child is not None and child.is_leaf:
-            _add(make_btns_fn([child], depth, name, selected_value))
+            _add(btns([child], depth, name, selected_value))
             return sections
-        _add(make_btns_fn([child] if child else [], depth, name, selected_value))
+        _add(btns([child] if child else [], depth, name, selected_value))
         if child is None:
             return sections
         current_node = child
@@ -556,8 +539,8 @@ def _build_sections_compact_impl(
     if selected_value:
         selected_child = current_node.find(selected_value)
         if selected_child and selected_child.is_leaf:
-            _add(make_btns_fn([selected_child], depth, selected_value, selected_value))
+            _add(btns([selected_child], depth, selected_value, selected_value))
             return sections
 
-    _add(make_btns_fn(current_node.children, depth, selected_value, selected_value))
+    _add(btns(current_node.children, depth, selected_value, selected_value))
     return sections

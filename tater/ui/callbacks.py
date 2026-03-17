@@ -874,15 +874,6 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     def _get_widget(field_path: str) -> Optional[HierarchicalLabelWidget]:
         return _find_hl_template(tater_app.widgets, field_path)
 
-    def node_at(root, path: list[str]):
-        node = root
-        for name in path:
-            child = node.find(name)
-            if child is None:
-                return root
-            node = child
-        return node
-
     # ---- 1a. Show/hide clear button ----
     @app.callback(
         Output({"type": "hier-search-clear", "field": MATCH}, "style"),
@@ -951,7 +942,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
         root = widget.root
 
-        parent = node_at(root, path[:depth])
+        parent = _node_at(root, path[:depth])
         clicked = parent.find(node_name)
         is_search_result = False
         if clicked is None:
@@ -1041,7 +1032,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     """Register MATCH callbacks for all HierarchicalLabelTagsWidget instances."""
     from tater.widgets.hierarchical_label import (
-        HierarchicalLabelTagsWidget, _find_path, _make_tags_option_buttons, _make_tags_pill,
+        HierarchicalLabelTagsWidget, _find_path, _node_at, _make_tags_option_buttons, _make_tags_pill,
     )
 
     tags_templates = [w for w in _collect_hl_templates(tater_app.widgets)
@@ -1054,15 +1045,6 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     def _get_widget(field_path: str):
         w = _find_hl_template(tater_app.widgets, field_path)
         return w if isinstance(w, HierarchicalLabelTagsWidget) else None
-
-    def node_at(root, path):
-        node = root
-        for name in path:
-            child = node.find(name)
-            if child is None:
-                return root
-            node = child
-        return node
 
     # 1. Reset nav + search on doc change — initialise path from existing selection
     @app.callback(
@@ -1115,7 +1097,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         # Determine new nav path: full path to clicked node (includes the node itself)
         # Search results are not children of the current nav node — detect by checking the tree
-        current_node = node_at(root, path)
+        current_node = _node_at(root, path)
         is_search_result = current_node.find(node_name) is None
         if is_search_result:
             new_path = _find_path(root, node_name)
@@ -1126,7 +1108,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         if not new_path:
             return no_update, no_update
 
-        clicked_node = node_at(root, new_path)
+        clicked_node = _node_at(root, new_path)
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         if annotation is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
             value_helpers.set_model_value(annotation, field_path, node_name)
@@ -1199,7 +1181,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         # Pills = nav path; last pill gets selected style only if it's the saved value
         # (leaf always; non-leaf only when allow_non_leaf=True)
-        last_node = node_at(root, path) if path else None
+        last_node = _node_at(root, path) if path else None
         last_is_selected = bool(last_node and (last_node.is_leaf or widget.allow_non_leaf))
         pills = [
             _make_tags_pill(name, pipe_field, i, is_selected=(i == len(path) - 1 and last_is_selected))
@@ -1213,7 +1195,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             matches = [n for n in root.all_nodes() if n is not root and q in n.name.lower()]
             option_tags = _make_tags_option_buttons(matches, pipe_field, len(path), selected_value)
         else:
-            current_node = node_at(root, path)
+            current_node = _node_at(root, path)
             option_tags = _make_tags_option_buttons(current_node.children, pipe_field, len(path), selected_value)
 
         return pills, clear_search, option_tags
