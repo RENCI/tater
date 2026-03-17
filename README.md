@@ -378,7 +378,11 @@ uv sync --group dev
 source .venv/bin/activate
 ```
 
-Browser tests require Google Chrome. Install it once via the `.deb` package:
+Browser tests use Chrome by default, but Dash's testing framework supports other browsers — see the [Dash testing docs](https://dash.plotly.com/testing) for alternatives.
+
+On **macOS/Windows**, install Chrome normally from [google.com/chrome](https://www.google.com/chrome/). On **standard Linux**, use your package manager or the [official Linux install guide](https://support.google.com/chrome/a/answer/9025903).
+
+**WSL users**: Chrome must be installed via the `.deb` package (snap does not work in WSL):
 
 ```bash
 wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
