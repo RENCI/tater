@@ -180,9 +180,36 @@ SpanAnnotationWidget(
 )
 ```
 
+Colors are assigned automatically from the palette. To use a specific color for an entity, pass a hex string to `EntityType`:
+
+```python
+EntityType("Medication", color="#4e79a7")
+EntityType("Diagnosis", color="#e15759")
+```
+
+The `palette` parameter controls auto-assigned colors (default: `"tableau10"`). Palettes are from [D3's categorical schemes](https://d3js.org/d3-scale-chromatic/categorical):
+
+| Palette | Description |
+|---------|-------------|
+| `category10` | D3's category10 |
+| `accent` | ColorBrewer Accent — mixed tones |
+| `dark2` | ColorBrewer Dark2 — dark, saturated |
+| `observable10` | Observable's 10-color palette |
+| `paired` | ColorBrewer Paired — 12 colors in light/dark pairs |
+| `pastel1` | ColorBrewer Pastel1 — soft tones |
+| `pastel2` | ColorBrewer Pastel2 — soft tones |
+| `set1` | ColorBrewer Set1 — bold, high-contrast |
+| `set2` | ColorBrewer Set2 — medium saturation |
+| `set3` | ColorBrewer Set3 — light, 12 colors |
+| `tableau10` | Tableau's 10-color categorical palette (default) |
+
+```python
+SpanAnnotationWidget("entities", label="Entities", palette="set1", entity_types=[...])
+```
+
 #### Hierarchical label
 
-Navigate a tree hierarchy to select a leaf node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
+Navigate a tree hierarchy to select a node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
 
 ```python
 from tater.widgets import (
@@ -205,6 +232,12 @@ HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
 ```
 
 All three accept `searchable=True` (default). Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+
+By default only leaf nodes can be selected. Pass `allow_non_leaf=True` to allow selecting any node — clicking a non-leaf selects it as the annotation value and also navigates into it to show its children. The selected node is indicated by a dark border regardless of depth:
+
+```python
+HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, allow_non_leaf=True)
+```
 
 ### Containers
 
@@ -378,7 +411,11 @@ uv sync --group dev
 source .venv/bin/activate
 ```
 
-Browser tests require Google Chrome. Install it once via the `.deb` package:
+Browser tests use Chrome by default, but Dash's testing framework supports other browsers — see the [Dash testing docs](https://dash.plotly.com/testing) for alternatives.
+
+On **macOS/Windows**, install Chrome normally from [google.com/chrome](https://www.google.com/chrome/). On **standard Linux**, use your package manager or the [official Linux install guide](https://support.google.com/chrome/a/answer/9025903).
+
+**WSL users**: Chrome must be installed via the `.deb` package (snap does not work in WSL):
 
 ```bash
 wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb

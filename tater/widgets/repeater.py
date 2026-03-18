@@ -30,6 +30,7 @@ import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
 import typing
+from pydantic import BaseModel
 from .base import ContainerWidget, TaterWidget, ControlWidget, _resolve_field_info, _unwrap_optional
 
 # Component-type strings for nested (repeater-inside-repeater) IDs.
@@ -87,30 +88,42 @@ class RepeaterWidget(ContainerWidget):
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
+        from tater.ui import value_helpers
         rendered = []
+        pipe_ld = self.field_path.replace(".", "|")
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
+
+            # GroupWidget: set context before render_field so child schema_ids
+            # use MATCH-compatible ld/path/tf keys.
+            if isinstance(template, GroupWidget):
+                widget._set_repeater_context(pipe_ld, str(index))
+                _load_defaults_from_annotation(widget, tater_app, doc_id)
+                rendered.append(widget.render_field(mt="sm"))
+                continue
 
             # For nested RepeaterWidgets use _component_with_context so initial
             # items are pre-populated from the annotation rather than empty.
             if isinstance(template, RepeaterWidget):
                 comp = widget._component_with_context(tater_app, doc_id)
             else:
+                # Set repeater context BEFORE component() so the rendered
+                # component gets MATCH-compatible schema_id (ld/path/tf) rather
+                # than the standalone full-path encoding.  This is required for
+                # conditional-visibility MATCH callbacks to find the component,
+                # and ensures the component renders with correct annotation
+                # values on doc navigation (prevents React controlled→uncontrolled
+                # warnings when the same component ID is reused across docs).
+                if isinstance(template, ControlWidget):
+                    widget._set_repeater_context(pipe_ld, str(index))
+                    if tater_app and doc_id:
+                        annotation = tater_app.annotations.get(doc_id)
+                        if annotation is not None:
+                            v = value_helpers.get_model_value(annotation, widget.field_path)
+                            if v is not None:
+                                widget.default = v
                 comp = widget.component()
-
-            # GroupWidget: propagate repeater context to children so their
-            # schema_ids use MATCH-compatible ld/path/tf keys, then render normally.
-            if isinstance(template, GroupWidget):
-                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
-                _load_defaults_from_annotation(widget, tater_app, doc_id)
-                rendered.append(widget.render_field(mt="sm"))
-                continue
-
-            # Set repeater context on ControlWidget so schema_id uses MATCH-
-            # compatible ld/path keys instead of the full pipe-encoded path.
-            if isinstance(template, ControlWidget):
-                widget._set_repeater_context(self.field_path.replace(".", "|"), str(index))
 
             items = []
             if not widget.renders_own_label:
@@ -509,6 +522,12 @@ class RepeaterWidget(ContainerWidget):
                 f"Field '{self.field_path}' has type {inner!r}, but {type(self).__name__} requires a list field."
             )
         item_type = typing.get_args(inner)[0]
+        # Fill in widgets for any item model fields not explicitly covered,
+        # using the same auto-generation logic as top-level widgets_from_model.
+        # Lazy import avoids the circular dependency (json_loader imports repeater).
+        if isinstance(item_type, type) and issubclass(item_type, BaseModel):
+            from tater.loaders.json_loader import widgets_from_model
+            self.item_widgets = widgets_from_model(item_type, overrides=self.item_widgets)
         for item_widget in self.item_widgets:
             # Pre-finalize so GroupWidget children get item-relative field_path
             # values (e.g. "booleans.is_indoor") before bind_schema traverses them.

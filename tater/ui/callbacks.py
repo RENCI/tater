@@ -148,12 +148,14 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Refresh menu dropdown with status badges after any navigation or status change
     @app.callback(
         Output("document-menu-dropdown", "children"),
+        Output("filter-flagged", "variant"),
         Input("timing-store", "data"),
         Input("status-store", "data"),
-        Input("filter-flagged", "checked"),
+        Input("filter-flagged", "n_clicks"),
     )
-    def update_menu_items(timing_data, status_data, flagged_only):
-        return _build_menu_items(tater_app, flagged_only=bool(flagged_only))
+    def update_menu_items(timing_data, status_data, n_clicks):
+        flagged_only = bool((n_clicks or 0) % 2)
+        return _build_menu_items(tater_app, flagged_only=flagged_only), "filled" if flagged_only else "outline"
 
     # Load flag and notes from metadata when the document changes.
     @app.callback(
@@ -860,7 +862,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     Component IDs use pipe-encoded field paths so the ``field`` key uniquely
     identifies each HL instance without per-widget registration.
     """
-    from tater.widgets.hierarchical_label import HierarchicalLabelWidget, HierarchicalLabelTagsWidget, _find_path, _make_buttons, _section
+    from tater.widgets.hierarchical_label import HierarchicalLabelWidget, HierarchicalLabelTagsWidget, _find_path, _make_buttons, _section, _node_at
 
     hl_templates = [w for w in _collect_hl_templates(tater_app.widgets)
                     if not isinstance(w, HierarchicalLabelTagsWidget)]
@@ -871,15 +873,6 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
     def _get_widget(field_path: str) -> Optional[HierarchicalLabelWidget]:
         return _find_hl_template(tater_app.widgets, field_path)
-
-    def node_at(root, path: list[str]):
-        node = root
-        for name in path:
-            child = node.find(name)
-            if child is None:
-                return root
-            node = child
-        return node
 
     # ---- 1a. Show/hide clear button ----
     @app.callback(
@@ -905,7 +898,19 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         Input("current-doc-id", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(_doc_id):
+    def reset_nav(doc_id):
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        widget = _get_widget(field_path)
+        if widget is None:
+            return []
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
+        if selected_value:
+            computed_path = _find_path(widget.root, selected_value)
+            if computed_path:
+                node = _node_at(widget.root, computed_path)
+                return computed_path[:-1] if node.is_leaf else computed_path
         return []
 
     # ---- 3. Handle node button click → update path, write if leaf ----
@@ -937,7 +942,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
         root = widget.root
 
-        parent = node_at(root, path[:depth])
+        parent = _node_at(root, path[:depth])
         clicked = parent.find(node_name)
         is_search_result = False
         if clicked is None:
@@ -972,8 +977,22 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             return new_path, ("" if is_search_result else no_update)
         else:
             if depth < len(path) and path[depth] == node_name:
+                # Back: parent is non-leaf; only selectable if allow_non_leaf=True, else clear
+                new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
+                if doc_id:
+                    annotation = tater_app.annotations.get(doc_id)
+                    if annotation is not None:
+                        value_helpers.set_model_value(annotation, field_path, new_value)
+                        tater_app._save_annotations_to_file(doc_id=doc_id)
                 return path[:depth], no_update
-            return path[:depth] + [node_name], no_update
+            # Forward: navigate into non-leaf; only select if allow_non_leaf=True
+            new_path = path[:depth] + [node_name]
+            if widget.allow_non_leaf and doc_id:
+                annotation = tater_app.annotations.get(doc_id)
+                if annotation is not None:
+                    value_helpers.set_model_value(annotation, field_path, node_name)
+                    tater_app._save_annotations_to_file(doc_id=doc_id)
+            return new_path, no_update
 
     # ---- 4. Rebuild sections from nav state / search / doc change ----
     @app.callback(
@@ -1004,8 +1023,9 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
         if search_query and search_query.strip():
             q = search_query.strip().lower()
-            matches = [n for n in root.all_leaves() if q in n.name.lower()]
-            return [_section("Search results", _make_buttons(matches, pipe_field, 0, selected_value))], breadcrumb
+            candidates = root.all_nodes()[1:] if widget.allow_non_leaf else root.all_leaves()
+            matches = [n for n in candidates if q in n.name.lower()]
+            return [_section("Search results", _make_buttons(matches, pipe_field, 0, selected_value=selected_value))], breadcrumb
 
         return widget._render_sections(path, pipe_field, selected_value), breadcrumb
 
@@ -1013,7 +1033,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     """Register MATCH callbacks for all HierarchicalLabelTagsWidget instances."""
     from tater.widgets.hierarchical_label import (
-        HierarchicalLabelTagsWidget, _find_path, _make_tags_option_buttons, _make_tags_pill,
+        HierarchicalLabelTagsWidget, _find_path, _node_at, _make_tags_option_buttons, _make_tags_pill,
     )
 
     tags_templates = [w for w in _collect_hl_templates(tater_app.widgets)
@@ -1027,26 +1047,28 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         w = _find_hl_template(tater_app.widgets, field_path)
         return w if isinstance(w, HierarchicalLabelTagsWidget) else None
 
-    def node_at(root, path):
-        node = root
-        for name in path:
-            child = node.find(name)
-            if child is None:
-                return root
-            node = child
-        return node
-
-    # 1. Reset nav + search on doc change
+    # 1. Reset nav + search on doc change — initialise path from existing selection
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Input("current-doc-id", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(_):
+    def reset_nav(doc_id):
+        pipe_field = ctx.outputs_list[0]["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        widget = _get_widget(field_path)
+        if widget is None:
+            return [], ""
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
+        if selected_value:
+            computed_path = _find_path(widget.root, selected_value)
+            if computed_path:
+                return computed_path, ""  # Tags: full path including selected node
         return [], ""
 
-    # 2. Handle option tag click → navigate or toggle-select leaf
+    # 2. Handle option tag click — always a forward selection
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
@@ -1066,7 +1088,6 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         pipe_field = triggered["field"]
         field_path = pipe_field.replace("|", ".")
-        depth = triggered["depth"]
         node_name = triggered["name"]
         path = list(current_path or [])
 
@@ -1075,53 +1096,40 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
         root = widget.root
 
-        parent = node_at(root, path[:depth])
-        clicked = parent.find(node_name)
-        is_search_result = False
-        if clicked is None:
-            clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
-            if clicked is None:
-                return no_update, no_update
-            is_search_result = True
-
-        if clicked.is_leaf:
-            annotation = tater_app.annotations.get(doc_id) if doc_id else None
-            current_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
-
-            if is_search_result:
-                full_path = _find_path(root, node_name)
-                new_path = full_path[:-1]
-            else:
-                new_path = path[:depth]
-
-            if current_value == node_name:
-                if annotation is not None:
-                    value_helpers.set_model_value(annotation, field_path, None)
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
-            else:
-                if annotation is not None:
-                    value_helpers.set_model_value(annotation, field_path, node_name)
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
-
-            return new_path, ""
+        # Determine new nav path: full path to clicked node (includes the node itself)
+        # Search results are not children of the current nav node — detect by checking the tree
+        current_node = _node_at(root, path)
+        is_search_result = current_node.find(node_name) is None
+        if is_search_result:
+            new_path = _find_path(root, node_name)
         else:
-            if depth < len(path) and path[depth] == node_name:
-                return path[:depth], ""
-            return path[:depth] + [node_name], ""
+            new_path = path[:triggered["depth"]] + [node_name]
 
-    # 3. Handle pill × button click → navigate back or deselect leaf
+        # Verify the node exists
+        if not new_path:
+            return no_update, no_update
+
+        clicked_node = _node_at(root, new_path)
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        if annotation is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
+            value_helpers.set_model_value(annotation, field_path, node_name)
+            tater_app._save_annotations_to_file(doc_id=doc_id)
+
+        return new_path, ""
+
+    # 3. Handle pill click → navigate back, selecting parent
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
-        Input({"type": "hl-tags-pill-remove", "field": MATCH, "idx": ALL}, "n_clicks"),
+        Input({"type": "hl-tags-pill", "field": MATCH, "idx": ALL}, "n_clicks"),
         State({"type": "hl-tags-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
         prevent_initial_call=True,
     )
-    def handle_pill_remove(n_clicks_list, current_nav, doc_id):
+    def handle_pill_click(n_clicks_list, current_nav, doc_id):
         if not ctx.triggered_id:
             return no_update
         triggered = ctx.triggered_id
-        if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-pill-remove":
+        if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-pill":
             return no_update
         if not ctx.triggered or not ctx.triggered[0].get("value"):
             return no_update
@@ -1131,14 +1139,15 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         field_path = pipe_field.replace("|", ".")
         path = list(current_nav or [])
 
+        widget = _get_widget(field_path)
+        # Parent is non-leaf; only selectable if allow_non_leaf=True, else clear
+        parent_name = (path[idx - 1] if idx > 0 else None) if (widget and widget.allow_non_leaf) else None
         annotation = tater_app.annotations.get(doc_id) if doc_id else None
         if annotation is not None:
-            value_helpers.set_model_value(annotation, field_path, None)
+            value_helpers.set_model_value(annotation, field_path, parent_name)
             tater_app._save_annotations_to_file(doc_id=doc_id)
 
-        if idx < len(path):
-            return path[:idx]
-        return path  # leaf removed, keep nav path
+        return path[:idx]
 
     # 4. Rebuild pills + option tags on nav/search/doc change
     @app.callback(
@@ -1155,8 +1164,6 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         field_path = pipe_field.replace("|", ".")
         path = list(current_path or [])
 
-        # Clear search when triggered by nav or doc change; leave it alone when
-        # the user is typing (otherwise we'd clear on every keystroke).
         triggered = ctx.triggered_id
         if triggered == "current-doc-id" or (
             isinstance(triggered, dict) and triggered.get("type") == "hl-tags-nav"
@@ -1170,32 +1177,27 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update, no_update
         root = widget.root
 
-        selected_value = None
-        if doc_id:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation is not None:
-                selected_value = value_helpers.get_model_value(annotation, field_path)
+        annotation = tater_app.annotations.get(doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
 
-        if selected_value and not path:
-            computed = _find_path(root, selected_value)
-            if computed:
-                path = computed[:-1]
+        # Pills = nav path; last pill gets selected style only if it's the saved value
+        # (leaf always; non-leaf only when allow_non_leaf=True)
+        last_node = _node_at(root, path) if path else None
+        last_is_selected = bool(last_node and (last_node.is_leaf or widget.allow_non_leaf))
+        pills = [
+            _make_tags_pill(name, pipe_field, i, is_selected=(i == len(path) - 1 and last_is_selected))
+            for i, name in enumerate(path)
+        ]
 
-        # Build pills
-        pills = [_make_tags_pill(name, pipe_field, i) for i, name in enumerate(path)]
-        if selected_value:
-            pills.append(_make_tags_pill(selected_value, pipe_field, len(path), is_selected=True))
-
-        # Build option buttons — use search only when user is typing (not when clearing)
+        # Options = children of current nav level; empty when at a leaf
         use_search = clear_search is no_update and bool(search_query and search_query.strip())
         if use_search:
             q = search_query.strip().lower()
-            matches = [n for n in root.all_leaves() if q in n.name.lower()]
-            option_tags = _make_tags_option_buttons(matches, pipe_field, 0, selected_value)
-        elif selected_value:
-            option_tags = []
+            candidates = root.all_nodes()[1:] if widget.allow_non_leaf else root.all_leaves()
+            matches = [n for n in candidates if q in n.name.lower()]
+            option_tags = _make_tags_option_buttons(matches, pipe_field, len(path), selected_value)
         else:
-            current_node = node_at(root, path)
+            current_node = _node_at(root, path)
             option_tags = _make_tags_option_buttons(current_node.children, pipe_field, len(path), selected_value)
 
         return pills, clear_search, option_tags
