@@ -139,7 +139,7 @@ Widget base class hierarchy in `base.py`:
   callback functions (capture to local variables before the `@app.callback` decorator).
 - **Escape-hatch callbacks**: for cross-field rules that can't be expressed as widget declarations,
   assign widgets to named variables and use `widget.component_id` in `Output`/`Input` — avoids
-  hard-coding ID strings. See `apps/examples/config/hooks.py` for the pattern. The `configure(app)` function
+  hard-coding ID strings. See `apps/examples/config/hooks.py` for the pattern. The `register_callbacks(app)` function
   in a config module is the right place for these; it is called after `set_annotation_widgets` so
   all component IDs are finalised.
 - `required=True` is **UI-only**: it shows a `*` indicator and drives the `in_progress` /

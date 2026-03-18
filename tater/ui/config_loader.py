@@ -36,10 +36,7 @@ def load_config_module(path: str) -> dict[str, Any]:
     ``theme``
         ``"light"`` or ``"dark"`` (optional, defaults to ``"light"``).
 
-    ``on_save``
-        An ``OnSaveHook`` callable (optional).
-
-    ``configure``
+    ``register_callbacks``
         A callable ``(app: TaterApp) -> None`` called after
         ``set_annotation_widgets()``.  Use for escape-hatch Dash callbacks
         that need the live app instance (optional).
@@ -67,6 +64,5 @@ def load_config_module(path: str) -> dict[str, Any]:
         "description": getattr(module, "description", None),
         "instructions": getattr(module, "instructions", None),
         "theme": getattr(module, "theme", "light"),
-        "on_save": getattr(module, "on_save", None),
-        "configure": getattr(module, "configure", None),
+        "register_callbacks": getattr(module, "register_callbacks", None),
     }
