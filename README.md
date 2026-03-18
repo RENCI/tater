@@ -108,8 +108,7 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
 | `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
-| `on_save` | no | Callable `(doc_id: str, annotation: BaseModel) -> None` called after each auto-save |
-| `configure` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks |
+| `register_callbacks` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks and setting `app.on_save` |
 
 ## Widgets
 

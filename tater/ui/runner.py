@@ -18,8 +18,7 @@ def main() -> None:
     description = config.get("description")
     instructions = config.get("instructions")
     theme = config.get("theme", "light")
-    on_save = config.get("on_save")
-    configure = config.get("configure")
+    register_callbacks = config.get("register_callbacks")
 
     if schema_model is None:
         raise SystemExit("error: no schema_model found in config")
@@ -40,7 +39,6 @@ def main() -> None:
         theme=theme,
         annotations_path=args.annotations,
         schema_model=schema_model,
-        on_save=on_save,
     )
 
     if not app.load_documents(args.documents):
@@ -48,8 +46,8 @@ def main() -> None:
 
     app.set_annotation_widgets(widgets)
 
-    if configure is not None:
-        configure(app)
+    if register_callbacks is not None:
+        register_callbacks(app)
 
     app.run(debug=args.debug, port=args.port, host=args.host)
 

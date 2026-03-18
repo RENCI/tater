@@ -4,11 +4,11 @@ on_save hook
 ------------
 ``on_save`` is not defined at module level here because its audit path
 depends on the app's annotations path, which is only known at runtime.
-Instead, ``configure`` sets ``app.on_save`` after the app is created.
+Instead, ``register_callbacks`` sets ``app.on_save`` after the app is created.
 
 Escape hatch
 ------------
-``configure`` also registers a Dash callback that clears ``pet_mood``
+``register_callbacks`` also registers a Dash callback that clears ``pet_mood``
 whenever ``needs_attention`` is unchecked — a cross-field rule that can't be
 expressed as a widget declaration.  It runs after ``set_annotation_widgets``
 so that Tater's component IDs are already finalised.
@@ -52,7 +52,7 @@ needs_attention = CheckboxWidget(
 widgets = [pet_mood, needs_attention]
 
 
-def configure(app) -> None:
+def register_callbacks(app) -> None:
     # Wire up on_save using the app's annotations path.
     audit_path = (
         Path(app.annotations_path).parent / "audit.jsonl"
