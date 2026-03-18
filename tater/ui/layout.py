@@ -17,7 +17,7 @@ from tater.ui.callbacks import _has_any_span as _has_any_span_widgets
 # Header: 48px content row + 4px progress bar
 _HEADER_HEIGHT = 52
 # Footer: two rows (status + navigation)
-_FOOTER_HEIGHT = 80
+_FOOTER_HEIGHT = 84
 
 
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
@@ -293,7 +293,7 @@ def _build_app_footer() -> dmc.AppShellFooter:
                     justify="space-between",
                 ),
             ],
-            gap="xs",
+            gap="8",
             px="md",
             py="xs",
         ),

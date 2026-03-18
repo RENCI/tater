@@ -899,7 +899,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
     def reset_nav(doc_id):
-        pipe_field = ctx.outputs_list[0]["id"]["field"]
+        pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
