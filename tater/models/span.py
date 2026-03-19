@@ -1,5 +1,5 @@
 """SpanAnnotation model for text span annotations."""
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class SpanAnnotation(BaseModel):
@@ -9,3 +9,9 @@ class SpanAnnotation(BaseModel):
     end: int
     text: str
     tag: str
+
+    @model_validator(mode="after")
+    def validate_span_bounds(self) -> "SpanAnnotation":
+        if self.end <= self.start:
+            raise ValueError(f"end ({self.end}) must be greater than start ({self.start})")
+        return self
