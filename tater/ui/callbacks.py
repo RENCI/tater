@@ -5,7 +5,6 @@ import copy
 from typing import TYPE_CHECKING, Optional
 
 import time
-from datetime import datetime
 
 from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html
 import dash_mantine_components as dmc
@@ -223,6 +222,10 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             return True
 
 
+_STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
+_STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
+
+
 def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     """Setup callbacks for save time and document timing display."""
     app = tater_app.app
@@ -238,10 +241,21 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     def on_save_click(n_clicks, current_doc_id, timing_data):
         if not n_clicks:
             return no_update
-        tater_app._save_annotations_to_file(doc_id=current_doc_id)
+        now = time.time()
         if timing_data is None:
             timing_data = {}
-        timing_data["last_save_time"] = time.time()
+        # Flush elapsed time into metadata before saving, then reset the start
+        # so the clientside timer continues without double-counting.
+        paused = timing_data.get("paused", False)
+        if not paused:
+            start = timing_data.get("doc_start_time")
+            if start and current_doc_id and current_doc_id in tater_app.metadata:
+                tater_app.metadata[current_doc_id].annotation_seconds += now - start
+            timing_data["doc_start_time"] = now
+            meta = tater_app.metadata.get(current_doc_id)
+            timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
+        tater_app._save_annotations_to_file(doc_id=current_doc_id)
+        timing_data["last_save_time"] = now
         return timing_data
 
     # Handle document changes to initialize timing
@@ -263,69 +277,70 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         timing_data["paused"] = False
         if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
             timing_data["session_start_time"] = time.time()
+        meta = tater_app.metadata.get(doc_id) if doc_id else None
+        timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
 
         status = tater_app.metadata[doc_id].status if doc_id and doc_id in tater_app.metadata else "not_started"
         return timing_data, status
 
-    # Update footer text every second
-
-    _STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-    _STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
-
+    # Update save status and pause icon whenever timing-store changes (i.e. on every save,
+    # navigation, or pause toggle) — no interval needed, no "Updating..." flicker.
     @app.callback(
         Output("save-status-text", "children"),
         Output("save-status-text", "c"),
-        Output("timing-text", "children"),
-        Output("btn-pause-timer", "children"),
-        Input("clock-interval", "n_intervals"),
-        State("timing-store", "data"),
-        State("current-doc-id", "data"),
-        prevent_initial_call=False,
+        Input("timing-store", "data"),
     )
-    def update_footer(n_intervals, timing_data, doc_id):
-        now = time.time()
-
-        # Save status text - show error in red, or timestamp of last save
+    def update_save_status(timing_data):
+        from datetime import datetime
         if tater_app._save_error:
             save_text = f"Save failed: {tater_app._save_error}"
             save_color = "red"
         elif timing_data and timing_data.get("last_save_time"):
-            save_time = timing_data["last_save_time"]
-            dt = datetime.fromtimestamp(save_time)
+            dt = datetime.fromtimestamp(timing_data["last_save_time"])
             save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
             save_color = "dimmed"
         else:
             save_text = "Never saved"
             save_color = "dimmed"
+        return save_text, save_color
 
-        paused = timing_data.get("paused", False) if timing_data else False
-
-        # Doc time: show total annotation_seconds for current doc, plus live elapsed if not paused
-        total_seconds = 0.0
-        meta = tater_app.metadata.get(doc_id)
-        if meta:
-            total_seconds = meta.annotation_seconds
-        if not paused and timing_data and timing_data.get("doc_start_time"):
-            total_seconds += now - timing_data["doc_start_time"]
-
-        # Format as h/m/s
-        total_seconds = int(total_seconds)
-        if total_seconds < 60:
-            timing_text = f"Doc time: {total_seconds}s"
-        elif total_seconds < 3600:
-            minutes = total_seconds // 60
-            seconds = total_seconds % 60
-            timing_text = f"Doc time: {minutes}m {seconds}s"
-        else:
-            hours = total_seconds // 3600
-            minutes = (total_seconds % 3600) // 60
-            timing_text = f"Doc time: {hours}h {minutes}m"
-
-        if paused:
-            timing_text += " (paused)"
-
-        pause_icon = DashIconify(icon="tabler:player-play", width=16) if paused else DashIconify(icon="tabler:player-pause", width=16)
-        return save_text, save_color, timing_text, pause_icon
+    # Update the doc timer display every second — runs entirely in the browser so
+    # there is no server round-trip and no "Updating..." tab-title flicker.
+    # Reads annotation_seconds_at_load from timing-store (written on doc load,
+    # navigation, and pause) so it never needs to call back to Python.
+    app.clientside_callback(
+        """
+        function(n_intervals, timing_data) {
+            if (!timing_data) return ["Doc time: 0s", "tabler:player-pause"];
+            var paused = timing_data.paused || false;
+            var base = timing_data.annotation_seconds_at_load || 0;
+            var total = base;
+            if (!paused && timing_data.doc_start_time) {
+                total += Date.now() / 1000 - timing_data.doc_start_time;
+            }
+            total = Math.floor(total);
+            var text;
+            if (total < 60) {
+                text = "Doc time: " + total + "s";
+            } else if (total < 3600) {
+                var m = Math.floor(total / 60);
+                var s = total % 60;
+                text = "Doc time: " + m + "m " + s + "s";
+            } else {
+                var h = Math.floor(total / 3600);
+                var m = Math.floor((total % 3600) / 60);
+                text = "Doc time: " + h + "h " + m + "m";
+            }
+            if (paused) text += " (paused)";
+            var icon = paused ? "tabler:player-play" : "tabler:player-pause";
+            return [text, icon];
+        }
+        """,
+        Output("timing-text", "children"),
+        Output("btn-pause-timer-icon", "icon"),
+        Input("clock-interval", "n_intervals"),
+        Input("timing-store", "data"),
+    )
 
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
@@ -348,6 +363,9 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
                 tater_app.metadata[doc_id].annotation_seconds += now - start
             timing_data["doc_start_time"] = None
             timing_data["paused"] = True
+            # Update baseline so the clientside timer shows the correct accumulated total
+            meta = tater_app.metadata.get(doc_id) if doc_id else None
+            timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
         else:
             timing_data["doc_start_time"] = now
             timing_data["paused"] = False
@@ -1446,6 +1464,8 @@ def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int
     timing_data["paused"] = False
     if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
         timing_data["session_start_time"] = time.time()
+    new_meta = tater_app.metadata.get(doc_id)
+    timing_data["annotation_seconds_at_load"] = new_meta.annotation_seconds if new_meta else 0.0
 
     return doc_id, timing_data
 
