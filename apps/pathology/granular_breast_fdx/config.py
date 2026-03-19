@@ -11,8 +11,8 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from tater.widgets import (
-    CheckboxWidget, HierarchicalLabelCompactWidget,
-    ListableWidget
+    CheckboxWidget, HierarchicalLabelTagsWidget,
+    AccordionWidget
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
@@ -37,13 +37,13 @@ ontology = load_hierarchy_from_yaml("apps/pathology/granular_breast_fdx/breast_f
 
 
 widgets = [
-    ListableWidget(
+    AccordionWidget(
         schema_field="diagnoses",
         label="Breast Cancer Diagnoses",
         description="Add each diagnosis mentioned in the pathology report",
         item_label="Diagnosis",
         item_widgets=[
-            HierarchicalLabelCompactWidget(
+            HierarchicalLabelTagsWidget(
                 schema_field="diagnosis_code",
                 label="Diagnosis",
                 description="Browse the hierarchical diagnosis ontology",

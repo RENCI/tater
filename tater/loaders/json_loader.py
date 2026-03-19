@@ -120,8 +120,7 @@ from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.span import SpanAnnotationWidget, EntityType
 from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
-from tater.widgets.listable import ListableWidget
-from tater.widgets.repeater import TabsWidget, AccordionWidget
+from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelFullWidget,
     HierarchicalLabelTagsWidget,
