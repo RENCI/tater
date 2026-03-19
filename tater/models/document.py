@@ -1,4 +1,4 @@
-"""Document and metadata models for Tater."""
+"""Document and metadata models for tater."""
 from typing import Optional, Any, Literal
 from pydantic import BaseModel, Field, model_validator
 

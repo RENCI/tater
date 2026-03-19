@@ -90,7 +90,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 withinPortal=True,
             ),
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
-            dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None}),
+            dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
             dcc.Store(id="auto-advance-store", data=0),
             dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
@@ -281,7 +281,7 @@ def _build_app_footer() -> dmc.AppShellFooter:
                     [
                         dmc.Group([
                             dmc.ActionIcon(
-                                DashIconify(icon="tabler:player-pause", width=16),
+                                DashIconify(id="btn-pause-timer-icon", icon="tabler:player-pause", width=16),
                                 id="btn-pause-timer",
                                 size="sm",
                                 variant="outline",
