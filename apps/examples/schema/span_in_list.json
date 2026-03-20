@@ -6,7 +6,7 @@
   "data_schema": [
     {
       "id": "findings",
-      "type": "listable",
+      "type": "repeater",
       "label": "Findings",
       "widget": {"item_label": "Finding"},
       "item_fields": [

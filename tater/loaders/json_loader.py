@@ -43,7 +43,7 @@ Schema format::
         },
         {
           "id": "pets",
-          "type": "listable",
+          "type": "repeater",
           "label": "Pets",
           "item_fields": [
             {"id": "name", "type": "text",   "label": "Name"},
@@ -58,16 +58,16 @@ The ``widget`` object is optional on leaf fields. Without it, a sensible
 default widget is chosen for each field type.
 
 Field types:
+  ``boolean``           — true/false (default: CheckboxWidget)
   ``choice``            — single selection from ``options`` (default: SegmentedControlWidget)
   ``multi_choice``      — multiple selections from ``options`` (default: MultiSelectWidget)
-  ``text``              — free text (default: TextInputWidget)
-  ``boolean``           — true/false (default: CheckboxWidget)
   ``numeric``           — number (default: NumberInputWidget)
   ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
+  ``text``              — free text (default: TextInputWidget)
   ``span_annotation``   — text span labelling (SpanAnnotationWidget)
   ``hierarchical_label``— tree-based label (default: HierarchicalLabelTagsWidget)
   ``group``             — nested sub-model with ``fields``
-  ``listable``          — repeatable list of sub-items with ``item_fields``
+  ``repeater``          — repeatable list of sub-items with ``item_fields``
                           (widget type override: ``tabs`` or ``accordion``)
   ``divider``           — labeled section break; no ``id`` required; supports ``label``,
                           ``description``
@@ -81,8 +81,9 @@ Widget override types (``"widget": {"type": "..."}``):
   ``switch``                   — for ``boolean`` fields
   ``chip_boolean``             — for ``boolean`` fields
   ``slider``                   — for ``numeric`` fields
-  ``hierarchical_label_full``  — for ``hierarchical_label`` fields
-  ``hierarchical_label_tags``  — for ``hierarchical_label`` fields
+  ``hierarchical_label_compact`` — for ``hierarchical_label`` fields
+  ``hierarchical_label_full``    — for ``hierarchical_label`` fields
+  ``hierarchical_label_tags``    — for ``hierarchical_label`` fields
 
 Widget options (``"widget": {"option": value}``):
   ``auto_advance``  — ``true`` on ``choice`` or ``boolean`` fields to advance to the next
@@ -122,6 +123,7 @@ from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
+    HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
     HierarchicalLabelTagsWidget,
     build_tree,
@@ -311,7 +313,7 @@ def _process_field(
 ) -> tuple[Any, TaterWidget]:
     """Recursively process one field spec into a (pydantic_field_def, widget) pair.
 
-    Child widgets for ``group`` and ``list`` types use their local id only —
+    Child widgets for ``group`` and ``repeater`` types use their local id only —
     ``GroupWidget._finalize_paths`` and ``ListableWidget._render_item_widgets``
     propagate the full path automatically.
     """
@@ -332,7 +334,7 @@ def _process_field(
             local_id, label=label, description=description, children=child_widgets
         )
 
-    if ftype == "listable":
+    if ftype == "repeater":
         item_model_fields: dict[str, Any] = {}
         item_widgets: list[TaterWidget] = []
         for child_spec in spec.get("item_fields", []):
@@ -483,6 +485,11 @@ def _build_widget(
         ref = spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
+        if widget_type == "hierarchical_label_compact":
+            return HierarchicalLabelCompactWidget(
+                fid, label=label, description=description,
+                hierarchy=hierarchy, searchable=searchable,
+            )
         if widget_type == "hierarchical_label_full":
             return HierarchicalLabelFullWidget(
                 fid, label=label, description=description,
