@@ -4,7 +4,7 @@
   "description": "Pet record observations in accordion sections; each observation has a list of breed mentions with span evidence and hierarchical breed labels.",
   "instructions": "## Annotation workflow\n\n1. Click **Add Observation** to create a new accordion section\n2. Select the **Observation Type** (breed mention, behavior, health condition, owner note)\n3. Inside the observation, click **Add Mention** for each time a breed or animal is referenced\n4. For each mention:\n   - Highlight the text in the document and click **Span** to tag it\n   - Use the **Breed / Species** hierarchy to identify the animal\n   - Set your **Confidence** in the identification\n5. Collapse completed observations with the accordion controls\n6. Set the **Overall Assessment** at the bottom\n",
   "hierarchies": {
-    "ontology": "../../data/pet_ontology.yaml"
+    "ontology": "../data/pet_ontology.yaml"
   },
   "data_schema": [
     {

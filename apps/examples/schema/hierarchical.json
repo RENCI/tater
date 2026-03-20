@@ -4,7 +4,7 @@
   "description": "Pet/animal ontology with tags, compact, and full hierarchical label widgets.",
   "instructions": "## Navigation\n\n- Use **chevron buttons** (\u2192) to explore the ontology\n- Use **search** to find breeds by name\n- Expand/collapse branches with the tree UI\n\n**Tags Breed** uses tags view (path shown as dismissible pills).\n**Primary Breed** uses compact view (shows only selected).\n**Secondary Breed** uses full view (shows all siblings).\n",
   "hierarchies": {
-    "ontology": "../../data/pet_ontology.yaml"
+    "ontology": "../data/pet_ontology.yaml"
   },
   "data_schema": [
     {
