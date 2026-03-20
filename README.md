@@ -85,11 +85,18 @@ Alternatively, use a JSON schema file (`my_schema.json`):
   "spec_version": "1.0",
   "title": "My Annotator",
   "data_schema": [
-    {"id": "sentiment", "type": "choice", "options": ["positive", "negative", "neutral"], "required": true},
+    {
+      "id": "sentiment",
+      "type": "choice",
+      "options": ["positive", "negative", "neutral"],
+      "widget": {"type": "segmented_control", "label": "Sentiment", "required": true}
+    },
     {"id": "is_relevant", "type": "boolean"}
   ]
 }
 ```
+
+Fields without a `widget` block get auto-generated default widgets.
 
 ```bash
 tater --schema my_schema.json --documents data/documents.json
@@ -300,50 +307,68 @@ A JSON schema file has this top-level structure:
 
 ### Field definition
 
-Every entry in `data_schema` (and `item_fields` / `fields` for list/group types) has:
+Every entry in `data_schema` (and `item_fields` / `fields` for repeater/group types) is either a **field** or a **divider**.
+
+**Field** — has `id` and `type` at the top level. Data-schema keys only:
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `id` | **yes** | Field name (used as Pydantic field name and widget ID) |
+| `id` | **yes** | Field name (Pydantic field name and widget ID) |
 | `type` | **yes** | Field type — see table below |
-| `label` | no | Display label (defaults to humanized `id`) |
-| `description` | no | Help text shown below the widget |
-| `required` | no | `true` marks the field as required for completion tracking |
-| `widget` | no | Object with widget-type overrides — see per-type notes below |
+| `options` | for `choice`/`multi_choice` | List of option strings |
+| `default` | no | Default value |
+| `fields` | for `group` | Child field definitions |
+| `item_fields` | for `repeater` | Item field definitions |
+| `widget` | no | Widget config block — see below |
+
+**Divider** — no `id` or `type`; only a `widget` block:
+
+```json
+{"widget": {"type": "divider", "label": "Section Heading"}}
+```
+
+### Widget config block
+
+All UI properties belong inside the `widget` block. `widget.type` is required for leaf fields when a `widget` block is present; it selects the widget class. Fields with no `widget` block get auto-generated default widgets.
+
+| Key | Description |
+|-----|-------------|
+| `type` | Widget class — see field types table for valid values |
+| `label` | Display label (default: humanized `id`) |
+| `description` | Help text shown below the widget |
+| `required` | `true` marks the field for completion tracking |
+| `auto_advance` | `true` advances to the next document on selection (`choice`/`boolean`) |
+| `placeholder` | Placeholder text (`text_input`, `text_area`) |
+| `orientation` | `"vertical"` or `"horizontal"` (`radio_group`, `chip_radio`, `checkbox_group`, `segmented_control`) |
+| `min_value` / `max_value` / `step` | Bounds and step size (`number_input`, `slider`, `range_slider`) |
+| `entity_types` | List of entity type name strings (`span_annotation`) |
+| `hierarchy_ref` | Key into the top-level `hierarchies` dict (`hierarchical_label`) |
+| `searchable` | Enable search (default `true`) (`hierarchical_label`) |
+| `item_label` | Singular label for list items (`listable`, `tabs`, `accordion`) |
+| `conditional_on` | `{"field": "field_id", "value": ...}` — show this widget only when the named field equals the given value |
 
 ### Field types
 
-| `type` | Schema type | Default widget | Widget overrides (`widget.type`) |
-|--------|-------------|----------------|----------------------------------|
-| `boolean` | `bool` | `CheckboxWidget` | `switch`, `chip_boolean` |
-| `choice` | `Literal[...]` | `SegmentedControlWidget` | `radio_group`, `select`, `chip_radio` |
-| `multi_choice` | `list[Literal[...]]` | `MultiSelectWidget` | `checkbox_group` |
-| `numeric` | `float` | `NumberInputWidget` | `slider` |
-| `range_slider` | `Optional[list[float]]` | `RangeSliderWidget` | — |
-| `text` | `str` | `TextInputWidget` | `text_area` |
-| `span_annotation` | `list[SpanAnnotation]` | `SpanAnnotationWidget` | — |
-| `hierarchical_label` | `Optional[str]` | `HierarchicalLabelTagsWidget` | `hierarchical_label_compact`, `hierarchical_label_full` |
-| `group` | nested model | `GroupWidget` | — |
-| `listable` | `list[model]` | `ListableWidget` | `tabs`, `accordion` |
-| `divider` | — | `DividerWidget` | — |
+| `type` | Schema type | Default widget | Widget `type` overrides |
+|--------|-------------|----------------|-------------------------|
+| `boolean` | `bool` | `checkbox` | `switch`, `chip_boolean` |
+| `choice` | `Literal[...]` | `segmented_control` | `radio_group`, `select`, `chip_radio` |
+| `multi_choice` | `list[Literal[...]]` | `multi_select` | `checkbox_group` |
+| `numeric` | `float` | `number_input` | `slider` |
+| `range_slider` | `list[float]` | `range_slider` | — |
+| `text` | `str` | `text_input` | `text_area` |
+| `span_annotation` | `list[SpanAnnotation]` | `span_annotation` | — |
+| `hierarchical_label` | `Optional[str]` | `hierarchical_label_tags` | `hierarchical_label_compact`, `hierarchical_label_full` |
+| `group` | nested model | auto (`GroupWidget`) | — |
+| `repeater` | `list[model]` | `listable` | `tabs`, `accordion` |
 
-**`choice` / `multi_choice`** — requires `options` array.
+**`group`** — requires `fields`; `widget.type` is not used (there is only one GroupWidget). Provide a `widget` block to set `label`/`description` and explicitly control which child fields get widgets. Without a `widget` block, auto-generation covers the whole group.
 
-**`numeric` / `range_slider`** — `widget` may include `min_value`, `max_value`, `step`.
+**`repeater`** — requires `item_fields`; `widget.type` selects the layout (`listable` default, `tabs`, or `accordion`).
 
-**`text`** — `widget` may include `placeholder`.
+**`span_annotation`** — `entity_types` is required in the `widget` block.
 
-**`radio_group`** — `widget.orientation`: `"vertical"` or `"horizontal"`.
-
-**`hierarchical_label`** — requires `hierarchy_ref` matching a key in `hierarchies`. `widget` may include `searchable` (default `true`).
-
-**`span_annotation`** — requires `entity_types` array of strings.
-
-**`group`** — requires `fields` array of child field definitions.
-
-**`listable`** — requires `item_fields` array of child field definitions. `widget` may include `add_label`, `delete_label`, `initial_count`. Use `widget.type: "tabs"` or `"accordion"` for alternative layouts.
-
-**`divider`** — no `id` required. Optional `label` and `description`. Does not contribute to the annotation model.
+**`hierarchical_label`** — `hierarchy_ref` (in the `widget` block) must match a key in the top-level `hierarchies` dict.
 
 ## Document format
 
