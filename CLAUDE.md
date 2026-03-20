@@ -15,6 +15,10 @@ tater/                  # Library package
   __init__.py           # Public API: SpanAnnotation, SpanAnnotationWidget,
                         #   EntityType, load_schema, parse_schema, widgets_from_model
   models/               # Pydantic data models (Document, SpanAnnotation)
+  loaders/              # Schema loaders
+    model_loader.py     # WIDGET_CLASS, DEFAULT_WIDGET, widgets_from_model,
+                        #   _widget_from_field_type, _humanize
+    json_loader.py      # JSON schema → (Pydantic model, partial widget list)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
   widgets/              # All widget classes
     base.py             # Widget base class hierarchy (see Widget conventions)
@@ -23,11 +27,9 @@ tater/                  # Library package
     ...                 # One file per concrete widget (see Widget conventions)
 apps/
   examples/
-    config/             # Python config-file examples (simple, hooks, span, span_in_list, tabs, …)
+    config/             # Python config-file examples (simple, hooks, span, span_in_list, …)
     schema/             # JSON schema-file examples
-    data/               # Sample documents
-  pathology/            # Domain-specific example apps
-data/                   # Additional sample documents and ontologies
+    data/               # Sample documents and ontologies (e.g. pet_ontology.yaml)
 spec/                   # Design documents (see below)
 ```
 
@@ -51,6 +53,11 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
 - **Widget binding**: each widget has a `schema_field` (dot-path into the model) and a
   `component_id` derived from it. `bind_schema(model)` is called by TaterApp to validate and
   extract metadata.
+- **Loader design**: `model_loader.py` is the primary path — `widgets_from_model(model)`
+  auto-generates widgets from Pydantic type hints. `json_loader.py` parses a JSON schema into
+  a Pydantic model and a *partial* widget list (only fields with a `widget` block). `runner.py`
+  calls `widgets_from_model(model, overrides=widgets)` to fill the gaps — the same flow used
+  by the Python config path.
 - **Callbacks**: each widget registers its own Dash callbacks in `register_callbacks(app)`.
   The central `callbacks.py` handles navigation, doc loading, and metadata (flag/notes/status).
 - **Persistence**: `TaterApp._save_annotations_to_file()` is called eagerly on every change.
@@ -191,6 +198,8 @@ python -m pytest tests/ --headless                        # full suite
 - `test_component_id.py` — `component_id` and `conditional_wrapper_id` derivation
 - `test_decode_field_path.py` — `_decode_field_path` for standalone, single-repeater, and doubly-nested cases
 - `test_save_load.py` — `TaterApp` save/load round-trip (no browser): flat fields, nested models, `SpanAnnotation` lists, metadata, schema-mismatch warnings
+- `test_widgets_from_model.py` — `widgets_from_model`, `WIDGET_CLASS`, `DEFAULT_WIDGET`; auto-gen for all field types, nested models, overrides
+- `test_parse_schema.py` — `parse_schema`, `_build_pydantic_field`, `_build_widget_from_spec`; no-widget-block → absent from list, containers, dividers, conditionals, unknown type errors
 - `test_browser.py` — `dash.testing` browser tests: navigation, flag, notes
 
 **Browser test setup** requires Google Chrome (`.deb`, not snap) and `webdriver-manager`. The `pytest_setup_options` hook in `conftest.py` auto-installs a matching ChromeDriver via `webdriver-manager` on first run.
