@@ -7,16 +7,26 @@
     {
       "id": "pet_mood",
       "type": "choice",
-      "options": ["happy", "anxious", "calm"],
-      "required": true,
-      "label": "Pet Mood",
-      "description": "Overall mood of the pet in this record"
+      "options": [
+        "happy",
+        "anxious",
+        "calm"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Pet Mood",
+        "description": "Overall mood of the pet in this record",
+        "required": true
+      }
     },
     {
       "id": "needs_attention",
       "type": "boolean",
-      "label": "Needs Attention?",
-      "description": "Does this pet require immediate attention?"
+      "widget": {
+        "type": "checkbox",
+        "label": "Needs Attention?",
+        "description": "Does this pet require immediate attention?"
+      }
     }
   ]
 }

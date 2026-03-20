@@ -2,30 +2,43 @@
   "spec_version": "1.0",
   "title": "tater - auto-advance",
   "description": "Choice and boolean widgets that automatically advance to the next document on selection.",
-  "instructions": "## Auto-advance annotation\n\nThis example demonstrates two auto-advance patterns:\n\n**Choice auto-advance** (`SegmentedControlWidget`)\n- Selecting any option immediately moves to the next document\n- Useful for high-throughput single-label tasks\n\n**Boolean auto-advance** (`SwitchWidget`)\n- Toggling the switch (on *or* off) immediately moves to the next document\n- Useful for quick yes/no screening passes\n\nThe **Notes** field does not auto-advance — free-text fields rarely benefit from it.\n\n> **Tip:** If you need to correct a label on a previous document, use the document\n> selector in the sidebar rather than navigating back through auto-advanced docs.\n",
+  "instructions": "## Auto-advance annotation\n\nThis example demonstrates two auto-advance patterns:\n\n**Choice auto-advance** (`SegmentedControlWidget`)\n- Selecting any option immediately moves to the next document\n- Useful for high-throughput single-label tasks\n\n**Boolean auto-advance** (`SwitchWidget`)\n- Toggling the switch (on *or* off) immediately moves to the next document\n- Useful for quick yes/no screening passes\n\nThe **Notes** field does not auto-advance \u2014 free-text fields rarely benefit from it.\n\n> **Tip:** If you need to correct a label on a previous document, use the document\n> selector in the sidebar rather than navigating back through auto-advanced docs.\n",
   "data_schema": [
     {
       "id": "relevance",
       "type": "choice",
-      "options": ["relevant", "not relevant", "unsure"],
-      "required": true,
-      "label": "Relevance",
-      "description": "Is this document relevant to the study? Selecting an option advances to the next document.",
-      "widget": {"auto_advance": true}
+      "options": [
+        "relevant",
+        "not relevant",
+        "unsure"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Relevance",
+        "description": "Is this document relevant to the study? Selecting an option advances to the next document.",
+        "required": true,
+        "auto_advance": true
+      }
     },
     {
       "id": "needs_review",
       "type": "boolean",
-      "label": "Needs Review",
-      "description": "Flag this document for a second-pass review. Toggling advances to the next document.",
-      "widget": {"type": "switch", "auto_advance": true}
+      "widget": {
+        "type": "switch",
+        "label": "Needs Review",
+        "description": "Flag this document for a second-pass review. Toggling advances to the next document.",
+        "auto_advance": true
+      }
     },
     {
       "id": "notes",
       "type": "text",
-      "label": "Notes",
-      "description": "Optional free-text notes. Does not trigger auto-advance.",
-      "widget": {"type": "text_area", "placeholder": "Any additional observations..."}
+      "widget": {
+        "type": "text_area",
+        "label": "Notes",
+        "description": "Optional free-text notes. Does not trigger auto-advance.",
+        "placeholder": "Any additional observations..."
+      }
     }
   ]
 }

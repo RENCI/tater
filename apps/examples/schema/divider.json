@@ -4,40 +4,63 @@
   "description": "Demonstrates DividerWidget for named section breaks.",
   "data_schema": [
     {
-      "type": "divider",
-      "label": "Mood Assessment",
-      "description": "Emotional and energy state of the pet"
+      "widget": {
+        "type": "divider",
+        "label": "Mood Assessment",
+        "description": "Emotional and energy state of the pet"
+      }
     },
     {
       "id": "pet_mood",
       "type": "choice",
-      "options": ["happy", "anxious", "calm"],
-      "required": true,
-      "label": "Pet Mood"
+      "options": [
+        "happy",
+        "anxious",
+        "calm"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Pet Mood",
+        "required": true
+      }
     },
     {
       "id": "energy_level",
       "type": "choice",
-      "options": ["low", "medium", "high"],
-      "required": true,
-      "label": "Energy Level",
-      "widget": {"type": "radio_group", "orientation": "horizontal"}
+      "options": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "widget": {
+        "type": "radio_group",
+        "label": "Energy Level",
+        "required": true,
+        "orientation": "horizontal"
+      }
     },
     {
-      "type": "divider",
-      "label": "Actions"
+      "widget": {
+        "type": "divider",
+        "label": "Actions"
+      }
     },
     {
       "id": "needs_attention",
       "type": "boolean",
-      "label": "Needs Attention?"
+      "widget": {
+        "type": "checkbox",
+        "label": "Needs Attention?"
+      }
     },
     {
       "id": "notes",
       "type": "text",
-      "label": "Notes",
-      "description": "Any additional observations",
-      "widget": {"type": "text_area"}
+      "widget": {
+        "type": "text_area",
+        "label": "Notes",
+        "description": "Any additional observations"
+      }
     }
   ]
 }

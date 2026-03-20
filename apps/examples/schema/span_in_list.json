@@ -1,36 +1,59 @@
 {
   "spec_version": "1.0",
   "title": "tater - spans in list",
-  "description": "Span annotation inside a repeatable list — each finding tracks its own evidence spans.",
+  "description": "Span annotation inside a repeatable list \u2014 each finding tracks its own evidence spans.",
   "instructions": "## Steps\n\n1. Click **Add Finding** to create a new finding card\n2. Select the finding label (positive / negative / uncertain)\n3. Highlight text in the document, then click an evidence entity type to tag it for that finding\n4. Repeat for each finding\n5. Set the overall assessment at the bottom\n",
   "data_schema": [
     {
       "id": "findings",
       "type": "repeater",
-      "label": "Findings",
-      "widget": {"item_label": "Finding"},
       "item_fields": [
         {
           "id": "label",
           "type": "choice",
-          "options": ["positive", "negative", "uncertain"],
-          "label": "Label"
+          "options": [
+            "positive",
+            "negative",
+            "uncertain"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Label"
+          }
         },
         {
           "id": "evidence",
           "type": "span_annotation",
-          "label": "Evidence Spans",
-          "description": "Highlight text then click an entity type to tag evidence for this finding.",
-          "entity_types": ["Support", "Against", "Context"]
+          "widget": {
+            "type": "span_annotation",
+            "label": "Evidence Spans",
+            "description": "Highlight text then click an entity type to tag evidence for this finding.",
+            "entity_types": [
+              "Support",
+              "Against",
+              "Context"
+            ]
+          }
         }
-      ]
+      ],
+      "widget": {
+        "type": "listable",
+        "label": "Findings",
+        "item_label": "Finding"
+      }
     },
     {
       "id": "overall",
       "type": "choice",
-      "options": ["normal", "abnormal"],
-      "required": true,
-      "label": "Overall Assessment"
+      "options": [
+        "normal",
+        "abnormal"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Overall Assessment",
+        "required": true
+      }
     }
   ]
 }

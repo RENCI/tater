@@ -7,48 +7,79 @@
     {
       "id": "is_indoor",
       "type": "boolean",
-      "label": "Indoor?",
-      "description": "Is this an indoor setting?",
-      "widget": {"type": "switch"}
+      "widget": {
+        "type": "switch",
+        "label": "Indoor?",
+        "description": "Is this an indoor setting?"
+      }
     },
     {
       "id": "indoor_location",
       "type": "text",
-      "label": "Indoor Location",
-      "widget": {"type": "text_input", "placeholder": "e.g. living room, kitchen"},
-      "conditional_on": {"field": "is_indoor", "value": true}
+      "widget": {
+        "type": "text_input",
+        "label": "Indoor Location",
+        "placeholder": "e.g. living room, kitchen",
+        "conditional_on": {
+          "field": "is_indoor",
+          "value": true
+        }
+      }
     },
     {
       "id": "has_health_issue",
       "type": "boolean",
-      "label": "Has health issue?"
+      "widget": {
+        "type": "checkbox",
+        "label": "Has health issue?"
+      }
     },
     {
       "id": "health_description",
       "type": "text",
-      "label": "Health Description",
-      "widget": {"type": "text_area", "placeholder": "Describe the health issue..."},
-      "conditional_on": {"field": "has_health_issue", "value": true}
+      "widget": {
+        "type": "text_area",
+        "label": "Health Description",
+        "placeholder": "Describe the health issue...",
+        "conditional_on": {
+          "field": "has_health_issue",
+          "value": true
+        }
+      }
     },
     {
       "id": "is_stray",
       "type": "boolean",
-      "label": "Is stray?",
-      "widget": {"type": "switch"}
+      "widget": {
+        "type": "switch",
+        "label": "Is stray?"
+      }
     },
     {
       "id": "rescue_org",
       "type": "text",
-      "label": "Rescue Organisation",
-      "widget": {"type": "text_input", "placeholder": "Organisation name"},
-      "conditional_on": {"field": "is_stray", "value": true}
+      "widget": {
+        "type": "text_input",
+        "label": "Rescue Organisation",
+        "placeholder": "Organisation name",
+        "conditional_on": {
+          "field": "is_stray",
+          "value": true
+        }
+      }
     },
     {
       "id": "rescue_notes",
       "type": "text",
-      "label": "Rescue Notes",
-      "widget": {"type": "text_area", "placeholder": "Additional notes about rescue..."},
-      "conditional_on": {"field": "is_stray", "value": true}
+      "widget": {
+        "type": "text_area",
+        "label": "Rescue Notes",
+        "placeholder": "Additional notes about rescue...",
+        "conditional_on": {
+          "field": "is_stray",
+          "value": true
+        }
+      }
     }
   ]
 }

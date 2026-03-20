@@ -10,54 +10,91 @@
     {
       "id": "observations",
       "type": "repeater",
-      "label": "Observations",
-      "description": "Annotate each observation in the pet record.",
-      "widget": {"type": "accordion", "item_label": "Observation"},
       "item_fields": [
         {
           "id": "observation_type",
           "type": "choice",
-          "options": ["breed mention", "behavior", "health condition", "owner note"],
-          "label": "Observation Type"
+          "options": [
+            "breed mention",
+            "behavior",
+            "health condition",
+            "owner note"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Observation Type"
+          }
         },
         {
           "id": "mentions",
           "type": "repeater",
-          "label": "Breed Mentions",
-          "description": "Each time a breed or species is referenced in this observation.",
-          "widget": {"item_label": "Mention"},
           "item_fields": [
             {
               "id": "spans",
               "type": "span_annotation",
-              "label": "Span",
-              "description": "Highlight the text that names or describes the breed.",
-              "entity_types": ["Breed", "Species"]
+              "widget": {
+                "type": "span_annotation",
+                "label": "Span",
+                "description": "Highlight the text that names or describes the breed.",
+                "entity_types": [
+                  "Breed",
+                  "Species"
+                ]
+              }
             },
             {
               "id": "breed",
               "type": "hierarchical_label",
-              "hierarchy_ref": "ontology",
-              "label": "Breed / Species",
-              "description": "Navigate the pet ontology to select the breed or species.",
-              "widget": {"searchable": true}
+              "widget": {
+                "type": "hierarchical_label_tags",
+                "label": "Breed / Species",
+                "description": "Navigate the pet ontology to select the breed or species.",
+                "hierarchy_ref": "ontology",
+                "searchable": true
+              }
             },
             {
               "id": "confidence",
               "type": "choice",
-              "options": ["definite", "likely", "uncertain"],
-              "label": "Confidence"
+              "options": [
+                "definite",
+                "likely",
+                "uncertain"
+              ],
+              "widget": {
+                "type": "segmented_control",
+                "label": "Confidence"
+              }
             }
-          ]
+          ],
+          "widget": {
+            "type": "listable",
+            "label": "Breed Mentions",
+            "description": "Each time a breed or species is referenced in this observation.",
+            "item_label": "Mention"
+          }
         }
-      ]
+      ],
+      "widget": {
+        "type": "accordion",
+        "label": "Observations",
+        "description": "Annotate each observation in the pet record.",
+        "item_label": "Observation"
+      }
     },
     {
       "id": "overall_assessment",
       "type": "choice",
-      "options": ["routine", "follow-up needed", "urgent"],
-      "required": true,
-      "label": "Overall Assessment"
+      "options": [
+        "routine",
+        "follow-up needed",
+        "urgent"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Overall Assessment",
+        "required": true
+      }
     }
   ]
 }
