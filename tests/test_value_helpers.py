@@ -1,10 +1,10 @@
-"""Tests for get_model_value / set_model_value and dict variants."""
+"""Tests for get_model_value / set_model_value and get_dict_value / set_dict_value."""
 import pytest
 from tater.ui.value_helpers import (
     get_model_value,
     set_model_value,
-    get_nested_value,
-    set_nested_value,
+    get_dict_value,
+    set_dict_value,
     create_list_item,
 )
 from tater import SpanAnnotation
@@ -134,28 +134,28 @@ class TestCreateListItem:
 
 
 # ---------------------------------------------------------------------------
-# get_nested_value / set_nested_value (dict variants)
+# get_dict_value / set_dict_value (dict variants)
 # ---------------------------------------------------------------------------
 
 class TestDictHelpers:
     def test_get_nested(self):
         d = {"pets": [{"kind": "cat"}]}
-        assert get_nested_value(d, "pets.0.kind") == "cat"
+        assert get_dict_value(d, "pets.0.kind") == "cat"
 
     def test_get_missing(self):
-        assert get_nested_value({}, "a.b") is None
+        assert get_dict_value({}, "a.b") is None
 
     def test_set_creates_intermediate_dicts(self):
         d = {}
-        set_nested_value(d, "a.b.c", "hello")
+        set_dict_value(d, "a.b.c", "hello")
         assert d["a"]["b"]["c"] == "hello"
 
     def test_set_creates_list_for_numeric_key(self):
         d = {}
-        set_nested_value(d, "items.0.name", "first")
+        set_dict_value(d, "items.0.name", "first")
         assert d["items"][0]["name"] == "first"
 
     def test_round_trip(self):
         d = {}
-        set_nested_value(d, "x.y", 99)
-        assert get_nested_value(d, "x.y") == 99
+        set_dict_value(d, "x.y", 99)
+        assert get_dict_value(d, "x.y") == 99
