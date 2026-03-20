@@ -111,7 +111,7 @@
           "required": true,
           "label": "Pet Age",
           "description": "How old is the pet?",
-          "widget": {"type": "number_input", "min_value": 0, "max_value": 50, "step": 0.1}
+          "widget": {"min_value": 0, "max_value": 50, "step": 0.1}
         },
         {
           "id": "confidence",
@@ -143,7 +143,7 @@
           "required": true,
           "label": "Reviewer Note",
           "description": "Optional short note about this document",
-          "widget": {"type": "text_input", "placeholder": "Enter a short note"}
+          "widget": {"placeholder": "Enter a short note"}
         },
         {
           "id": "detailed_notes",

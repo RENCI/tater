@@ -306,13 +306,13 @@ class TaterApp:
         """Get a value from a Pydantic model/dict using dot notation."""
         return value_helpers.get_model_value(model, path)
     
-    def _get_nested_value(self, obj: Any, path: str) -> Any:
-        """Get a value from a nested structure using dot notation."""
-        return value_helpers.get_nested_value(obj, path)
-    
-    def _set_nested_value(self, obj: dict, path: str, value: Any) -> None:
+    def _get_dict_value(self, obj: Any, path: str) -> Any:
+        """Get a value from a nested dict/list structure using dot notation."""
+        return value_helpers.get_dict_value(obj, path)
+
+    def _set_dict_value(self, obj: dict, path: str, value: Any) -> None:
         """Set a value in a nested dict/list structure using dot notation."""
-        value_helpers.set_nested_value(obj, path, value)
+        value_helpers.set_dict_value(obj, path, value)
 
     def run(self, debug: bool = False, port: int = 8050, host: str = "127.0.0.1") -> None:
         """

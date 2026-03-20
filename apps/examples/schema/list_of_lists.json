@@ -6,7 +6,7 @@
   "data_schema": [
     {
       "id": "findings",
-      "type": "listable",
+      "type": "repeater",
       "label": "Findings",
       "description": "Annotate each clinical finding and its supporting evidence.",
       "widget": {"item_label": "Finding"},
@@ -26,7 +26,7 @@
         },
         {
           "id": "evidence",
-          "type": "listable",
+          "type": "repeater",
           "label": "Supporting Evidence",
           "description": "Add quotes from the document that support this finding.",
           "widget": {"item_label": "Evidence"},

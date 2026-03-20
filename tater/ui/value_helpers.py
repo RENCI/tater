@@ -14,7 +14,7 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
     For paths like "pets.0.kind", creates model instances in lists as needed.
     """
     if isinstance(model, dict):
-        set_nested_value(model, path, value)
+        set_dict_value(model, path, value)
         return
 
     keys = path.split('.')
@@ -125,7 +125,7 @@ def get_model_value(model: BaseModel | dict, path: str) -> Any:
     For Pydantic models, uses getattr.
     """
     if isinstance(model, dict):
-        return get_nested_value(model, path)
+        return get_dict_value(model, path)
 
     keys = path.split('.')
     current = model
@@ -155,8 +155,8 @@ def get_model_value(model: BaseModel | dict, path: str) -> Any:
     return current
 
 
-def get_nested_value(obj: Any, path: str) -> Any:
-    """Get a value from a nested structure using dot notation (e.g., 'pets.0.kind')."""
+def get_dict_value(obj: Any, path: str) -> Any:
+    """Get a value from a nested dict/list structure using dot notation (e.g., 'pets.0.kind')."""
     keys = path.split('.')
     current = obj
 
@@ -180,8 +180,8 @@ def get_nested_value(obj: Any, path: str) -> Any:
     return current
 
 
-def set_nested_value(obj: dict, path: str, value: Any) -> None:
-    """Set a value in a nested dict structure using dot notation (e.g., 'pets.0.kind')."""
+def set_dict_value(obj: dict, path: str, value: Any) -> None:
+    """Set a value in a nested dict/list structure using dot notation (e.g., 'pets.0.kind')."""
     keys = path.split('.')
     current = obj
 

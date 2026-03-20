@@ -43,7 +43,7 @@ Schema format::
         },
         {
           "id": "pets",
-          "type": "listable",
+          "type": "repeater",
           "label": "Pets",
           "item_fields": [
             {"id": "name", "type": "text",   "label": "Name"},
@@ -58,16 +58,16 @@ The ``widget`` object is optional on leaf fields. Without it, a sensible
 default widget is chosen for each field type.
 
 Field types:
+  ``boolean``           — true/false (default: CheckboxWidget)
   ``choice``            — single selection from ``options`` (default: SegmentedControlWidget)
   ``multi_choice``      — multiple selections from ``options`` (default: MultiSelectWidget)
-  ``text``              — free text (default: TextInputWidget)
-  ``boolean``           — true/false (default: CheckboxWidget)
   ``numeric``           — number (default: NumberInputWidget)
   ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
+  ``text``              — free text (default: TextInputWidget)
   ``span_annotation``   — text span labelling (SpanAnnotationWidget)
   ``hierarchical_label``— tree-based label (default: HierarchicalLabelTagsWidget)
   ``group``             — nested sub-model with ``fields``
-  ``listable``          — repeatable list of sub-items with ``item_fields``
+  ``repeater``          — repeatable list of sub-items with ``item_fields``
                           (widget type override: ``tabs`` or ``accordion``)
   ``divider``           — labeled section break; no ``id`` required; supports ``label``,
                           ``description``
@@ -81,8 +81,9 @@ Widget override types (``"widget": {"type": "..."}``):
   ``switch``                   — for ``boolean`` fields
   ``chip_boolean``             — for ``boolean`` fields
   ``slider``                   — for ``numeric`` fields
-  ``hierarchical_label_full``  — for ``hierarchical_label`` fields
-  ``hierarchical_label_tags``  — for ``hierarchical_label`` fields
+  ``hierarchical_label_compact`` — for ``hierarchical_label`` fields
+  ``hierarchical_label_full``    — for ``hierarchical_label`` fields
+  ``hierarchical_label_tags``    — for ``hierarchical_label`` fields
 
 Widget options (``"widget": {"option": value}``):
   ``auto_advance``  — ``true`` on ``choice`` or ``boolean`` fields to advance to the next
@@ -122,6 +123,7 @@ from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
+    HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
     HierarchicalLabelTagsWidget,
     build_tree,
@@ -146,24 +148,24 @@ def _to_classname(field_id: str) -> str:
     return "".join(part.title() for part in field_id.replace("-", "_").split("_"))
 
 
-def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | None:
-    """Directly build a default widget from a Pydantic field annotation.
+def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | None:
+    """Build a default widget from a Pydantic field's type hint.
 
     Returns ``None`` for unrecognized types.
     """
     label = _humanize(field_name)
-    origin = typing.get_origin(annotation)
-    args = typing.get_args(annotation)
+    origin = typing.get_origin(field_type)
+    args = typing.get_args(field_type)
 
     # Unwrap Optional[X] / Union[X, None] / X | None (Python 3.10+)
     is_union = origin is Union or (
         hasattr(_builtin_types, "UnionType")
-        and isinstance(annotation, _builtin_types.UnionType)
+        and isinstance(field_type, _builtin_types.UnionType)
     )
     if is_union:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
-            return _widget_from_annotation(field_name, non_none[0])
+            return _widget_from_field_type(field_name, non_none[0])
         return None
 
     # Literal["a", "b"] → SegmentedControlWidget
@@ -189,7 +191,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
         if isinstance(item_type, type) and issubclass(item_type, BaseModel):
             item_widgets = [
                 w for w in (
-                    _widget_from_annotation(n, fi.annotation)
+                    _widget_from_field_type(n, fi.annotation)
                     for n, fi in item_type.model_fields.items()
                 ) if w is not None
             ]
@@ -198,21 +200,21 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
         return None
 
     # bool must come before int (bool is a subclass of int)
-    if annotation is bool:
+    if field_type is bool:
         return _build_widget(field_name, "boolean", False, label, None, None, {}, {}, {})
 
-    if annotation is str:
+    if field_type is str:
         return _build_widget(field_name, "text", False, label, None, None, {}, {}, {})
 
-    if annotation in (float, int):
+    if field_type in (float, int):
         return _build_widget(field_name, "numeric", False, label, None, None, {}, {}, {})
 
     # SubModel → GroupWidget
-    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+    if isinstance(field_type, type) and issubclass(field_type, BaseModel):
         child_widgets = [
             w for w in (
-                _widget_from_annotation(n, fi.annotation)
-                for n, fi in annotation.model_fields.items()
+                _widget_from_field_type(n, fi.annotation)
+                for n, fi in field_type.model_fields.items()
             ) if w is not None
         ]
         return GroupWidget(field_name, label=label, children=child_widgets)
@@ -224,7 +226,7 @@ def widgets_from_model(
     model: type[BaseModel],
     overrides: list[TaterWidget] | None = None,
 ) -> list[TaterWidget]:
-    """Generate default widgets from a Pydantic model's field annotations.
+    """Generate default widgets from a Pydantic model's field type hints.
 
     Uses the same widget defaults as the JSON schema loader. Unrecognized
     field types are silently skipped.
@@ -250,7 +252,7 @@ def widgets_from_model(
         if name in override_map:
             result.append(override_map[name])
         else:
-            w = _widget_from_annotation(name, fi.annotation)
+            w = _widget_from_field_type(name, fi.annotation)
             if w is not None:
                 result.append(w)
     return result
@@ -311,7 +313,7 @@ def _process_field(
 ) -> tuple[Any, TaterWidget]:
     """Recursively process one field spec into a (pydantic_field_def, widget) pair.
 
-    Child widgets for ``group`` and ``list`` types use their local id only —
+    Child widgets for ``group`` and ``repeater`` types use their local id only —
     ``GroupWidget._finalize_paths`` and ``ListableWidget._render_item_widgets``
     propagate the full path automatically.
     """
@@ -332,7 +334,7 @@ def _process_field(
             local_id, label=label, description=description, children=child_widgets
         )
 
-    if ftype == "listable":
+    if ftype == "repeater":
         item_model_fields: dict[str, Any] = {}
         item_widgets: list[TaterWidget] = []
         for child_spec in spec.get("item_fields", []):
@@ -483,6 +485,11 @@ def _build_widget(
         ref = spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
+        if widget_type == "hierarchical_label_compact":
+            return HierarchicalLabelCompactWidget(
+                fid, label=label, description=description,
+                hierarchy=hierarchy, searchable=searchable,
+            )
         if widget_type == "hierarchical_label_full":
             return HierarchicalLabelFullWidget(
                 fid, label=label, description=description,

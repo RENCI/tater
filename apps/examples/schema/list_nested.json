@@ -6,7 +6,7 @@
   "data_schema": [
     {
       "id": "vet_visits",
-      "type": "listable",
+      "type": "repeater",
       "label": "Vet Visits",
       "description": "Add each veterinary visit with date, reason, and notes.",
       "widget": {

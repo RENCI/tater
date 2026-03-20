@@ -9,7 +9,7 @@
   "data_schema": [
     {
       "id": "observations",
-      "type": "listable",
+      "type": "repeater",
       "label": "Observations",
       "description": "Annotate each observation in the pet record.",
       "widget": {"type": "accordion", "item_label": "Observation"},
@@ -22,7 +22,7 @@
         },
         {
           "id": "mentions",
-          "type": "listable",
+          "type": "repeater",
           "label": "Breed Mentions",
           "description": "Each time a breed or species is referenced in this observation.",
           "widget": {"item_label": "Mention"},
