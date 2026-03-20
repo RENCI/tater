@@ -1,84 +1,202 @@
 {
   "spec_version": "1.0",
   "title": "tater - conditional",
-  "description": "Conditional fields with labels, descriptions, and widget hints.",
-  "instructions": "Try toggling these controls:\n\n- **Is Indoor?** - Reveals indoor-specific fields\n- **Has Special Needs?** - Reveals special care options\n- **Has Microchip?** - Reveals microchip details\n\nFields appear/disappear based on your selections.\n",
+  "description": "Widgets that appear based on boolean toggles or the selected option.",
+  "instructions": "Try toggling or selecting inside each accordion item:\n\n**Boolean conditions** (Status group)\n- **Indoor?** \u2013 Reveals an indoor location field\n- **Has health issue?** \u2013 Reveals a health description\n- **Is stray?** \u2013 Reveals rescue organisation and notes\n\n**Choice conditions** (Type & Breed group)\n- **Pet Type** \u2013 Reveals dog, cat, or fish-specific fields\n",
   "data_schema": [
     {
-      "id": "is_indoor",
-      "type": "boolean",
-      "widget": {
-        "type": "switch",
-        "label": "Indoor?",
-        "description": "Is this an indoor setting?"
-      }
-    },
-    {
-      "id": "indoor_location",
-      "type": "text",
-      "widget": {
-        "type": "text_input",
-        "label": "Indoor Location",
-        "placeholder": "e.g. living room, kitchen",
-        "conditional_on": {
-          "field": "is_indoor",
-          "value": true
+      "id": "pets",
+      "type": "repeater",
+      "item_fields": [
+        {
+          "id": "booleans",
+          "type": "group",
+          "fields": [
+            {
+              "id": "is_indoor",
+              "type": "boolean",
+              "widget": {
+                "type": "switch",
+                "label": "Indoor?",
+                "description": "Is this an indoor setting?"
+              }
+            },
+            {
+              "id": "indoor_location",
+              "type": "text",
+              "widget": {
+                "type": "text_input",
+                "label": "Indoor Location",
+                "placeholder": "e.g. living room, kitchen",
+                "conditional_on": {
+                  "field": "is_indoor",
+                  "value": true
+                }
+              }
+            },
+            {
+              "id": "has_health_issue",
+              "type": "boolean",
+              "widget": {
+                "type": "checkbox",
+                "label": "Has health issue?"
+              }
+            },
+            {
+              "id": "health_description",
+              "type": "text",
+              "widget": {
+                "type": "text_area",
+                "label": "Health Description",
+                "placeholder": "Describe the health issue...",
+                "conditional_on": {
+                  "field": "has_health_issue",
+                  "value": true
+                }
+              }
+            },
+            {
+              "id": "is_stray",
+              "type": "boolean",
+              "widget": {
+                "type": "chip_boolean",
+                "label": "Is stray?"
+              }
+            },
+            {
+              "id": "rescue_org",
+              "type": "text",
+              "widget": {
+                "type": "text_input",
+                "label": "Rescue Organisation",
+                "placeholder": "Organisation name",
+                "conditional_on": {
+                  "field": "is_stray",
+                  "value": true
+                }
+              }
+            },
+            {
+              "id": "rescue_notes",
+              "type": "text",
+              "widget": {
+                "type": "text_area",
+                "label": "Rescue Notes",
+                "placeholder": "Additional notes about rescue...",
+                "conditional_on": {
+                  "field": "is_stray",
+                  "value": true
+                }
+              }
+            }
+          ],
+          "widget": {
+            "label": "Status",
+            "description": "Boolean toggle conditionals"
+          }
+        },
+        {
+          "id": "choices",
+          "type": "group",
+          "fields": [
+            {
+              "id": "pet_type",
+              "type": "choice",
+              "options": [
+                "cat",
+                "dog",
+                "fish"
+              ],
+              "widget": {
+                "type": "select",
+                "label": "Pet Type",
+                "description": "Select the pet type to see relevant fields",
+                "required": true
+              }
+            },
+            {
+              "id": "dog_breed",
+              "type": "text",
+              "widget": {
+                "type": "text_input",
+                "label": "Dog Breed",
+                "placeholder": "e.g. Golden Retriever",
+                "conditional_on": {
+                  "field": "pet_type",
+                  "value": "dog"
+                }
+              }
+            },
+            {
+              "id": "dog_temperament",
+              "type": "choice",
+              "options": [
+                "calm",
+                "playful",
+                "aggressive"
+              ],
+              "widget": {
+                "type": "radio_group",
+                "label": "Dog Temperament",
+                "orientation": "horizontal",
+                "conditional_on": {
+                  "field": "pet_type",
+                  "value": "dog"
+                }
+              }
+            },
+            {
+              "id": "cat_color",
+              "type": "text",
+              "widget": {
+                "type": "text_input",
+                "label": "Cat Color",
+                "placeholder": "e.g. Orange tabby",
+                "conditional_on": {
+                  "field": "pet_type",
+                  "value": "cat"
+                }
+              }
+            },
+            {
+              "id": "fish_tank_size",
+              "type": "choice",
+              "options": [
+                "small",
+                "medium",
+                "large"
+              ],
+              "widget": {
+                "type": "select",
+                "label": "Tank Size",
+                "description": "What size tank is the fish in?",
+                "conditional_on": {
+                  "field": "pet_type",
+                  "value": "fish"
+                }
+              }
+            }
+          ],
+          "widget": {
+            "label": "Type & Breed",
+            "description": "Choice-based conditionals"
+          }
+        },
+        {
+          "id": "additional_notes",
+          "type": "text",
+          "widget": {
+            "type": "text_area",
+            "label": "Additional Notes",
+            "placeholder": "Any other notes about the pet..."
+          }
         }
-      }
-    },
-    {
-      "id": "has_health_issue",
-      "type": "boolean",
+      ],
       "widget": {
-        "type": "checkbox",
-        "label": "Has health issue?"
-      }
-    },
-    {
-      "id": "health_description",
-      "type": "text",
-      "widget": {
-        "type": "text_area",
-        "label": "Health Description",
-        "placeholder": "Describe the health issue...",
-        "conditional_on": {
-          "field": "has_health_issue",
-          "value": true
-        }
-      }
-    },
-    {
-      "id": "is_stray",
-      "type": "boolean",
-      "widget": {
-        "type": "switch",
-        "label": "Is stray?"
-      }
-    },
-    {
-      "id": "rescue_org",
-      "type": "text",
-      "widget": {
-        "type": "text_input",
-        "label": "Rescue Organisation",
-        "placeholder": "Organisation name",
-        "conditional_on": {
-          "field": "is_stray",
-          "value": true
-        }
-      }
-    },
-    {
-      "id": "rescue_notes",
-      "type": "text",
-      "widget": {
-        "type": "text_area",
-        "label": "Rescue Notes",
-        "placeholder": "Additional notes about rescue...",
-        "conditional_on": {
-          "field": "is_stray",
-          "value": true
-        }
+        "type": "accordion",
+        "label": "Conditional in Repeater",
+        "description": "Boolean and choice conditionals inside grouped sections of a repeatable accordion.",
+        "item_label": "Pet"
       }
     }
   ]
