@@ -148,8 +148,8 @@ def _to_classname(field_id: str) -> str:
     return "".join(part.title() for part in field_id.replace("-", "_").split("_"))
 
 
-def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | None:
-    """Directly build a default widget from a Pydantic field annotation.
+def _widget_from_field_type(field_name: str, annotation: Any) -> TaterWidget | None:
+    """Build a default widget from a Pydantic field's type hint.
 
     Returns ``None`` for unrecognized types.
     """
@@ -165,7 +165,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
     if is_union:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
-            return _widget_from_annotation(field_name, non_none[0])
+            return _widget_from_field_type(field_name, non_none[0])
         return None
 
     # Literal["a", "b"] → SegmentedControlWidget
@@ -191,7 +191,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
         if isinstance(item_type, type) and issubclass(item_type, BaseModel):
             item_widgets = [
                 w for w in (
-                    _widget_from_annotation(n, fi.annotation)
+                    _widget_from_field_type(n, fi.annotation)
                     for n, fi in item_type.model_fields.items()
                 ) if w is not None
             ]
@@ -213,7 +213,7 @@ def _widget_from_annotation(field_name: str, annotation: Any) -> TaterWidget | N
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         child_widgets = [
             w for w in (
-                _widget_from_annotation(n, fi.annotation)
+                _widget_from_field_type(n, fi.annotation)
                 for n, fi in annotation.model_fields.items()
             ) if w is not None
         ]
@@ -226,7 +226,7 @@ def widgets_from_model(
     model: type[BaseModel],
     overrides: list[TaterWidget] | None = None,
 ) -> list[TaterWidget]:
-    """Generate default widgets from a Pydantic model's field annotations.
+    """Generate default widgets from a Pydantic model's field type hints.
 
     Uses the same widget defaults as the JSON schema loader. Unrecognized
     field types are silently skipped.
@@ -252,7 +252,7 @@ def widgets_from_model(
         if name in override_map:
             result.append(override_map[name])
         else:
-            w = _widget_from_annotation(name, fi.annotation)
+            w = _widget_from_field_type(name, fi.annotation)
             if w is not None:
                 result.append(w)
     return result
