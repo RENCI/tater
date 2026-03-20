@@ -7,33 +7,47 @@
     {
       "id": "vet_visits",
       "type": "repeater",
-      "label": "Vet Visits",
-      "description": "Add each veterinary visit with date, reason, and notes.",
-      "widget": {
-        "item_label": "Visit"
-      },
       "item_fields": [
         {
           "id": "date",
           "type": "text",
-          "label": "Visit Date",
-          "placeholder": "e.g. 2024-01-15"
+          "widget": {
+            "type": "text_input",
+            "label": "Visit Date",
+            "placeholder": "e.g. 2024-01-15"
+          }
         },
         {
           "id": "reason",
           "type": "choice",
-          "options": ["checkup", "vaccination", "illness", "injury"],
-          "label": "Visit Reason",
-          "widget": {"type": "radio_group", "orientation": "horizontal"}
+          "options": [
+            "checkup",
+            "vaccination",
+            "illness",
+            "injury"
+          ],
+          "widget": {
+            "type": "radio_group",
+            "label": "Visit Reason",
+            "orientation": "horizontal"
+          }
         },
         {
           "id": "notes",
           "type": "text",
-          "label": "Visit Notes",
-          "placeholder": "Additional details about the visit...",
-          "widget": {"type": "text_area"}
+          "widget": {
+            "type": "text_area",
+            "label": "Visit Notes",
+            "placeholder": "Additional details about the visit..."
+          }
         }
-      ]
+      ],
+      "widget": {
+        "type": "listable",
+        "label": "Vet Visits",
+        "description": "Add each veterinary visit with date, reason, and notes.",
+        "item_label": "Visit"
+      }
     }
   ]
 }

@@ -7,8 +7,15 @@
     {
       "id": "pet_mood",
       "type": "choice",
-      "options": ["happy", "anxious", "calm"],
-      "required": true
+      "options": [
+        "happy",
+        "anxious",
+        "calm"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "required": true
+      }
     },
     {
       "id": "needs_attention",

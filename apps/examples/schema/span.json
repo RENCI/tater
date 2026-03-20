@@ -7,16 +7,31 @@
     {
       "id": "entities",
       "type": "span_annotation",
-      "entity_types": ["Pet", "Breed", "Behavior", "Activity"],
-      "label": "Pet Entities",
-      "description": "Highlight text then click an entity type to label it."
+      "widget": {
+        "type": "span_annotation",
+        "label": "Pet Entities",
+        "description": "Highlight text then click an entity type to label it.",
+        "entity_types": [
+          "Pet",
+          "Breed",
+          "Behavior",
+          "Activity"
+        ]
+      }
     },
     {
       "id": "quality",
       "type": "choice",
-      "options": ["high", "medium", "low"],
-      "required": true,
-      "label": "Record Quality"
+      "options": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Record Quality",
+        "required": true
+      }
     }
   ]
 }

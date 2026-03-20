@@ -7,39 +7,64 @@
     {
       "id": "document_mood",
       "type": "choice",
-      "options": ["positive", "negative", "neutral"],
-      "label": "Document Mood",
-      "description": "Top-level field"
+      "options": [
+        "positive",
+        "negative",
+        "neutral"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Document Mood",
+        "description": "Top-level field"
+      }
     },
     {
       "id": "address",
       "type": "group",
-      "label": "Address",
-      "description": "First level of nesting",
       "fields": [
         {
           "id": "pet_type",
           "type": "choice",
-          "options": ["cat", "dog", "fish"],
-          "label": "Pet Type at Address",
-          "widget": {"type": "radio_group", "orientation": "vertical"}
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "radio_group",
+            "label": "Pet Type at Address",
+            "orientation": "vertical"
+          }
         },
         {
           "id": "location",
           "type": "group",
-          "label": "Location Details",
-          "description": "Second level of nesting",
           "fields": [
             {
               "id": "location_mood",
               "type": "choice",
-              "options": ["cheerful", "stressful", "peaceful"],
-              "label": "Location Atmosphere",
-              "description": "Three levels deep!"
+              "options": [
+                "cheerful",
+                "stressful",
+                "peaceful"
+              ],
+              "widget": {
+                "type": "segmented_control",
+                "label": "Location Atmosphere",
+                "description": "Three levels deep!"
+              }
             }
-          ]
+          ],
+          "widget": {
+            "label": "Location Details",
+            "description": "Second level of nesting"
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Address",
+        "description": "First level of nesting"
+      }
     }
   ]
 }

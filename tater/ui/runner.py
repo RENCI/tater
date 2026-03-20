@@ -30,6 +30,14 @@ def main() -> None:
         widgets = widgets_from_model(schema_model)
     elif not _covers_all_fields(widgets, schema_model):
         # Partial list — treat as overrides, auto-generate the rest.
+        if any(w.schema_field == "" for w in widgets):
+            import warnings
+            warnings.warn(
+                "Widget list contains dividers but does not cover all model fields. "
+                "Dividers will be dropped. Provide widgets for all fields to preserve them.",
+                UserWarning,
+                stacklevel=2,
+            )
         widgets = widgets_from_model(schema_model, overrides=widgets)
 
     app = TaterApp(
