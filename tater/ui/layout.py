@@ -176,7 +176,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
     left = dmc.Group([
         dmc.Text(id="document-title", fw=500, size="sm"),
         dmc.Badge(id="status-badge", variant="light", size="sm"),
-    ], gap="sm", style={"flex": "1"})
+    ], style={"flex": "1", "columnGap": "var(--mantine-spacing-sm)", "rowGap": "2px"})
 
     center = dmc.Group(
         [dmc.Title(tater_app.title, order=3)],
