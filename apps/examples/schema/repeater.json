@@ -1,44 +1,131 @@
 {
   "spec_version": "1.0",
   "title": "tater - repeater",
-  "description": "Repeatable list widgets — list, tabs, and accordion styles.",
-  "instructions": "Demonstrates the three repeater widget styles for the same item schema:\n\n- **List** — items as a vertical stack of cards\n- **Tabs** — items as switchable tabs\n- **Accordion** — items as collapsible sections\n",
+  "description": "Repeatable list widgets \u2014 list, tabs, and accordion styles.",
+  "instructions": "Demonstrates the three repeater widget styles for the same item schema:\n\n- **List** \u2014 items as a vertical stack of cards\n- **Tabs** \u2014 items as switchable tabs\n- **Accordion** \u2014 items as collapsible sections\n",
   "data_schema": [
     {
       "id": "pets_list",
-      "type": "listable",
-      "label": "Pets (List)",
-      "description": "Items shown as a vertical stack of cards.",
-      "widget": {"item_label": "Pet"},
+      "type": "repeater",
       "item_fields": [
-        {"id": "kind", "type": "choice", "options": ["cat", "dog", "fish"], "label": "Pet Type"},
-        {"id": "neutered", "type": "boolean", "label": "Neutered / spayed"},
-        {"id": "indoor", "type": "boolean", "label": "Indoor", "widget": {"type": "switch"}}
-      ]
+        {
+          "id": "kind",
+          "type": "choice",
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Pet Type"
+          }
+        },
+        {
+          "id": "neutered",
+          "type": "boolean",
+          "widget": {
+            "type": "checkbox",
+            "label": "Neutered / spayed"
+          }
+        },
+        {
+          "id": "indoor",
+          "type": "boolean",
+          "widget": {
+            "type": "switch",
+            "label": "Indoor"
+          }
+        }
+      ],
+      "widget": {
+        "type": "listable",
+        "label": "Pets (List)",
+        "description": "Items shown as a vertical stack of cards.",
+        "item_label": "Pet"
+      }
     },
     {
       "id": "pets_tabs",
-      "type": "listable",
-      "label": "Pets (Tabs)",
-      "description": "Items shown as switchable tabs.",
-      "widget": {"type": "tabs", "item_label": "Pet"},
+      "type": "repeater",
       "item_fields": [
-        {"id": "kind", "type": "choice", "options": ["cat", "dog", "fish"], "label": "Pet Type"},
-        {"id": "neutered", "type": "boolean", "label": "Neutered / spayed"},
-        {"id": "indoor", "type": "boolean", "label": "Indoor", "widget": {"type": "switch"}}
-      ]
+        {
+          "id": "kind",
+          "type": "choice",
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Pet Type"
+          }
+        },
+        {
+          "id": "neutered",
+          "type": "boolean",
+          "widget": {
+            "type": "checkbox",
+            "label": "Neutered / spayed"
+          }
+        },
+        {
+          "id": "indoor",
+          "type": "boolean",
+          "widget": {
+            "type": "switch",
+            "label": "Indoor"
+          }
+        }
+      ],
+      "widget": {
+        "type": "tabs",
+        "label": "Pets (Tabs)",
+        "description": "Items shown as switchable tabs.",
+        "item_label": "Pet"
+      }
     },
     {
       "id": "pets_accordion",
-      "type": "listable",
-      "label": "Pets (Accordion)",
-      "description": "Items shown as collapsible sections.",
-      "widget": {"type": "accordion", "item_label": "Pet"},
+      "type": "repeater",
       "item_fields": [
-        {"id": "kind", "type": "choice", "options": ["cat", "dog", "fish"], "label": "Pet Type"},
-        {"id": "neutered", "type": "boolean", "label": "Neutered / spayed"},
-        {"id": "indoor", "type": "boolean", "label": "Indoor", "widget": {"type": "switch"}}
-      ]
+        {
+          "id": "kind",
+          "type": "choice",
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Pet Type"
+          }
+        },
+        {
+          "id": "neutered",
+          "type": "boolean",
+          "widget": {
+            "type": "checkbox",
+            "label": "Neutered / spayed"
+          }
+        },
+        {
+          "id": "indoor",
+          "type": "boolean",
+          "widget": {
+            "type": "switch",
+            "label": "Indoor"
+          }
+        }
+      ],
+      "widget": {
+        "type": "accordion",
+        "label": "Pets (Accordion)",
+        "description": "Items shown as collapsible sections.",
+        "item_label": "Pet"
+      }
     }
   ]
 }

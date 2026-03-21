@@ -7,30 +7,53 @@
     {
       "id": "document_mood",
       "type": "choice",
-      "options": ["positive", "negative", "neutral"],
-      "label": "Document Mood",
-      "description": "Overall tone of the entire document"
+      "options": [
+        "positive",
+        "negative",
+        "neutral"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Document Mood",
+        "description": "Overall tone of the entire document"
+      }
     },
     {
       "id": "owner",
       "type": "group",
-      "label": "Owner Information",
-      "description": "Information about the pet owner",
       "fields": [
         {
           "id": "owner_mood",
           "type": "choice",
-          "options": ["happy", "anxious", "calm"],
-          "label": "Owner Mood"
+          "options": [
+            "happy",
+            "anxious",
+            "calm"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Owner Mood"
+          }
         },
         {
           "id": "pet_type",
           "type": "choice",
-          "options": ["cat", "dog", "fish"],
-          "label": "Owner's Pet Type",
-          "widget": {"type": "radio_group", "orientation": "vertical"}
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "radio_group",
+            "label": "Owner's Pet Type",
+            "orientation": "vertical"
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Owner Information",
+        "description": "Information about the pet owner"
+      }
     }
   ]
 }

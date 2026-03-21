@@ -524,9 +524,9 @@ class RepeaterWidget(ContainerWidget):
         item_type = typing.get_args(inner)[0]
         # Fill in widgets for any item model fields not explicitly covered,
         # using the same auto-generation logic as top-level widgets_from_model.
-        # Lazy import avoids the circular dependency (json_loader imports repeater).
+        # Lazy import avoids the circular dependency (model_loader imports repeater).
         if isinstance(item_type, type) and issubclass(item_type, BaseModel):
-            from tater.loaders.json_loader import widgets_from_model
+            from tater.loaders.model_loader import widgets_from_model
             self.item_widgets = widgets_from_model(item_type, overrides=self.item_widgets)
         for item_widget in self.item_widgets:
             # Pre-finalize so GroupWidget children get item-relative field_path

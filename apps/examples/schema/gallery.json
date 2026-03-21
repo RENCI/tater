@@ -7,152 +7,234 @@
     {
       "id": "boolean",
       "type": "group",
-      "label": "Boolean",
-      "description": "True/false toggles.",
       "fields": [
         {
           "id": "is_cute",
           "type": "boolean",
-          "label": "Is cute?",
-          "description": "Check if this pet is cute"
+          "widget": {
+            "type": "checkbox",
+            "label": "Is cute?",
+            "description": "Check if this pet is cute"
+          }
         },
         {
           "id": "is_indoor",
           "type": "boolean",
-          "label": "Indoor?",
-          "description": "Is this an indoor setting?",
-          "widget": {"type": "switch"}
+          "widget": {
+            "type": "switch",
+            "label": "Indoor?",
+            "description": "Is this an indoor setting?"
+          }
         },
         {
           "id": "is_vaccinated",
           "type": "boolean",
-          "label": "Vaccinated",
-          "description": "Is this pet vaccinated?",
-          "widget": {"type": "chip_boolean"}
+          "widget": {
+            "type": "chip_boolean",
+            "label": "Vaccinated",
+            "description": "Is this pet vaccinated?"
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Boolean",
+        "description": "True/false toggles."
+      }
     },
     {
       "id": "single_choice",
       "type": "group",
-      "label": "Single Choice",
-      "description": "Pick one value from a set of options.",
       "fields": [
         {
           "id": "pet_type",
           "type": "choice",
-          "options": ["cat", "dog", "fish"],
-          "required": true,
-          "label": "Pet Type",
-          "description": "What type of pet is mentioned?",
-          "widget": {"type": "radio_group"}
+          "options": [
+            "cat",
+            "dog",
+            "fish"
+          ],
+          "widget": {
+            "type": "radio_group",
+            "label": "Pet Type",
+            "description": "What type of pet is mentioned?",
+            "required": true
+          }
         },
         {
           "id": "sentiment",
           "type": "choice",
-          "options": ["positive", "negative", "neutral"],
-          "required": true,
-          "label": "Sentiment",
-          "description": "Overall sentiment of the document"
+          "options": [
+            "positive",
+            "negative",
+            "neutral"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Sentiment",
+            "description": "Overall sentiment of the document",
+            "required": true
+          }
         },
         {
           "id": "priority",
           "type": "choice",
-          "options": ["low", "medium", "high"],
-          "required": true,
-          "label": "Priority",
-          "description": "Priority level for this document",
-          "widget": {"type": "chip_radio"}
+          "options": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "widget": {
+            "type": "chip_radio",
+            "label": "Priority",
+            "description": "Priority level for this document",
+            "required": true
+          }
         },
         {
           "id": "location",
           "type": "choice",
-          "options": ["home", "park", "vet", "shelter", "other"],
-          "required": true,
-          "label": "Location",
-          "description": "Where is the pet located?",
-          "widget": {"type": "select"}
+          "options": [
+            "home",
+            "park",
+            "vet",
+            "shelter",
+            "other"
+          ],
+          "widget": {
+            "type": "select",
+            "label": "Location",
+            "description": "Where is the pet located?",
+            "required": true
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Single Choice",
+        "description": "Pick one value from a set of options."
+      }
     },
     {
       "id": "multi_choice",
       "type": "group",
-      "label": "Multi Choice",
-      "description": "Select one or more values from a set of options.",
       "fields": [
         {
           "id": "favorite_colors",
           "type": "multi_choice",
-          "options": ["red", "green", "blue", "yellow", "purple"],
-          "required": true,
-          "label": "Favorite Colors",
-          "description": "Select one or more favorite colors"
+          "options": [
+            "red",
+            "green",
+            "blue",
+            "yellow",
+            "purple"
+          ],
+          "widget": {
+            "type": "multi_select",
+            "label": "Favorite Colors",
+            "description": "Select one or more favorite colors",
+            "required": true
+          }
         },
         {
           "id": "traits",
           "type": "multi_choice",
-          "options": ["friendly", "shy", "energetic", "calm", "playful"],
-          "label": "Traits",
-          "description": "Select all traits that apply",
-          "widget": {"type": "checkbox_group"}
+          "options": [
+            "friendly",
+            "shy",
+            "energetic",
+            "calm",
+            "playful"
+          ],
+          "widget": {
+            "type": "checkbox_group",
+            "label": "Traits",
+            "description": "Select all traits that apply"
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Multi Choice",
+        "description": "Select one or more values from a set of options."
+      }
     },
     {
       "id": "numeric",
       "type": "group",
-      "label": "Numeric",
-      "description": "Enter or select a number.",
       "fields": [
         {
           "id": "pet_age",
           "type": "numeric",
-          "required": true,
-          "label": "Pet Age",
-          "description": "How old is the pet?",
-          "widget": {"type": "number_input", "min_value": 0, "max_value": 50, "step": 0.1}
+          "widget": {
+            "type": "number_input",
+            "label": "Pet Age",
+            "description": "How old is the pet?",
+            "required": true,
+            "min_value": 0,
+            "max_value": 50,
+            "step": 0.1
+          }
         },
         {
           "id": "confidence",
           "type": "numeric",
-          "required": true,
           "default": 50,
-          "label": "Confidence",
-          "description": "How confident are you in this annotation?",
-          "widget": {"type": "slider", "min_value": 0, "max_value": 100, "step": 1}
+          "widget": {
+            "type": "slider",
+            "label": "Confidence",
+            "description": "How confident are you in this annotation?",
+            "required": true,
+            "min_value": 0,
+            "max_value": 100,
+            "step": 1
+          }
         },
         {
           "id": "age_range",
           "type": "range_slider",
-          "label": "Age Range",
-          "description": "Estimated age range of the pet",
-          "widget": {"min_value": 0, "max_value": 30, "step": 1}
+          "widget": {
+            "type": "range_slider",
+            "label": "Age Range",
+            "description": "Estimated age range of the pet",
+            "min_value": 0,
+            "max_value": 30,
+            "step": 1
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Numeric",
+        "description": "Enter or select a number."
+      }
     },
     {
       "id": "text",
       "type": "group",
-      "label": "Text",
-      "description": "Free-text entry.",
       "fields": [
         {
           "id": "reviewer_note",
           "type": "text",
-          "required": true,
-          "label": "Reviewer Note",
-          "description": "Optional short note about this document",
-          "widget": {"type": "text_input", "placeholder": "Enter a short note"}
+          "widget": {
+            "type": "text_input",
+            "label": "Reviewer Note",
+            "description": "Optional short note about this document",
+            "required": true,
+            "placeholder": "Enter a short note"
+          }
         },
         {
           "id": "detailed_notes",
           "type": "text",
-          "label": "Detailed Notes",
-          "description": "Extended notes about this document",
-          "widget": {"type": "text_area", "placeholder": "Enter detailed notes...", "min_rows": 4}
+          "widget": {
+            "type": "text_area",
+            "label": "Detailed Notes",
+            "description": "Extended notes about this document",
+            "placeholder": "Enter detailed notes..."
+          }
         }
-      ]
+      ],
+      "widget": {
+        "label": "Text",
+        "description": "Free-text entry."
+      }
     }
   ]
 }

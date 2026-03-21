@@ -2,34 +2,43 @@
   "spec_version": "1.0",
   "title": "tater - hierarchical",
   "description": "Pet/animal ontology with tags, compact, and full hierarchical label widgets.",
-  "instructions": "## Navigation\n\n- Use **chevron buttons** (→) to explore the ontology\n- Use **search** to find breeds by name\n- Expand/collapse branches with the tree UI\n\n**Tags Breed** uses tags view (path shown as dismissible pills).\n**Primary Breed** uses compact view (shows only selected).\n**Secondary Breed** uses full view (shows all siblings).\n",
+  "instructions": "## Navigation\n\n- Use **chevron buttons** (\u2192) to explore the ontology\n- Use **search** to find breeds by name\n- Expand/collapse branches with the tree UI\n\n**Tags Breed** uses tags view (path shown as dismissible pills).\n**Primary Breed** uses compact view (shows only selected).\n**Secondary Breed** uses full view (shows all siblings).\n",
   "hierarchies": {
-    "ontology": "../../data/pet_ontology.yaml"
+    "ontology": "../data/pet_ontology.yaml"
   },
   "data_schema": [
     {
       "id": "tags_breed",
       "type": "hierarchical_label",
-      "hierarchy_ref": "ontology",
-      "label": "Tags Breed",
-      "description": "Navigate via pill tags — click a tag to go back, × to deselect.",
-      "widget": {"type": "hierarchical_label_tags", "searchable": true}
+      "widget": {
+        "type": "hierarchical_label_tags",
+        "label": "Tags Breed",
+        "description": "Navigate via pill tags \u2014 click a tag to go back, \u00d7 to deselect.",
+        "hierarchy_ref": "ontology",
+        "searchable": true
+      }
     },
     {
       "id": "primary_breed",
       "type": "hierarchical_label",
-      "hierarchy_ref": "ontology",
-      "label": "Primary Breed",
-      "description": "Navigate the ontology to select a breed or type.",
-      "widget": {"searchable": true}
+      "widget": {
+        "type": "hierarchical_label_tags",
+        "label": "Primary Breed",
+        "description": "Navigate the ontology to select a breed or type.",
+        "hierarchy_ref": "ontology",
+        "searchable": true
+      }
     },
     {
       "id": "secondary_breed",
       "type": "hierarchical_label",
-      "hierarchy_ref": "ontology",
-      "label": "Secondary Breed (Mixed)",
-      "description": "Select a secondary breed if the pet is a mix.",
-      "widget": {"type": "hierarchical_label_full", "searchable": true}
+      "widget": {
+        "type": "hierarchical_label_full",
+        "label": "Secondary Breed (Mixed)",
+        "description": "Select a secondary breed if the pet is a mix.",
+        "hierarchy_ref": "ontology",
+        "searchable": true
+      }
     }
   ]
 }

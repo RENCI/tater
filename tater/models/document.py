@@ -43,7 +43,7 @@ class Document(BaseModel):
         Returns (in priority order):
         1. The 'name' field if provided
         2. The filename from 'file_path' if provided
-        3. The document 'id'
+        3. The document 'id', which is auto-generated if not provided
         """
         if self.name:
             return self.name
