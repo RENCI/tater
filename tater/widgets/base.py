@@ -508,7 +508,7 @@ class BooleanWidget(ControlWidget):
 
 @dataclass(eq=False)
 class NumericWidget(ControlWidget):
-    """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional[int/float]``."""
+    """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional[int|float]``."""
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
