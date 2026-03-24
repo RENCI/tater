@@ -87,15 +87,16 @@ WIDGET_CLASS: dict[str, type[TaterWidget]] = {
 
 
 # Maps field type strings to default widget classes.
-# Used by _widget_from_field_type for auto-generation.
+# Used by _widget_from_field_type for auto-generation; change an entry here
+# to change the default widget for that field type across the whole app.
 DEFAULT_WIDGET: dict[str, type[TaterWidget]] = {
-    "choice": SegmentedControlWidget,
-    "multi_choice": MultiSelectWidget,
-    "text": TextInputWidget,
-    "boolean": CheckboxWidget,
-    "numeric": NumberInputWidget,
-    "range_slider": RangeSliderWidget,
-    "span_annotation": SpanAnnotationWidget,
+    "choice":             SegmentedControlWidget,
+    "multi_choice":       MultiSelectWidget,
+    "text":               TextInputWidget,
+    "boolean":            CheckboxWidget,
+    "numeric":            NumberInputWidget,
+    "range_slider":       RangeSliderWidget,
+    "span_annotation":    SpanAnnotationWidget,
     "hierarchical_label": HierarchicalLabelTagsWidget,
 }
 
@@ -120,9 +121,9 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
             return _widget_from_field_type(field_name, non_none[0])
         return None
 
-    # Literal["a", "b"] → SegmentedControlWidget
+    # Literal["a", "b"] → choice default
     if origin is Literal:
-        return SegmentedControlWidget(field_name, label=label)
+        return DEFAULT_WIDGET["choice"](field_name, label=label)
 
     # list[X]
     if origin is list:
@@ -131,13 +132,13 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
             return None
         item_origin = typing.get_origin(item_type)
 
-        # list[Literal[...]] → MultiSelectWidget
+        # list[Literal[...]] → multi_choice default
         if item_origin is Literal:
-            return MultiSelectWidget(field_name, label=label)
+            return DEFAULT_WIDGET["multi_choice"](field_name, label=label)
 
-        # list[SpanAnnotation] → SpanAnnotationWidget (no entity types — requires override)
+        # list[SpanAnnotation] → span_annotation default (no entity types — requires override)
         if item_type is SpanAnnotation:
-            return SpanAnnotationWidget(field_name, label=label, entity_types=[])
+            return DEFAULT_WIDGET["span_annotation"](field_name, label=label, entity_types=[])
 
         # list[SubModel] → ListableWidget
         if isinstance(item_type, type) and issubclass(item_type, BaseModel):
@@ -153,13 +154,13 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
 
     # bool must come before int (bool is a subclass of int)
     if field_type is bool:
-        return CheckboxWidget(field_name, label=label)
+        return DEFAULT_WIDGET["boolean"](field_name, label=label)
 
     if field_type is str:
-        return TextInputWidget(field_name, label=label)
+        return DEFAULT_WIDGET["text"](field_name, label=label)
 
     if field_type in (float, int):
-        return NumberInputWidget(field_name, label=label)
+        return DEFAULT_WIDGET["numeric"](field_name, label=label)
 
     # SubModel → GroupWidget
     if isinstance(field_type, type) and issubclass(field_type, BaseModel):
