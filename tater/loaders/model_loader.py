@@ -42,30 +42,47 @@ def _humanize(field_id: str) -> str:
 # Maps widget type strings to widget classes.
 # Used by json_loader._build_widget_from_spec to look up classes by name.
 WIDGET_CLASS: dict[str, type[TaterWidget]] = {
-    # defaults (previously unnamed)
-    "segmented_control": SegmentedControlWidget,
-    "multi_select": MultiSelectWidget,
-    "text_input": TextInputWidget,
-    "checkbox": CheckboxWidget,
-    "number_input": NumberInputWidget,
-    "range_slider": RangeSliderWidget,
-    "span_annotation": SpanAnnotationWidget,
-    "hierarchical_label_tags": HierarchicalLabelTagsWidget,
-    "listable": ListableWidget,
-    "divider": DividerWidget,
-    # overrides (already named)
-    "radio_group": RadioGroupWidget,
-    "select": SelectWidget,
-    "chip_radio": ChipRadioWidget,
-    "checkbox_group": CheckboxGroupWidget,
-    "text_area": TextAreaWidget,
-    "switch": SwitchWidget,
-    "chip_boolean": ChipWidget,
-    "slider": SliderWidget,
-    "tabs": TabsWidget,
-    "accordion": AccordionWidget,
+    # boolean
+    "checkbox":                   CheckboxWidget,
+    "switch":                     SwitchWidget,
+    "chip_boolean":               ChipWidget,
+
+    # choice
+    "segmented_control":          SegmentedControlWidget,
+    "radio_group":                RadioGroupWidget,
+    "select":                     SelectWidget,
+    "chip_radio":                 ChipRadioWidget,
+
+    # multi-choice
+    "multi_select":               MultiSelectWidget,
+    "checkbox_group":             CheckboxGroupWidget,
+
+    # numeric
+    "number_input":               NumberInputWidget,
+    "slider":                     SliderWidget,
+    "range_slider":               RangeSliderWidget,
+
+    # text
+    "text_input":                 TextInputWidget,
+    "text_area":                  TextAreaWidget,
+
+    # span annotation
+    "span_annotation":            SpanAnnotationWidget,
+
+    # hierarchical label
+    "hierarchical_label_tags":    HierarchicalLabelTagsWidget,
     "hierarchical_label_compact": HierarchicalLabelCompactWidget,
-    "hierarchical_label_full": HierarchicalLabelFullWidget,
+    "hierarchical_label_full":    HierarchicalLabelFullWidget,
+
+    # group widget doesn't have a type string since it's not directly specifiable in JSON
+
+    # repeaters
+    "listable":                   ListableWidget,
+    "tabs":                       TabsWidget,
+    "accordion":                  AccordionWidget,
+
+    # structural
+    "divider":                    DividerWidget,
 }
 
 
