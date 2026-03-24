@@ -490,6 +490,7 @@ class BooleanWidget(ControlWidget):
     @property
     def schema_id(self) -> dict:
         # See ControlWidget.schema_id / _item_relative_tf for the encoding rationale.
+        # Necessary because booleans use a different component type and value prop, so the callbacks must target that type and prop.
         return {"type": "tater-bool-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
 
     def bind_schema(self, model: type) -> None:
