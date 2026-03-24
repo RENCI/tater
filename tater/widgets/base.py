@@ -490,6 +490,7 @@ class BooleanWidget(ControlWidget):
     @property
     def schema_id(self) -> dict:
         # See ControlWidget.schema_id / _item_relative_tf for the encoding rationale.
+        # Necessary because booleans use a different component type and value prop, so the callbacks must target that type and prop.
         return {"type": "tater-bool-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
 
     def bind_schema(self, model: type) -> None:
@@ -508,7 +509,7 @@ class BooleanWidget(ControlWidget):
 
 @dataclass(eq=False)
 class NumericWidget(ControlWidget):
-    """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional`` thereof."""
+    """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional[int/float]``."""
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
