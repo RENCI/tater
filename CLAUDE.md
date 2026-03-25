@@ -8,6 +8,8 @@ CLI to launch a Dash web app.
 
 Key stack: Python 3.10+, Dash, **Dash Mantine Components (DMC) v2.6 / Mantine v7**, Pydantic v2.
 
+DMC LLM-friendly documentation can be found [here](https://www.dash-mantine-components.com/assets/llms.txt).
+
 ## Directory layout
 
 ```
