@@ -11,15 +11,15 @@ class ChipRadioWidget(ChoiceWidget):
 
     vertical: bool = False
 
-    def component(self) -> dmc.ChipGroup:
+    def component(self) -> dmc.InputWrapper:
         chips = [dmc.Chip(opt, value=opt) for opt in self.options]
         container = dmc.Stack(chips, gap="xs") if self.vertical else dmc.Group(chips, wrap="wrap")
-        return dmc.ChipGroup(
+        return self._input_wrapper(dmc.ChipGroup(
             container,
             id=self.schema_id,
             value=self.default,
             deselectable=True,
-        )
+        ))
 
     def to_python_type(self) -> type:
         return str

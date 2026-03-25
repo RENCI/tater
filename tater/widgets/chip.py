@@ -11,16 +11,12 @@ class ChipWidget(BooleanWidget):
 
     default: bool = False
 
-    def component(self) -> dmc.Chip:
-        return dmc.Chip(
+    def component(self) -> dmc.InputWrapper:
+        return self._input_wrapper(dmc.Chip(
             self.label,
             id=self.schema_id,
             checked=self.default,
-        )
-
-    @property
-    def renders_own_label(self) -> bool:
-        return True
+        ))
 
     @property
     def value_prop(self) -> str:
