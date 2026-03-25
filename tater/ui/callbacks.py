@@ -57,7 +57,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         content = _render_document_content(raw_text, doc_id, tater_app)
 
         doc_index = next((i for i, d in enumerate(tater_app.documents) if d.id == doc_id), 0)
-        title = f"Document {doc_index + 1} of {len(tater_app.documents)}"
+        title = f"{doc_index + 1} / {len(tater_app.documents)}"
 
         # Format metadata from document info dict (without document count)
         metadata_parts = []
