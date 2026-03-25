@@ -19,14 +19,14 @@ class SliderWidget(NumericWidget):
     def empty_value(self):
         return self.default if self.default is not None else self.min_value
 
-    def component(self) -> dmc.Slider:
-        return dmc.Slider(
+    def component(self) -> dmc.InputWrapper:
+        return self._input_wrapper(dmc.Slider(
             id=self.schema_id,
             value=self.default if self.default is not None else self.min_value,
             min=self.min_value,
             max=self.max_value,
             step=self.step,
-        )
+        ))
 
     def to_python_type(self) -> type:
         return float

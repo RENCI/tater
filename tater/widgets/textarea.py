@@ -22,6 +22,9 @@ class TextAreaWidget(TextWidget):
             id=self.schema_id,
             value=self.default if self.default is not None else self.empty_value,
             placeholder=self.placeholder,
+            label=self._label_with_tooltip(),
+            description=self.description,
+            withAsterisk=self.required,
         )
 
     def to_python_type(self) -> type:

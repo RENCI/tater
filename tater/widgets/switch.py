@@ -1,7 +1,6 @@
 """Switch widget for boolean annotations."""
 from dataclasses import dataclass
 import dash_mantine_components as dmc
-from dash_iconify import DashIconify
 
 from .base import BooleanWidget
 
@@ -12,24 +11,8 @@ class SwitchWidget(BooleanWidget):
 
     default: bool = False
 
-    def component(self) -> dmc.Switch:
-        if self.auto_advance:
-            label = dmc.Group([
-                dmc.Text(self.label, size="sm"),
-                dmc.Tooltip(
-                    DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
-                    label="Auto-advances to next document",
-                    position="right",
-                    withArrow=True,
-                ),
-            ], gap=4)
-        else:
-            label = self.label
-        return dmc.Switch(id=self.schema_id, label=label, checked=self.default)
-
-    @property
-    def renders_own_label(self) -> bool:
-        return True
+    def component(self) -> dmc.InputWrapper:
+        return self._input_wrapper(dmc.Switch(id=self.schema_id, checked=self.default))
 
     @property
     def value_prop(self) -> str:

@@ -13,11 +13,15 @@ class CheckboxGroupWidget(MultiChoiceWidget):
 
     def component(self) -> dmc.CheckboxGroup:
         checkbox_items = [dmc.Checkbox(label=opt, value=opt) for opt in self.options]
-        container = dmc.Stack(checkbox_items, gap="xs") if self.vertical else dmc.Group(checkbox_items, wrap="wrap")
+        mt = 4 if self.description else None
+        container = dmc.Stack(checkbox_items, gap="xs", mt=mt) if self.vertical else dmc.Group(checkbox_items, wrap="wrap", mt=mt)
         return dmc.CheckboxGroup(
             id=self.schema_id,
             children=container,
             value=self.default,
+            label=self._label_with_tooltip(),
+            description=self.description,
+            withAsterisk=self.required,
         )
 
     def to_python_type(self) -> type:

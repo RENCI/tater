@@ -17,6 +17,9 @@ class MultiSelectWidget(MultiChoiceWidget):
             value=self.default,
             clearable=True,
             searchable=True,
+            label=self._label_with_tooltip(),
+            description=self.description,
+            withAsterisk=self.required,
         )
 
     def to_python_type(self) -> type:

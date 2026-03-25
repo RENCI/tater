@@ -115,20 +115,20 @@ class SpanAnnotationWidget(TaterWidget):
 
     @property
     def renders_own_label(self) -> bool:
-        return False
+        return True
 
     def component(self) -> Any:
         """Render the entity-type button row with inline stores."""
         from dash import html, dcc
         pipe_field = self.field_path.replace(".", "|")
-        return html.Div([
-            html.Div(
-                id={"type": "span-entity-buttons", "field": pipe_field},
-                children=self._make_buttons(pipe_field, {}),
-            ),
-            dcc.Store(id={"type": "span-selection", "field": pipe_field}, data=None),
-            dcc.Store(id={"type": "span-trigger", "field": pipe_field}, data=0),
-        ])
+        return self._input_wrapper(html.Div([
+                html.Div(
+                    id={"type": "span-entity-buttons", "field": pipe_field},
+                    children=self._make_buttons(pipe_field, {}),
+                ),
+                dcc.Store(id={"type": "span-selection", "field": pipe_field}, data=None),
+                dcc.Store(id={"type": "span-trigger", "field": pipe_field}, data=0),
+            ]), self.label)
 
     def _make_buttons(self, pipe_field: str, counts: dict) -> Any:
         """Build the entity-type button group with per-entity span counts.

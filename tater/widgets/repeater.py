@@ -125,13 +125,7 @@ class RepeaterWidget(ContainerWidget):
                                 widget.default = v
                 comp = widget.component()
 
-            items = []
-            if not widget.renders_own_label:
-                items.append(dmc.Text(widget.label, fw=500, size="sm"))
-            items.append(comp)
-            if widget.description and not widget.renders_own_label:
-                items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-            stack = dmc.Stack(items, gap="xs", mt="sm")
+            stack = dmc.Stack([comp], gap="xs", mt="sm")
             if widget._condition is not None:
                 rendered.append(html.Div(stack, id=widget.conditional_wrapper_id))
             else:
@@ -315,13 +309,7 @@ class RepeaterWidget(ContainerWidget):
                     if value is not None:
                         widget.default = value
                 nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
-                items = []
-                if widget.label:
-                    items.append(dmc.Text(widget.label, fw=500, size="sm"))
-                items.append(widget.component())
-                if widget.description:
-                    items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-                rendered.append(dmc.Stack(items, gap="xs", mt="sm"))
+                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue
             nested_ld = f"{outer_list_field}|{item_field}"
             nested_path = f"{outer_li}.{inner_index}"
@@ -350,13 +338,7 @@ class RepeaterWidget(ContainerWidget):
 
             comp = widget.component()
 
-            items = []
-            if not widget.renders_own_label:
-                items.append(dmc.Text(widget.label, fw=500, size="sm"))
-            items.append(comp)
-            if widget.description:
-                items.append(dmc.Text(widget.description, size="xs", c="dimmed"))
-            stack = dmc.Stack(items, gap="xs", mt="sm")
+            stack = dmc.Stack([comp], gap="xs", mt="sm")
             if widget._condition is not None:
                 rendered.append(html.Div(stack, id=widget.conditional_wrapper_id))
             else:
