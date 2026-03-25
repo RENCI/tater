@@ -211,7 +211,8 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
             style={"height": f"{_HEADER_HEIGHT - 4}px"},
         ),
         dmc.Progress(id="document-progress", value=0, size="xs", radius=0),
-    ])
+    ],
+    style={"boxShadow": "0 2px 6px rgba(0,0,0,0.1)"})
 
 
 def _build_app_footer() -> dmc.AppShellFooter:
@@ -297,5 +298,5 @@ def _build_app_footer() -> dmc.AppShellFooter:
             px="md",
             py="xs",
         ),
-        style={"borderTop": "1px solid var(--mantine-color-default-border)", "backgroundColor": "var(--mantine-color-body)"},
+        style={"boxShadow": "0 -2px 6px rgba(0,0,0,0.1)", "backgroundColor": "var(--mantine-color-body)"},
     )
