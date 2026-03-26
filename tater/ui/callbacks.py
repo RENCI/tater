@@ -721,23 +721,23 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # ---- Server: add span → increment per-item trigger (MATCH-only output) ----
+    # ---- Server: add span → MATCH-only output ----
     # Dash disallows mixing MATCH dict-ID outputs with static string-ID outputs
     # in the same callback.  add_span therefore writes only to the per-item
-    # span-trigger store; a separate relay_span_triggers callback converts the
-    # ALL pattern to the global span-any-change store so the doc viewer refreshes.
+    # span-trigger store (embedding the annotation update in the store data).
+    # relay_span_triggers then unpacks the annotation update and writes to
+    # annotations-store (both static string outputs — no MATCH mixing issue).
     @app.callback(
         Output({"type": "span-trigger", "field": MATCH}, "data"),
-        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "span-selection", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
         State({"type": "span-trigger", "field": MATCH}, "data"),
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def add_span(selection, doc_id, trigger_count, annotations_data):
+    def add_span(selection, doc_id, trigger_data, annotations_data):
         if not selection or not doc_id:
-            return no_update, no_update
+            return no_update
 
         pipe_field = ctx.triggered_id["field"]
         field_path = pipe_field.replace("|", ".")
@@ -747,20 +747,20 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         tag = selection.get("tag")
 
         if start_js is None or end_js is None or not tag:
-            return no_update, no_update
+            return no_update
 
         doc = next((d for d in _ta().documents if d.id == doc_id), None)
         if not doc:
-            return no_update, no_update
+            return no_update
 
         full_text = doc.load_content()
         if not (0 <= start_js < end_js <= len(full_text)):
-            return no_update, no_update
+            return no_update
 
         raw_slice = full_text[start_js:end_js]
         text = raw_slice.strip()
         if not text:
-            return no_update, no_update
+            return no_update
 
         trim_start = raw_slice.find(text)
         start = start_js + trim_start
@@ -769,34 +769,44 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         from tater.models.span import SpanAnnotation
         ann = _get_ann(annotations_data, doc_id)
         if ann is None:
-            return no_update, no_update
+            return no_update
         current_spans = value_helpers.get_model_value(ann, field_path) or []
 
         for existing in current_spans:
             ex_start = existing.start if hasattr(existing, "start") else existing.get("start")
             ex_end = existing.end if hasattr(existing, "end") else existing.get("end")
             if start < ex_end and end > ex_start:
-                return no_update, no_update
+                return no_update
 
         new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
         new_spans = list(current_spans) + [new_span]
         value_helpers.set_model_value(ann, field_path, new_spans)
         new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-        return (trigger_count or 0) + 1, new_annotations_data
+        prev_count = trigger_data.get("count", 0) if isinstance(trigger_data, dict) else (trigger_data or 0)
+        return {"count": prev_count + 1, "annotations_update": new_annotations_data}
 
-    # ---- Server: relay any per-item trigger → global span-any-change ----
+    # ---- Server: relay any per-item trigger → global span-any-change + annotations-store ----
     # This is the first writer of span-any-change (no allow_duplicate needed).
+    # Both outputs are static string IDs — no MATCH mixing issue.
     @app.callback(
         Output("span-any-change", "data"),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "span-trigger", "field": ALL}, "data"),
         State("span-any-change", "data"),
         prevent_initial_call=True,
     )
     def relay_span_triggers(all_triggers, global_count):
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
-        return (global_count or 0) + 1
+            return no_update, no_update
+        triggered_value = ctx.triggered[0]["value"]
+        annotations_update = (
+            triggered_value.get("annotations_update")
+            if isinstance(triggered_value, dict)
+            else None
+        )
+        new_count = (global_count or 0) + 1
+        return new_count, (annotations_update if annotations_update is not None else no_update)
 
     # ---- Server: refresh entity-button counts on add, delete, or doc navigation ----
     @app.callback(
@@ -1095,10 +1105,12 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         return []
 
     # ---- 3. Handle node button click → update path, write if leaf ----
+    # Uses hier-ann-relay (MATCH) instead of annotations-store (static) to avoid
+    # Dash's prohibition on mixing MATCH and static string outputs in one callback.
     @app.callback(
         Output({"type": "hier-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
-        Output("annotations-store", "data", allow_duplicate=True),
+        Output({"type": "hier-ann-relay", "field": MATCH}, "data"),
         Input({"type": "hier-node-btn", "field": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
         State({"type": "hier-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
@@ -1145,31 +1157,42 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             else:
                 new_path = path[:depth]
 
-            new_annotations_data = no_update
+            ann_relay = no_update
             if ann is not None:
                 if current_value == node_name:
                     value_helpers.set_model_value(ann, field_path, None)
                 else:
                     value_helpers.set_model_value(ann, field_path, node_name)
-                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {**(annotations_data or {}), doc_id: ann}
 
-            return new_path, ("" if is_search_result else no_update), new_annotations_data
+            return new_path, ("" if is_search_result else no_update), ann_relay
         else:
             if depth < len(path) and path[depth] == node_name:
                 # Back: parent is non-leaf; only selectable if allow_non_leaf=True, else clear
                 new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
-                new_annotations_data = no_update
+                ann_relay = no_update
                 if ann is not None:
                     value_helpers.set_model_value(ann, field_path, new_value)
-                    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-                return path[:depth], no_update, new_annotations_data
+                    ann_relay = {**(annotations_data or {}), doc_id: ann}
+                return path[:depth], no_update, ann_relay
             # Forward: navigate into non-leaf; only select if allow_non_leaf=True
             new_path = path[:depth] + [node_name]
-            new_annotations_data = no_update
+            ann_relay = no_update
             if widget.allow_non_leaf and ann is not None:
                 value_helpers.set_model_value(ann, field_path, node_name)
-                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-            return new_path, no_update, new_annotations_data
+                ann_relay = {**(annotations_data or {}), doc_id: ann}
+            return new_path, no_update, ann_relay
+
+    # ---- Relay hier-ann-relay → annotations-store (static outputs only) ----
+    @app.callback(
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "hier-ann-relay", "field": ALL}, "data"),
+        prevent_initial_call=True,
+    )
+    def relay_hier_ann(all_updates):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update
+        return ctx.triggered[0]["value"]
 
     # ---- 4. Rebuild sections from nav state / search / doc change ----
     @app.callback(
@@ -1251,10 +1274,12 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         return [], ""
 
     # 2. Handle option tag click — always a forward selection
+    # Uses hl-tags-ann-relay (MATCH) instead of annotations-store (static) to avoid
+    # Dash's prohibition on mixing MATCH and static string outputs in one callback.
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
-        Output("annotations-store", "data", allow_duplicate=True),
+        Output({"type": "hl-tags-ann-relay", "field": MATCH}, "data"),
         Input({"type": "hl-tags-node-btn", "field": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
         State({"type": "hl-tags-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
@@ -1295,17 +1320,17 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         clicked_node = _node_at(root, new_path)
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
-        new_annotations_data = no_update
+        ann_relay = no_update
         if ann is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
             value_helpers.set_model_value(ann, field_path, node_name)
-            new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {**(annotations_data or {}), doc_id: ann}
 
-        return new_path, "", new_annotations_data
+        return new_path, "", ann_relay
 
     # 3. Handle pill click → navigate back, selecting parent
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
-        Output("annotations-store", "data", allow_duplicate=True),
+        Output({"type": "hl-tags-ann-relay", "field": MATCH}, "data", allow_duplicate=True),
         Input({"type": "hl-tags-pill", "field": MATCH, "idx": ALL}, "n_clicks"),
         State({"type": "hl-tags-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
@@ -1330,12 +1355,23 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         # Parent is non-leaf; only selectable if allow_non_leaf=True, else clear
         parent_name = (path[idx - 1] if idx > 0 else None) if (widget and widget.allow_non_leaf) else None
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
-        new_annotations_data = no_update
+        ann_relay = no_update
         if ann is not None:
             value_helpers.set_model_value(ann, field_path, parent_name)
-            new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {**(annotations_data or {}), doc_id: ann}
 
-        return path[:idx], new_annotations_data
+        return path[:idx], ann_relay
+
+    # ---- Relay hl-tags-ann-relay → annotations-store (static outputs only) ----
+    @app.callback(
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "hl-tags-ann-relay", "field": ALL}, "data"),
+        prevent_initial_call=True,
+    )
+    def relay_hl_tags_ann(all_updates):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update
+        return ctx.triggered[0]["value"]
 
     # 4. Rebuild pills + option tags on nav/search/doc change
     @app.callback(
