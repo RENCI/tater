@@ -7,13 +7,19 @@ from argparse import Namespace
 def parse_args() -> Namespace:
     """Parse command-line arguments for Tater app."""
     parser = argparse.ArgumentParser(description="Tater Document Annotation App")
+
+    parser.add_argument(
+        "--hosted",
+        action="store_true",
+        help="Run in hosted mode: users upload their own schema and documents",
+    )
     parser.add_argument(
         "--documents",
         type=str,
-        required=True,
-        help="Path to documents JSON file or directory"
+        required=False,
+        help="Path to documents JSON file (required in non-hosted mode)"
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
         "--config",
         type=str,
@@ -47,5 +53,14 @@ def parse_args() -> Namespace:
         default=os.getenv("TATER_HOST", "127.0.0.1"),
         help="Host to bind to (default: 127.0.0.1, or TATER_HOST env var)"
     )
-    
-    return parser.parse_args()
+
+    args = parser.parse_args()
+
+    # Validate: non-hosted mode requires --documents and (--config or --schema)
+    if not args.hosted:
+        if not args.documents:
+            parser.error("--documents is required in non-hosted mode (or use --hosted)")
+        if not args.config and not args.schema:
+            parser.error("one of --config or --schema is required in non-hosted mode (or use --hosted)")
+
+    return args

@@ -226,6 +226,47 @@ class TaterApp:
         except Exception as e:
             print(f"Error loading annotations: {e}")
 
+    def _save_stores_to_file(
+        self,
+        annotations_data: dict,
+        metadata_data: dict,
+        doc_id: Optional[str] = None,
+    ) -> None:
+        """Save annotations and metadata from dcc.Store dicts to the annotations file.
+
+        Args:
+            annotations_data: {doc_id: annotation_dict} from annotations-store
+            metadata_data: {doc_id: metadata_dict} from metadata-store
+            doc_id: The document whose annotation triggered this save. When provided
+                and an ``on_save`` hook is configured, the hook is called after writing.
+        """
+        try:
+            path = Path(self.annotations_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            save_dict = {}
+            all_doc_ids = set(annotations_data or {}) | set(metadata_data or {})
+            for d_id in all_doc_ids:
+                save_dict[d_id] = {
+                    "annotations": (annotations_data or {}).get(d_id, {}),
+                    "metadata": (metadata_data or {}).get(d_id, {}),
+                }
+
+            with open(path, "w") as f:
+                json.dump(save_dict, f, indent=2)
+            self._save_error = None
+
+            if self.on_save and doc_id and (annotations_data or {}).get(doc_id) is not None:
+                try:
+                    if self.schema_model:
+                        ann_obj = self.schema_model(**(annotations_data[doc_id]))
+                        self.on_save(doc_id, ann_obj)
+                except Exception as hook_err:
+                    print(f"on_save hook error: {hook_err}")
+        except Exception as e:
+            self._save_error = str(e)
+            print(f"Error saving annotations: {e}")
+
     def _save_annotations_to_file(self, doc_id: Optional[str] = None) -> None:
         """Save all annotations to the annotations file.
 
@@ -275,6 +316,7 @@ class TaterApp:
     def _setup_repeater_callbacks(self) -> None:
         """Setup unified MATCH-based repeater callbacks."""
         callbacks.setup_repeater_callbacks(self)
+        callbacks.setup_nested_repeater_callbacks(self)
 
     def _setup_hl_callbacks(self) -> None:
         """Setup unified MATCH-based HierarchicalLabel callbacks."""
@@ -315,12 +357,5 @@ class TaterApp:
         value_helpers.set_dict_value(obj, path, value)
 
     def run(self, debug: bool = False, port: int = 8050, host: str = "127.0.0.1") -> None:
-        """
-        Start the Dash development server.
-
-        Args:
-            debug: Enable debug mode
-            port: Port number
-            host: Host address
-        """
+        """Start the Dash development server."""
         self.app.run(debug=debug, port=port, host=host)

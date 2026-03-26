@@ -16,6 +16,35 @@ if TYPE_CHECKING:
     from tater.widgets.base import TaterWidget
 
 
+# ---------------------------------------------------------------------------
+# Store helpers
+# ---------------------------------------------------------------------------
+
+def _default_meta() -> dict:
+    return {"flagged": False, "notes": "", "annotation_seconds": 0.0, "visited": False, "status": "not_started"}
+
+
+def _get_ann(annotations_data: dict | None, doc_id: str | None):
+    """Return the annotation dict for *doc_id*, or None."""
+    if not annotations_data or not doc_id:
+        return None
+    return annotations_data.get(doc_id)
+
+
+def _get_meta(metadata_data: dict | None, doc_id: str | None) -> dict:
+    """Return the metadata dict for *doc_id* (with defaults filled in)."""
+    base = _default_meta()
+    if not metadata_data or not doc_id:
+        return base
+    stored = metadata_data.get(doc_id)
+    if stored is None:
+        return base
+    return {**base, **stored}
+
+
+# ---------------------------------------------------------------------------
+
+
 def setup_callbacks(tater_app: TaterApp) -> None:
     """Register document and navigation callbacks on the Dash app."""
     app = tater_app.app
@@ -38,8 +67,12 @@ def setup_callbacks(tater_app: TaterApp) -> None:
          Output("btn-prev", "disabled"),
          Output("btn-next", "disabled")],
         [Input("current-doc-id", "data")] + span_trigger_inputs,
+        State("annotations-store", "data"),
     )
-    def update_document(doc_id, *_span_triggers):
+    def update_document(doc_id, *args):
+        # Last positional arg is annotations_data (State); span triggers precede it.
+        annotations_data = args[-1]
+
         if not doc_id:
             return "No document loaded", "No document", "", 0, True, True
 
@@ -54,7 +87,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         except Exception as e:
             raw_text = f"Error loading file: {e}"
 
-        content = _render_document_content(raw_text, doc_id, tater_app)
+        content = _render_document_content(raw_text, doc_id, tater_app, annotations_data)
 
         doc_index = next((i for i, d in enumerate(tater_app.documents) if d.id == doc_id), 0)
         title = f"{doc_index + 1} / {len(tater_app.documents)}"
@@ -80,15 +113,18 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("current-doc-id", "data"),
         Output("timing-store", "data"),
+        Output("metadata-store", "data", allow_duplicate=True),
         [Input("btn-prev", "n_clicks"),
          Input("btn-next", "n_clicks")],
         State("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True
     )
-    def navigate_buttons(prev_clicks, next_clicks, current_doc_id, timing_data):
+    def navigate_buttons(prev_clicks, next_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
         if not ctx.triggered or not tater_app.documents:
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         current_index = next((i for i, d in enumerate(tater_app.documents) if d.id == current_doc_id), 0)
 
@@ -97,52 +133,64 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         elif ctx.triggered_id == "btn-next" and current_index < len(tater_app.documents) - 1:
             current_index += 1
         else:
-            return no_update, no_update
+            return no_update, no_update, no_update
 
-        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, current_index, timing_data)
-        return doc_id, new_timing
+        doc_id, new_timing, new_metadata = _perform_navigation(
+            tater_app, current_doc_id, current_index, timing_data, annotations_data, metadata_data
+        )
+        return doc_id, new_timing, new_metadata
 
     # Menu item navigation (allow_duplicate=True required — see note above)
     @app.callback(
         Output("current-doc-id", "data", allow_duplicate=True),
         Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input({"type": "document-menu-item", "index": ALL}, "n_clicks"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True
     )
-    def navigate_menu_item(menu_clicks, current_doc_id, timing_data):
+    def navigate_menu_item(menu_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
         if not ctx.triggered or not tater_app.documents:
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         if not ctx.triggered[0]["value"]:
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         new_index = ctx.triggered_id["index"]
 
-        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, new_index, timing_data)
-        return doc_id, new_timing
+        doc_id, new_timing, new_metadata = _perform_navigation(
+            tater_app, current_doc_id, new_index, timing_data, annotations_data, metadata_data
+        )
+        return doc_id, new_timing, new_metadata
 
     # Auto-advance: navigate to next doc when an auto_advance widget gets a value.
     # (allow_duplicate=True required — see note above)
     @app.callback(
         Output("current-doc-id", "data", allow_duplicate=True),
         Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("auto-advance-store", "data"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def navigate_auto_advance(trigger, current_doc_id, timing_data):
+    def navigate_auto_advance(trigger, current_doc_id, timing_data, annotations_data, metadata_data):
         if not trigger:
-            return no_update, no_update
+            return no_update, no_update, no_update
         current_index = next(
             (i for i, d in enumerate(tater_app.documents) if d.id == current_doc_id), 0
         )
         if current_index >= len(tater_app.documents) - 1:
-            return no_update, no_update
-        doc_id, new_timing = _perform_navigation(tater_app, current_doc_id, current_index + 1, timing_data)
-        return doc_id, new_timing
+            return no_update, no_update, no_update
+        doc_id, new_timing, new_metadata = _perform_navigation(
+            tater_app, current_doc_id, current_index + 1, timing_data, annotations_data, metadata_data
+        )
+        return doc_id, new_timing, new_metadata
 
     # Refresh menu dropdown with status badges after any navigation or status change
     @app.callback(
@@ -151,64 +199,67 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Input("timing-store", "data"),
         Input("status-store", "data"),
         Input("filter-flagged", "n_clicks"),
+        State("metadata-store", "data"),
     )
-    def update_menu_items(timing_data, status_data, n_clicks):
+    def update_menu_items(timing_data, status_data, n_clicks, metadata_data):
         flagged_only = bool((n_clicks or 0) % 2)
-        return _build_menu_items(tater_app, flagged_only=flagged_only), "filled" if flagged_only else "outline"
+        return _build_menu_items(tater_app, metadata_data, flagged_only=flagged_only), "filled" if flagged_only else "outline"
 
     # Load flag and notes from metadata when the document changes.
     @app.callback(
         Output("flag-document", "checked"),
         Output("document-notes", "value"),
         Input("current-doc-id", "data"),
+        State("metadata-store", "data"),
     )
-    def load_flag_and_notes(doc_id):
+    def load_flag_and_notes(doc_id, metadata_data):
         if not doc_id:
             return False, ""
-        meta = tater_app.metadata.get(doc_id)
-        if meta is None:
-            return False, ""
-        return meta.flagged, meta.notes or ""
+        meta = _get_meta(metadata_data, doc_id)
+        return meta.get("flagged", False), meta.get("notes", "") or ""
 
     # Handle flag-document changes
     # Outputs to timing-store so update_menu_items re-runs after metadata is updated.
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("flag-document", "checked"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def save_flag(checked, doc_id, timing_data):
+    def save_flag(checked, doc_id, timing_data, metadata_data):
         if not doc_id:
-            return no_update
+            return no_update, no_update
 
-        tater_app.metadata[doc_id].flagged = checked
+        metadata_data = dict(metadata_data or {})
+        meta = dict(_get_meta(metadata_data, doc_id))
+        meta["flagged"] = checked
+        metadata_data[doc_id] = meta
 
         if timing_data is None:
             timing_data = {}
         timing_data["last_save_time"] = time.time()
-        return timing_data
+        return timing_data, metadata_data
 
     # Handle document-notes changes
     @app.callback(
-        Output("document-notes", "id"),  # Dummy output
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("document-notes", "value"),
         State("current-doc-id", "data"),
-        State("timing-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True
     )
-    def save_notes(notes, doc_id, timing_data):
+    def save_notes(notes, doc_id, metadata_data):
         if not doc_id:
             return no_update
 
-        tater_app.metadata[doc_id].notes = notes if notes else ""
-
-        # Update save time
-        if timing_data is None:
-            timing_data = {}
-        timing_data["last_save_time"] = time.time()
-        return no_update
+        metadata_data = dict(metadata_data or {})
+        meta = dict(_get_meta(metadata_data, doc_id))
+        meta["notes"] = notes if notes else ""
+        metadata_data[doc_id] = meta
+        return metadata_data
 
     if has_instructions:
         @app.callback(
@@ -221,6 +272,61 @@ def setup_callbacks(tater_app: TaterApp) -> None:
                 return no_update
             return True
 
+    is_hosted = tater_app.annotations_path is None
+
+    if is_hosted:
+        # Download annotations as JSON
+        @app.callback(
+            Output("download-annotations", "data"),
+            Input("btn-download", "n_clicks"),
+            State("annotations-store", "data"),
+            State("metadata-store", "data"),
+            prevent_initial_call=True,
+        )
+        def download_annotations(n_clicks, annotations_data, metadata_data):
+            if not n_clicks:
+                return no_update
+            save_dict = {}
+            all_ids = set(annotations_data or {}) | set(metadata_data or {})
+            for d_id in all_ids:
+                save_dict[d_id] = {
+                    "annotations": (annotations_data or {}).get(d_id, {}),
+                    "metadata": (metadata_data or {}).get(d_id, {}),
+                }
+            import json as _json
+            return {"content": _json.dumps(save_dict, indent=2), "filename": "annotations.json"}
+
+        # Start over: clear Flask session and redirect to upload page
+        @app.callback(
+            Output("annotate-location", "href"),
+            Input("btn-start-over", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def start_over(n_clicks):
+            if not n_clicks:
+                return no_update
+            import flask
+            flask.session.pop("tater_session", None)
+            return "/"
+
+    # Auto-save: write to file whenever annotations or metadata store changes.
+    @app.callback(
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("annotations-store", "data"),
+        Input("metadata-store", "data"),
+        State("current-doc-id", "data"),
+        State("timing-store", "data"),
+        prevent_initial_call=True,
+    )
+    def auto_save(annotations_data, metadata_data, doc_id, timing_data):
+        if not tater_app.annotations_path:
+            return no_update
+        tater_app._save_stores_to_file(annotations_data or {}, metadata_data or {}, doc_id=doc_id)
+        now = time.time()
+        timing_data = dict(timing_data or {})
+        timing_data["last_save_time"] = now
+        return timing_data
+
 
 _STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
 _STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
@@ -230,46 +336,57 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
     """Setup callbacks for save time and document timing display."""
     app = tater_app.app
 
-    # Manual save button
+    # Manual save button — flush timing into metadata, update last_save_time.
+    # Auto-save callback handles the actual file write when metadata-store changes.
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("btn-save", "n_clicks"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def on_save_click(n_clicks, current_doc_id, timing_data):
+    def on_save_click(n_clicks, current_doc_id, timing_data, metadata_data):
         if not n_clicks:
-            return no_update
+            return no_update, no_update
         now = time.time()
         if timing_data is None:
             timing_data = {}
+        metadata_data = dict(metadata_data or {})
         # Flush elapsed time into metadata before saving, then reset the start
         # so the clientside timer continues without double-counting.
         paused = timing_data.get("paused", False)
         if not paused:
             start = timing_data.get("doc_start_time")
-            if start and current_doc_id and current_doc_id in tater_app.metadata:
-                tater_app.metadata[current_doc_id].annotation_seconds += now - start
+            if start and current_doc_id:
+                meta = dict(_get_meta(metadata_data, current_doc_id))
+                meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+                metadata_data[current_doc_id] = meta
             timing_data["doc_start_time"] = now
-            meta = tater_app.metadata.get(current_doc_id)
-            timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
-        tater_app._save_annotations_to_file(doc_id=current_doc_id)
+            meta = _get_meta(metadata_data, current_doc_id)
+            timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
         timing_data["last_save_time"] = now
-        return timing_data
+        return timing_data, metadata_data
 
     # Handle document changes to initialize timing
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
         Output("status-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("current-doc-id", "data"),
         State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call='initial_duplicate',
     )
-    def on_doc_change(doc_id, timing_data):
+    def on_doc_change(doc_id, timing_data, annotations_data, metadata_data):
+        metadata_data = dict(metadata_data or {})
         if doc_id:
-            tater_app.metadata[doc_id].visited = True
-            update_status_for_doc(tater_app, doc_id)
+            meta = dict(_get_meta(metadata_data, doc_id))
+            meta["visited"] = True
+            metadata_data[doc_id] = meta
+            update_status_for_doc(tater_app, doc_id, annotations_data, metadata_data)
 
         if timing_data is None:
             timing_data = {}
@@ -277,11 +394,11 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
         timing_data["paused"] = False
         if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
             timing_data["session_start_time"] = time.time()
-        meta = tater_app.metadata.get(doc_id) if doc_id else None
-        timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
+        meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+        timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
 
-        status = tater_app.metadata[doc_id].status if doc_id and doc_id in tater_app.metadata else "not_started"
-        return timing_data, status
+        status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+        return timing_data, status, metadata_data
 
     # Update save status and pause icon whenever timing-store changes (i.e. on every save,
     # navigation, or pause toggle) — no interval needed, no "Updating..." flicker.
@@ -344,32 +461,37 @@ def _setup_timing_callbacks(tater_app: TaterApp) -> None:
 
     @app.callback(
         Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input("btn-pause-timer", "n_clicks"),
         State("timing-store", "data"),
         State("current-doc-id", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def toggle_pause(n_clicks, timing_data, doc_id):
+    def toggle_pause(n_clicks, timing_data, doc_id, metadata_data):
         if not n_clicks:
-            return no_update
+            return no_update, no_update
         if timing_data is None:
             timing_data = {}
+        metadata_data = dict(metadata_data or {})
         now = time.time()
         currently_paused = timing_data.get("paused", False)
         if not currently_paused:
             # Flush elapsed into metadata so time isn't lost
             start = timing_data.get("doc_start_time")
-            if start and doc_id and doc_id in tater_app.metadata:
-                tater_app.metadata[doc_id].annotation_seconds += now - start
+            if start and doc_id:
+                meta = dict(_get_meta(metadata_data, doc_id))
+                meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+                metadata_data[doc_id] = meta
             timing_data["doc_start_time"] = None
             timing_data["paused"] = True
             # Update baseline so the clientside timer shows the correct accumulated total
-            meta = tater_app.metadata.get(doc_id) if doc_id else None
-            timing_data["annotation_seconds_at_load"] = meta.annotation_seconds if meta else 0.0
+            meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+            timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
         else:
             timing_data["doc_start_time"] = now
             timing_data["paused"] = False
-        return timing_data
+        return timing_data, metadata_data
 
     @app.callback(
         Output("status-badge", "children"),
@@ -442,45 +564,57 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_values(all_values, doc_id, advance_count):
-        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields, convert_empty_str=True)
+    def capture_values(all_values, doc_id, advance_count, annotations_data, metadata_data):
+        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields,
+                           annotations_data, metadata_data, convert_empty_str=True)
 
     # --- Capture: checked prop (BooleanWidgets) ---
     @app.callback(
         Output("status-store", "data", allow_duplicate=True),
         Output("auto-advance-store", "data", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
         Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         State("current-doc-id", "data"),
         State("auto-advance-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_checked(all_values, doc_id, advance_count):
-        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields, advance_requires_value=False)
+    def capture_checked(all_values, doc_id, advance_count, annotations_data, metadata_data):
+        return _do_capture(doc_id, advance_count, tater_app, auto_advance_fields,
+                           annotations_data, metadata_data, advance_requires_value=False)
 
     # --- Load: value prop --- push annotation values to widgets on doc change
     @app.callback(
         Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
         State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
+        State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_values(doc_id, all_ids):
-        return _do_load(doc_id, all_ids, tater_app, empty_value_lookup)
+    def load_values(doc_id, all_ids, annotations_data):
+        return _do_load(doc_id, all_ids, annotations_data, empty_value_lookup)
 
     # --- Load: checked prop ---
     @app.callback(
         Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
         State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
+        State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_checked(doc_id, all_ids):
-        return _do_load(doc_id, all_ids, tater_app, empty_value_lookup, as_bool=True)
+    def load_checked(doc_id, all_ids, annotations_data):
+        return _do_load(doc_id, all_ids, annotations_data, empty_value_lookup, as_bool=True)
 
 
 def _do_capture(
@@ -488,49 +622,46 @@ def _do_capture(
     advance_count,
     tater_app,
     auto_advance_fields: set,
+    annotations_data: dict | None,
+    metadata_data: dict | None,
     convert_empty_str: bool = False,
     advance_requires_value: bool = True,
 ):
     """Shared body for capture_values and capture_checked.
 
-    ``convert_empty_str`` normalises empty strings to None (needed for text
-    widgets where Dash reports ``""`` when the user clears a field).
-
-    ``advance_requires_value`` keeps the auto-advance guard ``value is not None``
-    used for non-boolean widgets; pass ``False`` for boolean widgets where a
-    toggle back to ``False`` should also trigger auto-advance.
+    Returns (status, advance_count_or_no_update, new_annotations_data, new_metadata_data).
     """
+    no_store = no_update, no_update, no_update, no_update
     if not doc_id or not ctx.triggered_id:
-        return no_update, no_update
+        return no_store
     tid = ctx.triggered_id
     field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
     value = ctx.triggered[0]["value"]
     if convert_empty_str and value == "":
         value = None
-    annotation = tater_app.annotations.get(doc_id)
-    if annotation is None:
-        return no_update, no_update
-    old_value = value_helpers.get_model_value(annotation, field_path)
-    value_helpers.set_model_value(annotation, field_path, value)
-    update_status_for_doc(tater_app, doc_id)
-    status = tater_app.metadata[doc_id].status if doc_id in tater_app.metadata else "not_started"
+    ann = _get_ann(annotations_data, doc_id)
+    if ann is None:
+        return no_store
+    old_value = value_helpers.get_model_value(ann, field_path)
+    value_helpers.set_model_value(ann, field_path, value)
+    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+    metadata_data = dict(metadata_data or {})
+    update_status_for_doc(tater_app, doc_id, new_annotations_data, metadata_data)
+    status = metadata_data.get(doc_id, {}).get("status", "not_started")
     if field_path in auto_advance_fields:
         changed = value != old_value
         if changed and (not advance_requires_value or value is not None):
-            return status, (advance_count or 0) + 1
-    return status, no_update
+            return status, (advance_count or 0) + 1, new_annotations_data, metadata_data
+    return status, no_update, new_annotations_data, metadata_data
 
 
-def _do_load(doc_id: str, all_ids: list, tater_app, empty_value_lookup: dict, as_bool: bool = False) -> list:
-    """Shared body for load_values and load_checked.
-
-    ``as_bool`` wraps each value in ``bool()`` (needed for boolean widgets).
-    """
-    annotation = tater_app.annotations.get(doc_id) if doc_id else None
+def _do_load(doc_id: str, all_ids: list, annotations_data: dict | None, empty_value_lookup: dict, as_bool: bool = False) -> list:
+    """Shared body for load_values and load_checked."""
+    ann = _get_ann(annotations_data, doc_id) if doc_id else None
     result = []
     for wid in (all_ids or []):
         field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
-        v = value_helpers.get_model_value(annotation, field) if annotation else None
+        v = value_helpers.get_model_value(ann, field) if ann is not None else None
         if v is None:
             v = empty_value_lookup.get(wid["tf"])
         result.append(bool(v) if (as_bool and v is not None) else (False if as_bool else v))
@@ -599,14 +730,16 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
     # ALL pattern to the global span-any-change store so the doc viewer refreshes.
     @app.callback(
         Output({"type": "span-trigger", "field": MATCH}, "data"),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "span-selection", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
         State({"type": "span-trigger", "field": MATCH}, "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def add_span(selection, doc_id, trigger_count):
+    def add_span(selection, doc_id, trigger_count, annotations_data):
         if not selection or not doc_id:
-            return no_update
+            return no_update, no_update
 
         pipe_field = ctx.triggered_id["field"]
         field_path = pipe_field.replace("|", ".")
@@ -616,38 +749,43 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         tag = selection.get("tag")
 
         if start_js is None or end_js is None or not tag:
-            return no_update
+            return no_update, no_update
 
         doc = next((d for d in tater_app.documents if d.id == doc_id), None)
         if not doc:
-            return no_update
+            return no_update, no_update
 
         full_text = doc.load_content()
         if not (0 <= start_js < end_js <= len(full_text)):
-            return no_update
+            return no_update, no_update
 
         raw_slice = full_text[start_js:end_js]
         text = raw_slice.strip()
         if not text:
-            return no_update
+            return no_update, no_update
 
         trim_start = raw_slice.find(text)
         start = start_js + trim_start
         end = start + len(text)
 
         from tater.models.span import SpanAnnotation
-        annotation = tater_app.annotations[doc_id]
-        current_spans = value_helpers.get_model_value(annotation, field_path) or []
+        ann = _get_ann(annotations_data, doc_id)
+        if ann is None:
+            return no_update, no_update
+        current_spans = value_helpers.get_model_value(ann, field_path) or []
 
         for existing in current_spans:
-            if start < existing.end and end > existing.start:
-                return no_update
+            ex_start = existing.start if hasattr(existing, "start") else existing.get("start")
+            ex_end = existing.end if hasattr(existing, "end") else existing.get("end")
+            if start < ex_end and end > ex_start:
+                return no_update, no_update
 
-        new_spans = list(current_spans) + [SpanAnnotation(start=start, end=end, text=text, tag=tag)]
-        value_helpers.set_model_value(annotation, field_path, new_spans)
-        tater_app._save_annotations_to_file(doc_id=doc_id)
+        new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
+        new_spans = list(current_spans) + [new_span]
+        value_helpers.set_model_value(ann, field_path, new_spans)
+        new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-        return (trigger_count or 0) + 1
+        return (trigger_count or 0) + 1, new_annotations_data
 
     # ---- Server: relay any per-item trigger → global span-any-change ----
     # This is the first writer of span-any-change (no allow_duplicate needed).
@@ -668,8 +806,9 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         Input({"type": "span-trigger", "field": MATCH}, "data"),
         Input("span-any-change", "data"),
         Input("current-doc-id", "data"),
+        State("annotations-store", "data"),
     )
-    def update_entity_counts(item_trigger, any_change, doc_id):
+    def update_entity_counts(item_trigger, any_change, doc_id, annotations_data):
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         schema_field = field_path.split(".")[-1]
@@ -678,43 +817,52 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
             return no_update
         counts = {}
         if doc_id:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation:
-                spans = value_helpers.get_model_value(annotation, field_path) or []
+            ann = _get_ann(annotations_data, doc_id)
+            if ann is not None:
+                spans = value_helpers.get_model_value(ann, field_path) or []
                 for span in spans:
-                    counts[span.tag] = counts.get(span.tag, 0) + 1
+                    tag = span.tag if hasattr(span, "tag") else span.get("tag")
+                    counts[tag] = counts.get(tag, 0) + 1
         return widget._make_buttons(pipe_field, counts)
 
     # ---- Server: delete span → increment global span-any-change ----
     # Must be registered AFTER relay_span_triggers (which is the first writer).
     @app.callback(
         Output("span-any-change", "data", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input("span-delete-store", "data"),
         State("current-doc-id", "data"),
         State("span-any-change", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def delete_span(delete_data, doc_id, global_count):
+    def delete_span(delete_data, doc_id, global_count, annotations_data):
         if not delete_data or not doc_id:
-            return no_update
+            return no_update, no_update
 
         pipe_field = delete_data.get("field")
         del_start = delete_data.get("start")
         del_end = delete_data.get("end")
         if not pipe_field or del_start is None or del_end is None:
-            return no_update
+            return no_update, no_update
 
         field_path = pipe_field.replace("|", ".")
-        annotation = tater_app.annotations.get(doc_id)
-        if not annotation:
-            return no_update
+        ann = _get_ann(annotations_data, doc_id)
+        if ann is None:
+            return no_update, no_update
 
-        current_spans = value_helpers.get_model_value(annotation, field_path) or []
-        new_spans = [s for s in current_spans if not (s.start == del_start and s.end == del_end)]
-        value_helpers.set_model_value(annotation, field_path, new_spans)
-        tater_app._save_annotations_to_file(doc_id=doc_id)
+        current_spans = value_helpers.get_model_value(ann, field_path) or []
+        new_spans = [
+            s for s in current_spans
+            if not (
+                (s.start if hasattr(s, "start") else s.get("start")) == del_start
+                and (s.end if hasattr(s, "end") else s.get("end")) == del_end
+            )
+        ]
+        value_helpers.set_model_value(ann, field_path, new_spans)
+        new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-        return (global_count or 0) + 1
+        return (global_count or 0) + 1, new_annotations_data
 
 
 def setup_repeater_callbacks(tater_app: TaterApp) -> None:
@@ -733,10 +881,10 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
     app = tater_app.app
 
     # --- Annotation sync helpers ---
-    def _sync_annotation_add(widget_template, field_path, doc_id, new_index):
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return
+    def _sync_annotation_add(widget_template, field_path, annotations_data, doc_id, new_index):
+        ann = _get_ann(annotations_data, doc_id)
+        if ann is None:
+            return annotations_data
         extended = False
         for iw in widget_template.item_widgets:
             if isinstance(iw, ContainerWidget):
@@ -745,8 +893,8 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
             if not isinstance(iw, ControlWidget):
                 continue
             try:
-                tater_app._set_model_value(
-                    annotation,
+                value_helpers.set_model_value(
+                    ann,
                     f"{field_path}.{new_index}.{iw.schema_field}",
                     iw.empty_value,
                 )
@@ -755,32 +903,34 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
                 pass
         if not extended:
             try:
-                tater_app._set_model_value(annotation, f"{field_path}.{new_index}", None)
+                value_helpers.set_model_value(ann, f"{field_path}.{new_index}", None)
             except Exception:
                 pass
-        tater_app._save_annotations_to_file(doc_id=doc_id)
+        return {**(annotations_data or {}), doc_id: ann}
 
-    def _sync_annotation_delete(field_path, doc_id, del_position):
-        annotation = tater_app.annotations.get(doc_id)
-        if annotation is None:
-            return
-        current_list = value_helpers.get_model_value(annotation, field_path)
+    def _sync_annotation_delete(field_path, annotations_data, doc_id, del_position):
+        ann = _get_ann(annotations_data, doc_id)
+        if ann is None:
+            return annotations_data
+        current_list = value_helpers.get_model_value(ann, field_path)
         if isinstance(current_list, list) and del_position < len(current_list):
             current_list.pop(del_position)
-        tater_app._save_annotations_to_file(doc_id=doc_id)
+        return {**(annotations_data or {}), doc_id: ann}
 
     # --- Unified MATCH callback ---
     @app.callback(
         [Output({"type": "repeater-store",  "field": MATCH}, "data"),
          Output({"type": "repeater-items",  "field": MATCH}, "children"),
-         Output({"type": "repeater-change", "field": MATCH}, "data")],
+         Output({"type": "repeater-change", "field": MATCH}, "data"),
+         Output("annotations-store", "data", allow_duplicate=True)],
         [Input({"type": "repeater-add",    "field": MATCH}, "n_clicks"),
          Input({"type": "repeater-delete", "field": MATCH, "index": ALL}, "n_clicks"),
          Input("current-doc-id", "data")],
         [State({"type": "repeater-store",  "field": MATCH}, "data"),
-         State({"type": "repeater-change", "field": MATCH}, "data")],
+         State({"type": "repeater-change", "field": MATCH}, "data"),
+         State("annotations-store", "data")],
     )
-    def update_repeater(add_clicks, delete_clicks, doc_id, store_data, change_count):
+    def update_repeater(add_clicks, delete_clicks, doc_id, store_data, change_count, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
 
@@ -796,13 +946,13 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         if not ctx.triggered_id or ctx.triggered_id == "current-doc-id":
             indices = []
             if doc_id:
-                annotation = tater_app.annotations.get(doc_id)
-                if annotation is not None:
-                    lst = value_helpers.get_model_value(annotation, field_path)
+                ann = _get_ann(annotations_data, doc_id)
+                if ann is not None:
+                    lst = value_helpers.get_model_value(ann, field_path)
                     if isinstance(lst, list):
                         indices = list(range(len(lst)))
             store_data = {"indices": indices, "next_index": len(indices)}
-            return store_data, widget._render_items(indices, tater_app, doc_id), no_update
+            return store_data, widget._render_items(indices, tater_app, doc_id, annotations_data=annotations_data), no_update, no_update
 
         if not ctx.triggered or not ctx.triggered[0].get("value"):
             raise PreventUpdate
@@ -813,27 +963,30 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         indices = list(store_data.get("indices", []))
         active_value = None
         is_delete = False
+        new_annotations_data = no_update
 
         if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-add":
             new_index = len(indices)
             indices = list(range(new_index + 1))
             active_value = str(new_index)
-            if doc_id and doc_id in tater_app.annotations:
-                _sync_annotation_add(widget, field_path, doc_id, new_index)
+            if doc_id and _get_ann(annotations_data, doc_id) is not None:
+                new_annotations_data = _sync_annotation_add(widget, field_path, annotations_data, doc_id, new_index)
 
         elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-delete":
             delete_index = ctx.triggered_id.get("index")
             if delete_index in indices:
                 del_position = indices.index(delete_index)
-                if doc_id and doc_id in tater_app.annotations:
-                    _sync_annotation_delete(field_path, doc_id, del_position)
+                if doc_id and _get_ann(annotations_data, doc_id) is not None:
+                    new_annotations_data = _sync_annotation_delete(field_path, annotations_data, doc_id, del_position)
                 indices = list(range(len(indices) - 1))
                 active_value = str(indices[0]) if indices else None
                 is_delete = True
 
+        # Use updated annotations_data for rendering if we modified it
+        render_annotations = new_annotations_data if new_annotations_data is not no_update else annotations_data
         new_data = {"indices": indices, "next_index": len(indices)}
         new_change = (change_count or 0) + 1 if is_delete else no_update
-        return new_data, widget._render_items(indices, tater_app, doc_id, active_value=active_value), new_change
+        return new_data, widget._render_items(indices, tater_app, doc_id, active_value=active_value, annotations_data=render_annotations), new_change, new_annotations_data
 
     # --- Relay repeater deletes → span-any-change so doc viewer re-renders ---
     if _has_any_span(tater_app.widgets):
@@ -914,16 +1067,17 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output({"type": "hier-nav", "field": MATCH}, "data"),
         Input("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id):
+    def reset_nav(doc_id, annotations_data):
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
             return []
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
             computed_path = _find_path(widget.root, selected_value)
             if computed_path:
@@ -935,19 +1089,21 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output({"type": "hier-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hier-node-btn", "field": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
         State({"type": "hier-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_click(node_clicks, current_path, doc_id):
+    def handle_click(node_clicks, current_path, doc_id, annotations_data):
         if not ctx.triggered_id:
-            return no_update, no_update
+            return no_update, no_update, no_update
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict) or triggered.get("type") != "hier-node-btn":
-            return no_update, no_update
+            return no_update, no_update, no_update
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         pipe_field = triggered["field"]
         field_path = pipe_field.replace("|", ".")
@@ -957,7 +1113,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
         widget = _get_widget(field_path)
         if widget is None:
-            return no_update, no_update
+            return no_update, no_update, no_update
         root = widget.root
 
         parent = _node_at(root, path[:depth])
@@ -966,16 +1122,13 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         if clicked is None:
             clicked = next((n for n in root.all_leaves() if n.name == node_name), None)
             if clicked is None:
-                return no_update, no_update
+                return no_update, no_update, no_update
             is_search_result = True
 
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+
         if clicked.is_leaf:
-            current_value = None
-            annotation = None
-            if doc_id:
-                annotation = tater_app.annotations.get(doc_id)
-                if annotation is not None:
-                    current_value = value_helpers.get_model_value(annotation, field_path)
+            current_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
 
             if is_search_result:
                 full_path = _find_path(root, node_name)
@@ -983,34 +1136,31 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             else:
                 new_path = path[:depth]
 
-            if current_value == node_name:
-                if annotation is not None:
-                    value_helpers.set_model_value(annotation, field_path, None)
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
-            else:
-                if annotation is not None:
-                    value_helpers.set_model_value(annotation, field_path, node_name)
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
+            new_annotations_data = no_update
+            if ann is not None:
+                if current_value == node_name:
+                    value_helpers.set_model_value(ann, field_path, None)
+                else:
+                    value_helpers.set_model_value(ann, field_path, node_name)
+                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-            return new_path, ("" if is_search_result else no_update)
+            return new_path, ("" if is_search_result else no_update), new_annotations_data
         else:
             if depth < len(path) and path[depth] == node_name:
                 # Back: parent is non-leaf; only selectable if allow_non_leaf=True, else clear
                 new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
-                if doc_id:
-                    annotation = tater_app.annotations.get(doc_id)
-                    if annotation is not None:
-                        value_helpers.set_model_value(annotation, field_path, new_value)
-                        tater_app._save_annotations_to_file(doc_id=doc_id)
-                return path[:depth], no_update
+                new_annotations_data = no_update
+                if ann is not None:
+                    value_helpers.set_model_value(ann, field_path, new_value)
+                    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+                return path[:depth], no_update, new_annotations_data
             # Forward: navigate into non-leaf; only select if allow_non_leaf=True
             new_path = path[:depth] + [node_name]
-            if widget.allow_non_leaf and doc_id:
-                annotation = tater_app.annotations.get(doc_id)
-                if annotation is not None:
-                    value_helpers.set_model_value(annotation, field_path, node_name)
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
-            return new_path, no_update
+            new_annotations_data = no_update
+            if widget.allow_non_leaf and ann is not None:
+                value_helpers.set_model_value(ann, field_path, node_name)
+                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+            return new_path, no_update, new_annotations_data
 
     # ---- 4. Rebuild sections from nav state / search / doc change ----
     @app.callback(
@@ -1019,9 +1169,10 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         Input({"type": "hier-nav", "field": MATCH}, "data"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
         Input("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=False,
     )
-    def update_display(current_path, search_query, doc_id):
+    def update_display(current_path, search_query, doc_id, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         path = list(current_path or [])
@@ -1033,9 +1184,9 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
         selected_value = None
         if doc_id:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation is not None:
-                selected_value = value_helpers.get_model_value(annotation, field_path)
+            ann = _get_ann(annotations_data, doc_id)
+            if ann is not None:
+                selected_value = value_helpers.get_model_value(ann, field_path)
 
         breadcrumb = " → ".join(path) if path else "None selected"
 
@@ -1070,16 +1221,17 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Input("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id):
+    def reset_nav(doc_id, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
             return [], ""
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
             computed_path = _find_path(widget.root, selected_value)
             if computed_path:
@@ -1090,19 +1242,21 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hl-tags-node-btn", "field": MATCH, "depth": ALL, "name": ALL}, "n_clicks"),
         State({"type": "hl-tags-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_option_click(node_clicks, current_path, doc_id):
+    def handle_option_click(node_clicks, current_path, doc_id, annotations_data):
         if not ctx.triggered_id:
-            return no_update, no_update
+            return no_update, no_update, no_update
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-node-btn":
-            return no_update, no_update
+            return no_update, no_update, no_update
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         pipe_field = triggered["field"]
         field_path = pipe_field.replace("|", ".")
@@ -1111,7 +1265,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         widget = _get_widget(field_path)
         if widget is None:
-            return no_update, no_update
+            return no_update, no_update, no_update
         root = widget.root
 
         # Determine new nav path: full path to clicked node (includes the node itself)
@@ -1125,32 +1279,35 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         # Verify the node exists
         if not new_path:
-            return no_update, no_update
+            return no_update, no_update, no_update
 
         clicked_node = _node_at(root, new_path)
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        if annotation is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
-            value_helpers.set_model_value(annotation, field_path, node_name)
-            tater_app._save_annotations_to_file(doc_id=doc_id)
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        new_annotations_data = no_update
+        if ann is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
+            value_helpers.set_model_value(ann, field_path, node_name)
+            new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-        return new_path, ""
+        return new_path, "", new_annotations_data
 
     # 3. Handle pill click → navigate back, selecting parent
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hl-tags-pill", "field": MATCH, "idx": ALL}, "n_clicks"),
         State({"type": "hl-tags-nav", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_pill_click(n_clicks_list, current_nav, doc_id):
+    def handle_pill_click(n_clicks_list, current_nav, doc_id, annotations_data):
         if not ctx.triggered_id:
-            return no_update
+            return no_update, no_update
         triggered = ctx.triggered_id
         if not isinstance(triggered, dict) or triggered.get("type") != "hl-tags-pill":
-            return no_update
+            return no_update, no_update
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
+            return no_update, no_update
 
         idx = triggered["idx"]
         pipe_field = triggered["field"]
@@ -1160,12 +1317,13 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         widget = _get_widget(field_path)
         # Parent is non-leaf; only selectable if allow_non_leaf=True, else clear
         parent_name = (path[idx - 1] if idx > 0 else None) if (widget and widget.allow_non_leaf) else None
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        if annotation is not None:
-            value_helpers.set_model_value(annotation, field_path, parent_name)
-            tater_app._save_annotations_to_file(doc_id=doc_id)
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        new_annotations_data = no_update
+        if ann is not None:
+            value_helpers.set_model_value(ann, field_path, parent_name)
+            new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
-        return path[:idx]
+        return path[:idx], new_annotations_data
 
     # 4. Rebuild pills + option tags on nav/search/doc change
     @app.callback(
@@ -1175,9 +1333,10 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         Input({"type": "hl-tags-nav", "field": MATCH}, "data"),
         Input({"type": "hl-tags-search", "field": MATCH}, "value"),
         Input("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def update_display(current_path, search_query, doc_id):
+    def update_display(current_path, search_query, doc_id, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         path = list(current_path or [])
@@ -1195,8 +1354,8 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update, no_update
         root = widget.root
 
-        annotation = tater_app.annotations.get(doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(annotation, field_path) if annotation else None
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
 
         # Pills = nav path; last pill gets selected style only if it's the saved value
         # (leaf always; non-leaf only when allow_non_leaf=True)
@@ -1219,6 +1378,133 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             option_tags = _make_tags_option_buttons(current_node.children, pipe_field, len(path), selected_value)
 
         return pills, clear_search, option_tags
+
+
+def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
+    """Register a single generic MATCH callback for all nested repeater instances.
+
+    Replaces the per-instance ``register_list_callbacks`` approach so that a
+    single callback handles any depth of repeater-inside-repeater without
+    knowing field names at registration time.  ``ld`` in the component ID
+    encodes the nesting structure as dash-joined field names
+    (e.g. ``"findings-annotations"``).
+    """
+    from tater.widgets.repeater import (
+        RepeaterWidget,
+        _NESTED_ADD_TYPE, _NESTED_DELETE_TYPE, _NESTED_STORE_TYPE, _NESTED_ITEMS_TYPE,
+    )
+    from tater.widgets.base import ContainerWidget, ControlWidget
+    from dash.exceptions import PreventUpdate
+
+    def _has_nested(widgets):
+        for w in widgets:
+            if isinstance(w, RepeaterWidget):
+                for iw in w.item_widgets:
+                    if isinstance(iw, RepeaterWidget):
+                        return True
+                if _has_nested(w.item_widgets):
+                    return True
+        return False
+
+    if not _has_nested(tater_app.widgets):
+        return
+
+    app = tater_app.app
+
+    def _find_nested_template(ld: str):
+        """Locate the inner RepeaterWidget from a dash-joined ld string.
+
+        e.g. ``"findings-annotations"`` walks tater_app.widgets → finds the
+        RepeaterWidget at ``findings`` then ``annotations`` in its item_widgets.
+        Returns ``(template, outer_list_field, item_field)`` or ``(None, None, None)``.
+        """
+        segments = ld.split("-")
+        search_in = tater_app.widgets
+        current = None
+        for seg in segments:
+            found = next((w for w in search_in if w.schema_field == seg), None)
+            if found is None:
+                return None, None, None
+            current = found
+            search_in = getattr(current, "item_widgets", [])
+        if not isinstance(current, RepeaterWidget):
+            return None, None, None
+        return current, segments[0], segments[-1]
+
+    @app.callback(
+        [
+            Output({"type": _NESTED_STORE_TYPE, "ld": MATCH, "li": MATCH}, "data"),
+            Output({"type": _NESTED_ITEMS_TYPE, "ld": MATCH, "li": MATCH}, "children"),
+            Output("annotations-store", "data", allow_duplicate=True),
+        ],
+        [
+            Input({"type": _NESTED_ADD_TYPE, "ld": MATCH, "li": MATCH}, "n_clicks"),
+            Input(
+                {"type": _NESTED_DELETE_TYPE, "ld": MATCH, "li": MATCH, "inner_li": ALL},
+                "n_clicks",
+            ),
+        ],
+        [
+            State({"type": _NESTED_STORE_TYPE, "ld": MATCH, "li": MATCH}, "data"),
+            State("current-doc-id", "data"),
+            State("annotations-store", "data"),
+        ],
+    )
+    def _update_nested_items(add_clicks, delete_clicks, store_data, doc_id, annotations_data):
+        ld = ctx.outputs_list[0]["id"]["ld"]
+        outer_li = ctx.outputs_list[0]["id"]["li"]
+
+        template, outer_list_field, item_field = _find_nested_template(ld)
+        if template is None:
+            raise PreventUpdate
+
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            raise PreventUpdate
+
+        if store_data is None:
+            store_data = {"indices": [], "next_index": 0}
+
+        indices = list(store_data.get("indices", []))
+        new_annotations_data = no_update
+
+        if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_ADD_TYPE:
+            new_index = len(indices)
+            indices = list(range(new_index + 1))
+            ann = _get_ann(annotations_data, doc_id)
+            if doc_id and ann is not None:
+                for iw in template.item_widgets:
+                    if isinstance(iw, ContainerWidget):
+                        continue
+                    if not isinstance(iw, ControlWidget):
+                        continue
+                    try:
+                        value_helpers.set_model_value(
+                            ann,
+                            f"{outer_list_field}.{outer_li}.{item_field}.{new_index}.{iw.schema_field}",
+                            iw.empty_value,
+                        )
+                    except Exception:
+                        pass
+                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+
+        elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_DELETE_TYPE:
+            inner_li_del = ctx.triggered_id.get("inner_li")
+            if inner_li_del in indices:
+                del_position = indices.index(inner_li_del)
+                ann = _get_ann(annotations_data, doc_id)
+                if doc_id and ann is not None:
+                    full_path = f"{outer_list_field}.{outer_li}.{item_field}"
+                    inner_list = value_helpers.get_model_value(ann, full_path)
+                    if isinstance(inner_list, list) and del_position < len(inner_list):
+                        inner_list.pop(del_position)
+                    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+                indices = list(range(len(indices) - 1))
+
+        render_ann = new_annotations_data if new_annotations_data is not no_update else annotations_data
+        new_data = {"indices": indices, "next_index": len(indices)}
+        return new_data, template._render_nested_items(
+            indices, ld, outer_li, outer_list_field, item_field, tater_app, doc_id, render_ann
+        ), new_annotations_data
 
 
 def _collect_hl_templates(widgets: list) -> list:
@@ -1360,14 +1646,17 @@ def _collect_all_control_templates(widgets: list[TaterWidget]) -> list[TaterWidg
     return captured
 
 
-def update_status_for_doc(tater_app: TaterApp, doc_id: str) -> None:
-    """Compute and store the annotation status for a document."""
-    if not doc_id:
-        return
-    meta = tater_app.metadata[doc_id]
+def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
+    """Compute and store the annotation status for a document.
 
-    if not meta.visited:
-        meta.status = "not_started"
+    Mutates ``metadata_data[doc_id]["status"]`` in-place.
+    """
+    if not doc_id or metadata_data is None:
+        return
+    meta = metadata_data.setdefault(doc_id, _default_meta())
+
+    if not meta.get("visited", False):
+        meta["status"] = "not_started"
         return
 
     # Booleans always have a value (True/False), so they cannot meaningfully gate completion.
@@ -1376,21 +1665,21 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str) -> None:
         if w.required and w.to_python_type() is not bool
     ]
     if not required_widgets:
-        meta.status = "complete"
+        meta["status"] = "complete"
         return
 
-    annotation = tater_app.annotations.get(doc_id)
-    if not annotation:
-        meta.status = "in_progress"
+    ann = _get_ann(annotations_data, doc_id)
+    if ann is None:
+        meta["status"] = "in_progress"
         return
 
     for widget in required_widgets:
-        value = value_helpers.get_model_value(annotation, widget.field_path)
+        value = value_helpers.get_model_value(ann, widget.field_path)
         if not _has_value(value):
-            meta.status = "in_progress"
+            meta["status"] = "in_progress"
             return
 
-    meta.status = "complete"
+    meta["status"] = "complete"
 
 
 def _has_value(value) -> bool:
@@ -1404,17 +1693,17 @@ def _has_value(value) -> bool:
     return True
 
 
-def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
+def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_only: bool = False) -> list:
     """Build document menu items with status badges and flag indicators."""
     status_labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
     status_colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
     items = []
     for i, doc in enumerate(tater_app.documents):
-        meta = tater_app.metadata.get(doc.id)
-        flagged = meta.flagged if meta else False
+        meta = _get_meta(metadata_data, doc.id)
+        flagged = meta.get("flagged", False)
         if flagged_only and not flagged:
             continue
-        status = meta.status if meta else "not_started"
+        status = meta.get("status", "not_started")
         right_children = []
         if flagged:
             right_children.append(DashIconify(icon="tabler:flag-filled", color="red", width=14))
@@ -1445,32 +1734,40 @@ def _build_menu_items(tater_app: TaterApp, flagged_only: bool = False) -> list:
     return items
 
 
-def _perform_navigation(tater_app: TaterApp, current_doc_id: str, new_index: int, timing_data: dict) -> tuple:
-    """Shared navigation logic: accumulate timing, save, and return new doc_id and timing."""
+def _perform_navigation(
+    tater_app: TaterApp,
+    current_doc_id: str,
+    new_index: int,
+    timing_data: dict,
+    annotations_data: dict | None,
+    metadata_data: dict | None,
+) -> tuple:
+    """Shared navigation logic: accumulate timing, update status, return new doc_id, timing, metadata."""
     now = time.time()
+    metadata_data = dict(metadata_data or {})
     if current_doc_id:
+        meta = dict(_get_meta(metadata_data, current_doc_id))
         start = timing_data.get("doc_start_time") if timing_data else None
         if start:
-            tater_app.metadata[current_doc_id].annotation_seconds += now - start
-        update_status_for_doc(tater_app, current_doc_id)
+            meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+        metadata_data[current_doc_id] = meta
+        update_status_for_doc(tater_app, current_doc_id, annotations_data, metadata_data)
 
     doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""
-    tater_app._save_annotations_to_file(doc_id=current_doc_id)
-
     if timing_data is None:
         timing_data = {}
-    timing_data["last_save_time"] = time.time()
-    timing_data["doc_start_time"] = time.time()
+    timing_data["last_save_time"] = now
+    timing_data["doc_start_time"] = now
     timing_data["paused"] = False
     if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
-        timing_data["session_start_time"] = time.time()
-    new_meta = tater_app.metadata.get(doc_id)
-    timing_data["annotation_seconds_at_load"] = new_meta.annotation_seconds if new_meta else 0.0
+        timing_data["session_start_time"] = now
+    new_meta = _get_meta(metadata_data, doc_id)
+    timing_data["annotation_seconds_at_load"] = new_meta.get("annotation_seconds", 0.0)
 
-    return doc_id, timing_data
+    return doc_id, timing_data, metadata_data
 
 
-def _render_document_content(text: str, doc_id: str, tater_app) -> list | str:
+def _render_document_content(text: str, doc_id: str, tater_app, annotations_data: dict | None) -> list | str:
     """
     Return Dash component children for the document viewer.
 
@@ -1484,47 +1781,61 @@ def _render_document_content(text: str, doc_id: str, tater_app) -> list | str:
     if not doc_id or not _has_any_span(tater_app.widgets):
         return text
 
-    annotation = tater_app.annotations.get(doc_id)
+    ann = _get_ann(annotations_data, doc_id)
 
     # Collect (span, pipe_field, color) for all span instances in the annotation
     all_spans = []
-    for widget_template, field_path in _collect_span_instances(tater_app.widgets, annotation):
-        if annotation is None:
+    for widget_template, field_path in _collect_span_instances(tater_app.widgets, ann):
+        if ann is None:
             continue
-        spans = value_helpers.get_model_value(annotation, field_path) or []
+        spans = value_helpers.get_model_value(ann, field_path) or []
         pipe_field = field_path.replace(".", "|")
         for span in spans:
-            color = widget_template.get_color_for_tag(span.tag)
+            tag = span.tag if hasattr(span, "tag") else span.get("tag")
+            color = widget_template.get_color_for_tag(tag)
             all_spans.append((span, pipe_field, color))
 
     if not all_spans:
         return text
 
     # Sort by start position; skip overlapping spans
-    all_spans.sort(key=lambda x: x[0].start)
+    def _span_start(item):
+        s = item[0]
+        return s.start if hasattr(s, "start") else s.get("start", 0)
+
+    all_spans.sort(key=_span_start)
 
     components = []
     pos = 0
     for span, pipe_field, color in all_spans:
-        if span.start < pos:
+        s_start = span.start if hasattr(span, "start") else span.get("start")
+        s_end = span.end if hasattr(span, "end") else span.get("end")
+        s_text = span.text if hasattr(span, "text") else span.get("text", "")
+        tag = span.tag if hasattr(span, "tag") else span.get("tag")
+
+        if s_start < pos:
             continue  # overlapping — skip
-        if span.start > pos:
-            components.append(text[pos:span.start])
+        if s_start > pos:
+            components.append(text[pos:s_start])
 
         components.append(
             html.Mark(
-                span.text,
-                style={"backgroundColor": color, "padding": "1px 0"},
+                s_text,
                 **{
-                    "data-tag": span.tag,
-                    "data-start": str(span.start),
-                    "data-end": str(span.end),
+                    "data-start": s_start,
+                    "data-end": s_end,
                     "data-field": pipe_field,
-                    "data-color": color,
+                    "data-tag": tag,
+                    "style": {
+                        "backgroundColor": color,
+                        "cursor": "pointer",
+                        "borderRadius": "3px",
+                        "padding": "0 2px",
+                    },
                 },
             )
         )
-        pos = span.end
+        pos = s_end
 
     if pos < len(text):
         components.append(text[pos:])

@@ -27,6 +27,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
+    is_hosted = tater_app.annotations_path is None
 
     # Global span stores — one set shared by all SpanAnnotationWidgets
     span_stores = []
@@ -72,7 +73,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     ], gap="lg"),
                 ], size="xl", pt="xs", px="xs", fluid=True),
             ),
-            _build_app_footer(),
+            _build_app_footer(is_hosted=is_hosted),
         ],
         header={"height": _HEADER_HEIGHT},
         footer={"height": _FOOTER_HEIGHT},
@@ -89,11 +90,21 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 zIndex=1000,
                 withinPortal=True,
             ),
+            dcc.Location(id="annotate-location", refresh=True),
+            dcc.Download(id="download-annotations") if is_hosted else None,
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
             dcc.Store(id="auto-advance-store", data=0),
             dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
+            dcc.Store(id="annotations-store", data={
+                doc_id: ann.model_dump()
+                for doc_id, ann in tater_app.annotations.items()
+            }),
+            dcc.Store(id="metadata-store", data={
+                doc_id: meta.model_dump()
+                for doc_id, meta in tater_app.metadata.items()
+            }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             *span_stores,
             app_shell,
@@ -215,8 +226,54 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
     style={"boxShadow": "0 2px 6px rgba(0,0,0,0.1)"})
 
 
-def _build_app_footer() -> dmc.AppShellFooter:
+def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
     """Sticky footer: save status + timer (left), navigation controls (right)."""
+    # Right side of nav row: Next+Save (single mode) or Next+Download+StartOver (hosted)
+    if is_hosted:
+        right_nav = dmc.Group([
+            dmc.Button(
+                "Next", id="btn-next", variant="outline", size="sm",
+                fullWidth=True,
+                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                style={"flex": "1"},
+            ),
+            dmc.Button(
+                DashIconify(icon="tabler:download", width=16),
+                id="btn-download",
+                variant="outline",
+                size="sm",
+                px="xs",
+                title="Download annotations",
+            ),
+            dmc.Button(
+                DashIconify(icon="tabler:home", width=16),
+                id="btn-start-over",
+                variant="outline",
+                size="sm",
+                px="xs",
+                title="Start over",
+            ),
+        ], gap="xs", wrap="nowrap", style={"flex": "1"})
+        save_right = None
+    else:
+        right_nav = dmc.Group([
+            dmc.Button(
+                "Next", id="btn-next", variant="outline", size="sm",
+                fullWidth=True,
+                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+            ),
+            dmc.Button(
+                DashIconify(icon="tabler:device-floppy", width=16),
+                id="btn-save",
+                variant="outline",
+                size="sm",
+                px="xs",
+                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+            ),
+        ], gap=0, wrap="nowrap", style={"flex": "1"})
+        save_right = dmc.Text(id="save-status-text", size="sm", c="dimmed")
+
     return dmc.AppShellFooter(
         dmc.Stack(
             [
@@ -256,23 +313,8 @@ def _build_app_footer() -> dmc.AppShellFooter:
                                 style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
                             ),
                         ], gap=0, wrap="nowrap", style={"flex": "1"}),
-                        # Next + save (grows)
-                        dmc.Group([
-                            dmc.Button(
-                                "Next", id="btn-next", variant="outline", size="sm",
-                                fullWidth=True,
-                                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
-                            ),
-                            dmc.Button(
-                                DashIconify(icon="tabler:device-floppy", width=16),
-                                id="btn-save",
-                                variant="outline",
-                                size="sm",
-                                px="xs",
-                                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
-                            ),
-                        ], gap=0, wrap="nowrap", style={"flex": "1"}),
+                        # Right nav group
+                        right_nav,
                     ],
                     gap="sm",
                     align="center",
@@ -289,7 +331,7 @@ def _build_app_footer() -> dmc.AppShellFooter:
                             ),
                             dmc.Text(id="timing-text", size="sm", c="dimmed"),
                         ], gap="xs"),
-                        dmc.Text(id="save-status-text", size="sm", c="dimmed"),
+                        save_right or dmc.Text(id="save-status-text", size="sm", c="dimmed"),
                     ],
                     justify="space-between",
                 ),

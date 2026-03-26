@@ -40,7 +40,7 @@ _NESTED_STORE_TYPE  = "nested-repeater-store"
 _NESTED_ITEMS_TYPE  = "nested-repeater-items"
 
 
-def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str) -> None:
+def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str, annotations_data: dict | None = None) -> None:
     """Recursively set annotation values as widget defaults for ControlWidget descendants.
 
     Called before rendering a GroupWidget inside a repeater so components are
@@ -49,13 +49,16 @@ def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str) -> 
     callbacks fire.
     """
     from tater.widgets.group import GroupWidget
+    from tater.ui import value_helpers
     if isinstance(widget, GroupWidget):
         for child in widget.children:
-            _load_defaults_from_annotation(child, tater_app, doc_id)
+            _load_defaults_from_annotation(child, tater_app, doc_id, annotations_data)
     elif isinstance(widget, ControlWidget):
-        if tater_app and doc_id and doc_id in tater_app.annotations:
-            annotation = tater_app.annotations[doc_id]
-            value = tater_app._get_model_value(annotation, widget.field_path)
+        ann = (annotations_data or {}).get(doc_id) if doc_id else None
+        if ann is None and tater_app and doc_id and doc_id in tater_app.annotations:
+            ann = tater_app.annotations[doc_id]
+        if ann is not None:
+            value = value_helpers.get_model_value(ann, widget.field_path)
             if value is not None:
                 widget.default = value
 
@@ -82,7 +85,8 @@ class RepeaterWidget(ContainerWidget):
     # ------------------------------------------------------------------
 
     def _render_item_widgets(
-        self, index: int, tater_app: Optional[Any] = None, doc_id: Optional[str] = None
+        self, index: int, tater_app: Optional[Any] = None, doc_id: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
@@ -99,14 +103,14 @@ class RepeaterWidget(ContainerWidget):
             # use MATCH-compatible ld/path/tf keys.
             if isinstance(template, GroupWidget):
                 widget._set_repeater_context(pipe_ld, str(index))
-                _load_defaults_from_annotation(widget, tater_app, doc_id)
+                _load_defaults_from_annotation(widget, tater_app, doc_id, annotations_data)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
             # For nested RepeaterWidgets use _component_with_context so initial
             # items are pre-populated from the annotation rather than empty.
             if isinstance(template, RepeaterWidget):
-                comp = widget._component_with_context(tater_app, doc_id)
+                comp = widget._component_with_context(tater_app, doc_id, annotations_data)
             else:
                 # Set repeater context BEFORE component() so the rendered
                 # component gets MATCH-compatible schema_id (ld/path/tf) rather
@@ -117,12 +121,13 @@ class RepeaterWidget(ContainerWidget):
                 # warnings when the same component ID is reused across docs).
                 if isinstance(template, ControlWidget):
                     widget._set_repeater_context(pipe_ld, str(index))
-                    if tater_app and doc_id:
-                        annotation = tater_app.annotations.get(doc_id)
-                        if annotation is not None:
-                            v = value_helpers.get_model_value(annotation, widget.field_path)
-                            if v is not None:
-                                widget.default = v
+                    ann = (annotations_data or {}).get(doc_id) if doc_id else None
+                    if ann is None and tater_app and doc_id:
+                        ann = tater_app.annotations.get(doc_id)
+                    if ann is not None:
+                        v = value_helpers.get_model_value(ann, widget.field_path)
+                        if v is not None:
+                            widget.default = v
                 comp = widget.component()
 
             stack = dmc.Stack([comp], gap="xs", mt="sm")
@@ -155,7 +160,8 @@ class RepeaterWidget(ContainerWidget):
         return self._component_with_context()
 
     def _component_with_context(
-        self, tater_app: Optional[Any] = None, doc_id: Optional[str] = None
+        self, tater_app: Optional[Any] = None, doc_id: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> dmc.Stack:
         """Like component() but pre-populates items from the annotation when available.
 
@@ -166,10 +172,12 @@ class RepeaterWidget(ContainerWidget):
         from tater.ui import value_helpers
         pipe_field = self.field_path.replace(".", "|")
         indices: list[int] = []
-        if tater_app and doc_id:
-            annotation = tater_app.annotations.get(doc_id)
-            if annotation is not None:
-                lst = value_helpers.get_model_value(annotation, self.field_path)
+        if doc_id:
+            ann = (annotations_data or {}).get(doc_id)
+            if ann is None and tater_app:
+                ann = tater_app.annotations.get(doc_id)
+            if ann is not None:
+                lst = value_helpers.get_model_value(ann, self.field_path)
                 if isinstance(lst, list):
                     indices = list(range(len(lst)))
         store_data = {"indices": indices, "next_index": len(indices)}
@@ -186,7 +194,7 @@ class RepeaterWidget(ContainerWidget):
             ], justify="space-between"),
             dmc.Text(self.description or "", size="xs", c="dimmed") if self.description else None,
             dmc.Stack(
-                self._render_items(indices, tater_app, doc_id),
+                self._render_items(indices, tater_app, doc_id, annotations_data=annotations_data),
                 id={"type": "repeater-items", "field": pipe_field},
                 gap="md",
             ),
@@ -240,6 +248,7 @@ class RepeaterWidget(ContainerWidget):
         item_field: str,
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> Any:
         """Render this widget when nested inside an outer repeater.
 
@@ -247,17 +256,21 @@ class RepeaterWidget(ContainerWidget):
         MATCH callback can serve all outer rows without runtime re-registration.
         Nested items are always rendered as cards regardless of the subclass.
         """
+        from tater.ui import value_helpers
         indices: list[int] = []
-        if tater_app and doc_id and doc_id in tater_app.annotations:
-            annotation = tater_app.annotations[doc_id]
-            full_path = f"{outer_list_field}.{li}.{item_field}"
-            inner_list = tater_app._get_model_value(annotation, full_path)
-            if isinstance(inner_list, list):
-                indices = list(range(len(inner_list)))
+        if doc_id:
+            ann = (annotations_data or {}).get(doc_id)
+            if ann is None and tater_app and doc_id in tater_app.annotations:
+                ann = tater_app.annotations[doc_id]
+            if ann is not None:
+                full_path = f"{outer_list_field}.{li}.{item_field}"
+                inner_list = value_helpers.get_model_value(ann, full_path)
+                if isinstance(inner_list, list):
+                    indices = list(range(len(inner_list)))
 
         store_data = {"indices": indices, "next_index": len(indices)}
         initial_items = self._render_nested_items(
-            indices, ld, li, outer_list_field, item_field, tater_app, doc_id
+            indices, ld, li, outer_list_field, item_field, tater_app, doc_id, annotations_data
         )
 
         return dmc.Stack([
@@ -292,10 +305,12 @@ class RepeaterWidget(ContainerWidget):
         item_field: str,
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.group import GroupWidget
+        from tater.ui import value_helpers
         rendered = []
         for template in self.item_widgets:
             if isinstance(template, HierarchicalLabelWidget):
@@ -303,11 +318,14 @@ class RepeaterWidget(ContainerWidget):
                 widget._finalize_paths(
                     parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
                 )
-                if tater_app and doc_id and doc_id in tater_app.annotations:
-                    annotation = tater_app.annotations[doc_id]
-                    value = tater_app._get_model_value(annotation, widget.field_path)
-                    if value is not None:
-                        widget.default = value
+                if doc_id:
+                    ann = (annotations_data or {}).get(doc_id)
+                    if ann is None and tater_app and doc_id in tater_app.annotations:
+                        ann = tater_app.annotations[doc_id]
+                    if ann is not None:
+                        value = value_helpers.get_model_value(ann, widget.field_path)
+                        if value is not None:
+                            widget.default = value
                 nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue
@@ -319,7 +337,7 @@ class RepeaterWidget(ContainerWidget):
                 widget = copy.deepcopy(template)
                 widget._finalize_paths(parent_path=parent_path)
                 widget._set_repeater_context(nested_ld, nested_path)
-                _load_defaults_from_annotation(widget, tater_app, doc_id)
+                _load_defaults_from_annotation(widget, tater_app, doc_id, annotations_data)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
@@ -327,11 +345,14 @@ class RepeaterWidget(ContainerWidget):
                 continue
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=parent_path)
-            if tater_app and doc_id and doc_id in tater_app.annotations:
-                annotation = tater_app.annotations[doc_id]
-                value = tater_app._get_model_value(annotation, widget.field_path)
-                if value is not None:
-                    widget.default = value
+            if doc_id:
+                ann = (annotations_data or {}).get(doc_id)
+                if ann is None and tater_app and doc_id in tater_app.annotations:
+                    ann = tater_app.annotations[doc_id]
+                if ann is not None:
+                    value = value_helpers.get_model_value(ann, widget.field_path)
+                    if value is not None:
+                        widget.default = value
 
             # Set repeater context for MATCH-based callbacks (2-level nesting).
             widget._set_repeater_context(nested_ld, nested_path)
@@ -354,12 +375,13 @@ class RepeaterWidget(ContainerWidget):
         item_field: str,
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         """Render inner list cards for the given indices."""
         items = []
         for inner_index in indices:
             inner_widgets = self._render_nested_item_widgets(
-                ld, outer_li, inner_index, outer_list_field, item_field, tater_app, doc_id
+                ld, outer_li, inner_index, outer_list_field, item_field, tater_app, doc_id, annotations_data
             )
             items.append(
                 dmc.Card([
@@ -389,105 +411,33 @@ class RepeaterWidget(ContainerWidget):
         ld: str,
         field_segments: list[str],
     ) -> None:
-        """Register MATCH-based callbacks for this widget when nested inside another repeater.
+        """Register conditional visibility callbacks for item widgets nested inside this repeater.
 
-        ``field_segments`` is the ordered list of field names from the outermost list down
-        to this repeater's own field, e.g. ``["findings", "annotations"]`` when this
-        repeater lives at ``findings[i].annotations``.  Passing a longer list here is what
-        enables arbitrary-depth nesting: each recursive call appends one more segment.
+        The add/delete/load callback (``_update_nested_items``) is now handled
+        generically by ``setup_nested_repeater_callbacks`` in ``callbacks.py``.
+        This method only registers conditional callbacks for nested item widgets
+        that have ``_condition`` set.
         """
-        from dash import ALL, MATCH, Input, Output, State, ctx
-        from dash.exceptions import PreventUpdate
-
-        # The two names needed for the 2-level MATCH callback body.
-        outer_list_field = field_segments[0]
-        item_field = field_segments[-1]
-
         tater_app = getattr(app, "_tater_app", None)
+        if not tater_app:
+            return
+
+        from tater.widgets.group import GroupWidget
         item_widget_templates = self.item_widgets
+        nested_ld = "|".join(field_segments)
 
-        @app.callback(
-            [
-                Output({"type": _NESTED_STORE_TYPE, "ld": ld, "li": MATCH}, "data"),
-                Output({"type": _NESTED_ITEMS_TYPE, "ld": ld, "li": MATCH}, "children"),
-            ],
-            [
-                Input({"type": _NESTED_ADD_TYPE, "ld": ld, "li": MATCH}, "n_clicks"),
-                Input(
-                    {"type": _NESTED_DELETE_TYPE, "ld": ld, "li": MATCH, "inner_li": ALL},
-                    "n_clicks",
-                ),
-            ],
-            [
-                State({"type": _NESTED_STORE_TYPE, "ld": ld, "li": MATCH}, "data"),
-                State("current-doc-id", "data"),
-            ],
-        )
-        def _update_nested_items(add_clicks, delete_clicks, store_data, doc_id):
-            outer_li = ctx.outputs_list[0]["id"]["li"]
-
-            if not ctx.triggered or not ctx.triggered[0].get("value"):
-                raise PreventUpdate
-
-            if store_data is None:
-                store_data = {"indices": [], "next_index": 0}
-
-            indices = list(store_data.get("indices", []))
-
-            if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_ADD_TYPE:
-                new_index = len(indices)
-                indices = list(range(new_index + 1))
-                if tater_app and doc_id and doc_id in tater_app.annotations:
-                    annotation = tater_app.annotations[doc_id]
-                    for iw in item_widget_templates:
-                        if isinstance(iw, ContainerWidget):
-                            continue
-                        if not isinstance(iw, ControlWidget):
-                            continue
-                        try:
-                            tater_app._set_model_value(
-                                annotation,
-                                f"{outer_list_field}.{outer_li}.{item_field}.{new_index}.{iw.schema_field}",
-                                iw.empty_value,
-                            )
-                        except Exception:
-                            pass
-                    tater_app._save_annotations_to_file(doc_id=doc_id)
-
-            elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_DELETE_TYPE:
-                inner_li_del = ctx.triggered_id.get("inner_li")
-                if inner_li_del in indices:
-                    del_position = indices.index(inner_li_del)
-                    if tater_app and doc_id and doc_id in tater_app.annotations:
-                        annotation = tater_app.annotations[doc_id]
-                        full_path = f"{outer_list_field}.{outer_li}.{item_field}"
-                        inner_list = tater_app._get_model_value(annotation, full_path)
-                        if isinstance(inner_list, list) and del_position < len(inner_list):
-                            inner_list.pop(del_position)
-                        tater_app._save_annotations_to_file(doc_id=doc_id)
-                    indices = list(range(len(indices) - 1))
-
-            new_data = {"indices": indices, "next_index": len(indices)}
-            return new_data, self._render_nested_items(
-                indices, ld, outer_li, outer_list_field, item_field, tater_app, doc_id
-            )
-
-        if tater_app:
-            from tater.widgets.group import GroupWidget
-            # ld for ControlWidget conditional callbacks: pipe-join the list fields.
-            nested_ld = "|".join(field_segments)
-            for iw_template in item_widget_templates:
-                child_segments = field_segments + [iw_template.schema_field]
-                child_ld = "-".join(child_segments)
-                if isinstance(iw_template, RepeaterWidget):
-                    iw_template.register_list_callbacks(app, child_ld, child_segments)
-                elif isinstance(iw_template, GroupWidget):
-                    iw_template._register_repeater_conditional_callbacks(app, nested_ld)
-                elif isinstance(iw_template, ControlWidget):
-                    if iw_template._condition is not None:
-                        iw_template._register_repeater_conditional_callbacks(
-                            app, nested_ld, item_widget_templates
-                        )
+        for iw_template in item_widget_templates:
+            child_segments = field_segments + [iw_template.schema_field]
+            child_ld = "-".join(child_segments)
+            if isinstance(iw_template, RepeaterWidget):
+                iw_template.register_list_callbacks(app, child_ld, child_segments)
+            elif isinstance(iw_template, GroupWidget):
+                iw_template._register_repeater_conditional_callbacks(app, nested_ld)
+            elif isinstance(iw_template, ControlWidget):
+                if iw_template._condition is not None:
+                    iw_template._register_repeater_conditional_callbacks(
+                        app, nested_ld, item_widget_templates
+                    )
 
     # ------------------------------------------------------------------
     # Schema binding (shared)
@@ -534,6 +484,7 @@ class ListableWidget(RepeaterWidget):
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
         active_value: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         pipe_field = self.field_path.replace(".", "|")
         items = []
@@ -550,7 +501,7 @@ class ListableWidget(RepeaterWidget):
                             size="sm",
                         ),
                     ], justify="space-between"),
-                    dmc.Stack(self._render_item_widgets(index, tater_app, doc_id), gap="sm"),
+                    dmc.Stack(self._render_item_widgets(index, tater_app, doc_id, annotations_data), gap="sm"),
                 ], withBorder=True, p="md")
             )
         return items
@@ -570,6 +521,7 @@ class TabsWidget(RepeaterWidget):
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
         active_value: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         if not indices:
             return []
@@ -599,7 +551,7 @@ class TabsWidget(RepeaterWidget):
             panels.append(
                 dmc.TabsPanel(
                     dmc.Stack(
-                        self._render_item_widgets(index, tater_app, doc_id),
+                        self._render_item_widgets(index, tater_app, doc_id, annotations_data),
                         gap="sm",
                     ),
                     value=tab_value,
@@ -624,6 +576,7 @@ class AccordionWidget(RepeaterWidget):
         tater_app: Optional[Any] = None,
         doc_id: Optional[str] = None,
         active_value: Optional[str] = None,
+        annotations_data: dict | None = None,
     ) -> list[Any]:
         if not indices:
             return []
@@ -651,7 +604,7 @@ class AccordionWidget(RepeaterWidget):
                         ),
                         dmc.AccordionPanel(
                             dmc.Stack(
-                                self._render_item_widgets(index, tater_app, doc_id),
+                                self._render_item_widgets(index, tater_app, doc_id, annotations_data),
                                 gap="sm",
                             ),
                         ),
