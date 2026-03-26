@@ -294,6 +294,10 @@ class RepeaterWidget(ContainerWidget):
                 id={"type": _NESTED_STORE_TYPE, "ld": ld, "li": li},
                 data=store_data,
             ),
+            dcc.Store(
+                id={"type": "nested-repeater-ann-relay", "ld": ld, "li": li},
+                data=None,
+            ),
         ], gap="sm", mt="md")
 
     def _render_nested_item_widgets(

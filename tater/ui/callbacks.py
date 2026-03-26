@@ -1478,7 +1478,7 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
         [
             Output({"type": _NESTED_STORE_TYPE, "ld": MATCH, "li": MATCH}, "data"),
             Output({"type": _NESTED_ITEMS_TYPE, "ld": MATCH, "li": MATCH}, "children"),
-            Output("annotations-store", "data", allow_duplicate=True),
+            Output({"type": "nested-repeater-ann-relay", "ld": MATCH, "li": MATCH}, "data"),
         ],
         [
             Input({"type": _NESTED_ADD_TYPE, "ld": MATCH, "li": MATCH}, "n_clicks"),
@@ -1508,8 +1508,9 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
         if store_data is None:
             store_data = {"indices": [], "next_index": 0}
 
+        ta = _ta()
         indices = list(store_data.get("indices", []))
-        new_annotations_data = no_update
+        ann_relay = no_update
 
         if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_ADD_TYPE:
             new_index = len(indices)
@@ -1529,7 +1530,7 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
                         )
                     except Exception:
                         pass
-                new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {**(annotations_data or {}), doc_id: ann}
 
         elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_DELETE_TYPE:
             inner_li_del = ctx.triggered_id.get("inner_li")
@@ -1541,14 +1542,25 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
                     inner_list = value_helpers.get_model_value(ann, full_path)
                     if isinstance(inner_list, list) and del_position < len(inner_list):
                         inner_list.pop(del_position)
-                    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
+                    ann_relay = {**(annotations_data or {}), doc_id: ann}
                 indices = list(range(len(indices) - 1))
 
-        render_ann = new_annotations_data if new_annotations_data is not no_update else annotations_data
+        render_ann = ann_relay if ann_relay is not no_update else annotations_data
         new_data = {"indices": indices, "next_index": len(indices)}
         return new_data, template._render_nested_items(
-            indices, ld, outer_li, outer_list_field, item_field, tater_app, doc_id, render_ann
-        ), new_annotations_data
+            indices, ld, outer_li, outer_list_field, item_field, ta, doc_id, render_ann
+        ), ann_relay
+
+    # ---- Relay nested-repeater-ann-relay → annotations-store (static outputs only) ----
+    @app.callback(
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "nested-repeater-ann-relay", "ld": ALL, "li": ALL}, "data"),
+        prevent_initial_call=True,
+    )
+    def relay_nested_ann(all_updates):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update
+        return ctx.triggered[0]["value"]
 
 
 def _collect_hl_templates(widgets: list) -> list:
