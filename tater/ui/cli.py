@@ -56,11 +56,11 @@ def parse_args() -> Namespace:
 
     args = parser.parse_args()
 
-    # Validate: non-hosted mode requires --documents and (--config or --schema)
-    if not args.hosted:
-        if not args.documents:
-            parser.error("--documents is required in non-hosted mode (or use --hosted)")
-        if not args.config and not args.schema:
-            parser.error("one of --config or --schema is required in non-hosted mode (or use --hosted)")
+    # Validate: one of --hosted, --config, or --schema must be provided
+    if not args.hosted and not args.config and not args.schema:
+        parser.error("one of --hosted, --config, or --schema is required")
+    # Validate: non-hosted mode also requires --documents
+    if not args.hosted and not args.documents:
+        parser.error("--documents is required in non-hosted mode (or use --hosted)")
 
     return args

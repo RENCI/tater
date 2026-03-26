@@ -1,4 +1,44 @@
 /**
+ * Tater client-side utilities.
+ *
+ * Named clientside callbacks (referenced by name so they are always available
+ * regardless of when Dash registers them):
+ *   window.dash_clientside.tater.updateTimer
+ */
+
+window.dash_clientside = window.dash_clientside || {};
+window.dash_clientside.tater = window.dash_clientside.tater || {};
+
+Object.assign(window.dash_clientside.tater, {
+    updateTimer: function(n_intervals, timing_data) {
+        if (!timing_data) return ["Doc time: 0s", "tabler:player-pause"];
+        var paused = timing_data.paused || false;
+        var base = timing_data.annotation_seconds_at_load || 0;
+        var total = base;
+        if (!paused && timing_data.doc_start_time) {
+            total += Date.now() / 1000 - timing_data.doc_start_time;
+        }
+        total = Math.floor(total);
+        var text;
+        if (total < 60) {
+            text = "Doc time: " + total + "s";
+        } else if (total < 3600) {
+            var m = Math.floor(total / 60);
+            var s = total % 60;
+            text = "Doc time: " + m + "m " + s + "s";
+        } else {
+            var h = Math.floor(total / 3600);
+            var m = Math.floor((total % 3600) / 60);
+            text = "Doc time: " + h + "h " + m + "m";
+        }
+        if (paused) text += " (paused)";
+        var icon = paused ? "tabler:player-play" : "tabler:player-pause";
+        return [text, icon];
+    }
+});
+
+
+/**
  * Keyboard navigation for Tater annotation tool.
  *
  * Arrow left/right: navigate to previous/next document.

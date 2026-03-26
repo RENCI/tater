@@ -27,7 +27,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
-    is_hosted = tater_app.annotations_path is None
+    is_hosted = tater_app.is_hosted
 
     # Global span stores — one set shared by all SpanAnnotationWidgets
     span_stores = []
@@ -237,21 +237,27 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
                 rightSection=DashIconify(icon="tabler:arrow-right", width=16),
                 style={"flex": "1"},
             ),
-            dmc.Button(
-                DashIconify(icon="tabler:download", width=16),
-                id="btn-download",
-                variant="outline",
-                size="sm",
-                px="xs",
-                title="Download annotations",
+            dmc.Tooltip(
+                dmc.Button(
+                    DashIconify(icon="tabler:download", width=16),
+                    id="btn-download",
+                    variant="outline",
+                    size="sm",
+                    px="xs",
+                ),
+                label="Download annotations",
+                withArrow=True,
             ),
-            dmc.Button(
-                DashIconify(icon="tabler:home", width=16),
-                id="btn-start-over",
-                variant="outline",
-                size="sm",
-                px="xs",
-                title="Start over",
+            dmc.Tooltip(
+                dmc.Button(
+                    DashIconify(icon="tabler:home", width=16),
+                    id="btn-start-over",
+                    variant="outline",
+                    size="sm",
+                    px="xs",
+                ),
+                label="Start over",
+                withArrow=True,
             ),
         ], gap="xs", wrap="nowrap", style={"flex": "1"})
         save_right = None

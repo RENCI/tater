@@ -60,7 +60,7 @@ def build_upload_layout() -> dmc.MantineProvider:
                                         id="btn-start",
                                         fullWidth=True,
                                         disabled=True,
-                                        leftSection=DashIconify(icon="tabler:arrow-right", width=16),
+                                        rightSection=DashIconify(icon="tabler:arrow-right", width=16),
                                     ),
                                     html.Div(id="submit-feedback"),
                                 ],
@@ -118,8 +118,16 @@ def _upload_zone(upload_id: str, label: str, hint: str, icon: str) -> dmc.Stack:
 # Callbacks
 # ---------------------------------------------------------------------------
 
-def register_upload_callbacks(app: Dash) -> None:
-    """Register all upload-page callbacks on the given Dash app."""
+def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
+    """Register all upload-page callbacks on the given Dash app.
+
+    Args:
+        app: The Dash application instance.
+        on_session_ready: Optional callable(session_info) called after a new
+            session is written to flask.session.  Use this hook to pre-build
+            the per-session TaterApp so that annotation callbacks are registered
+            before the browser fetches ``/_dash-dependencies``.
+    """
 
     # Validate schema upload
     @app.callback(
@@ -139,7 +147,7 @@ def register_upload_callbacks(app: Dash) -> None:
         ok, msg = _validate_schema_json(result)
         if not ok:
             return None, _error_text(msg)
-        field_names = [f.get("name", "?") for f in result.get("fields", [])]
+        field_names = [f.get("id", "?") for f in result.get("data_schema", [])]
         summary = f"✓ {len(field_names)} field(s): {', '.join(field_names[:8])}" + (
             f" …and {len(field_names) - 8} more" if len(field_names) > 8 else ""
         )
@@ -161,10 +169,19 @@ def register_upload_callbacks(app: Dash) -> None:
             return None, _error_text(error)
         if not isinstance(result, list) or not result:
             return None, _error_text("Documents must be a non-empty JSON array.")
-        missing = [i for i, d in enumerate(result) if not isinstance(d, dict) or "id" not in d]
-        if missing:
+        bad = [i for i, d in enumerate(result) if not isinstance(d, dict)]
+        if bad:
+            return None, _error_text(f"Document(s) at index {bad[:3]} are not objects.")
+        file_path_docs = [i for i, d in enumerate(result) if isinstance(d, dict) and "file_path" in d]
+        if file_path_docs:
             return None, _error_text(
-                f"Document(s) at index {missing[:3]} are missing required 'id' field."
+                "Documents with 'file_path' are not supported in hosted mode. "
+                "Include document text inline using the 'text' field."
+            )
+        missing_text = [i for i, d in enumerate(result) if isinstance(d, dict) and "text" not in d]
+        if missing_text:
+            return None, _error_text(
+                f"Document(s) at index {missing_text[:3]} are missing required 'text' field."
             )
         return result, _success_text(f"✓ {len(result)} document(s) loaded.")
 
@@ -201,11 +218,14 @@ def register_upload_callbacks(app: Dash) -> None:
             Path(docs_path).write_text(json.dumps(documents_data))
 
             session_id = secrets.token_hex(16)
-            flask.session["tater_session"] = {
+            session_info = {
                 "session_id": session_id,
                 "schema_path": schema_path,
                 "docs_path": docs_path,
             }
+            flask.session["tater_session"] = session_info
+            if on_session_ready is not None:
+                on_session_ready(session_info)
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error starting session: {e}")
@@ -231,14 +251,14 @@ def _validate_schema_json(data: dict) -> tuple[bool, str]:
     """Basic structural check for a tater JSON schema."""
     if not isinstance(data, dict):
         return False, "Schema must be a JSON object."
-    if "fields" not in data:
-        return False, "Schema must have a 'fields' key."
-    fields = data["fields"]
+    if "data_schema" not in data:
+        return False, "Schema must have a 'data_schema' key."
+    fields = data["data_schema"]
     if not isinstance(fields, list) or not fields:
-        return False, "Schema 'fields' must be a non-empty array."
+        return False, "Schema 'data_schema' must be a non-empty array."
     for i, f in enumerate(fields):
-        if not isinstance(f, dict) or "name" not in f or "type" not in f:
-            return False, f"Field at index {i} is missing 'name' or 'type'."
+        if not isinstance(f, dict) or "id" not in f or "type" not in f:
+            return False, f"Field at index {i} is missing 'id' or 'type'."
     return True, ""
 
 

@@ -28,6 +28,8 @@ class TaterApp:
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
         on_save: Optional[OnSaveHook] = None,
+        is_hosted: bool = False,
+        dash_app: Optional[Any] = None,
     ):
         """
         Initialize the Tater app.
@@ -39,6 +41,8 @@ class TaterApp:
             theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
+            is_hosted: If True, running in hosted mode (no auto-save, download button shown)
+            dash_app: External Dash app to register callbacks on (hosted mode)
         """
         self.title = title or "tater - document annotation"
         self.description = description
@@ -47,7 +51,11 @@ class TaterApp:
         self.annotations_path = annotations_path
         self.schema_model = schema_model
         self.on_save = on_save
-        self.app = Dash(__name__, title="tater", suppress_callback_exceptions=True)
+        self.is_hosted = is_hosted
+        self.app = dash_app if dash_app is not None else Dash(__name__, title="tater", suppress_callback_exceptions=True)
+        # In hosted mode the shared Dash app carries a callable that resolves
+        # the current user's TaterApp from the Flask session at callback runtime.
+        self._get_current_app = getattr(self.app, '_tater_get_current_app', None)
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
         self.current_doc_index = 0
@@ -89,8 +97,8 @@ class TaterApp:
             
             self.documents = documents
             
-            # Set default annotations path if not provided
-            if self.annotations_path is None:
+            # Set default annotations path if not provided (skip in hosted mode)
+            if self.annotations_path is None and not self.is_hosted:
                 doc_path = Path(source)
                 self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
@@ -166,17 +174,23 @@ class TaterApp:
             for widget in self.widgets:
                 widget.bind_schema(self.schema_model)
 
-        # Register any widget-specific callbacks
-        for widget in self.widgets:
-            widget.register_callbacks(self.app)
-            widget._register_conditional_callbacks(self.app)
+        if not self.is_hosted:
+            self._setup_layout()
 
-        self._setup_layout()
-        self._setup_callbacks()
-        self._setup_value_capture_callbacks()
-        self._setup_span_callbacks()
-        self._setup_repeater_callbacks()
-        self._setup_hl_callbacks()
+        # In hosted mode the Dash app is shared across sessions; only register
+        # callbacks once (the first session sets them up for the shared app).
+        _already = self.is_hosted and getattr(self.app, '_tater_callbacks_registered', False)
+        if not _already:
+            for widget in self.widgets:
+                widget.register_callbacks(self.app)
+                widget._register_conditional_callbacks(self.app)
+            self._setup_callbacks()
+            self._setup_value_capture_callbacks()
+            self._setup_span_callbacks()
+            self._setup_repeater_callbacks()
+            self._setup_hl_callbacks()
+            if self.is_hosted:
+                self.app._tater_callbacks_registered = True
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""
