@@ -933,11 +933,13 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         return {**(annotations_data or {}), doc_id: ann}
 
     # --- Unified MATCH callback ---
+    # Uses repeater-ann-relay (MATCH) instead of annotations-store (static) to avoid
+    # Dash's prohibition on mixing MATCH and static string outputs in one callback.
     @app.callback(
-        [Output({"type": "repeater-store",  "field": MATCH}, "data"),
-         Output({"type": "repeater-items",  "field": MATCH}, "children"),
-         Output({"type": "repeater-change", "field": MATCH}, "data"),
-         Output("annotations-store", "data", allow_duplicate=True)],
+        [Output({"type": "repeater-store",     "field": MATCH}, "data"),
+         Output({"type": "repeater-items",     "field": MATCH}, "children"),
+         Output({"type": "repeater-change",    "field": MATCH}, "data"),
+         Output({"type": "repeater-ann-relay", "field": MATCH}, "data")],
         [Input({"type": "repeater-add",    "field": MATCH}, "n_clicks"),
          Input({"type": "repeater-delete", "field": MATCH, "index": ALL}, "n_clicks"),
          Input("current-doc-id", "data")],
@@ -980,30 +982,41 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         indices = list(store_data.get("indices", []))
         active_value = None
         is_delete = False
-        new_annotations_data = no_update
+        ann_relay = no_update
 
         if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-add":
             new_index = len(indices)
             indices = list(range(new_index + 1))
             active_value = str(new_index)
             if doc_id and _get_ann(annotations_data, doc_id) is not None:
-                new_annotations_data = _sync_annotation_add(widget, field_path, annotations_data, doc_id, new_index)
+                ann_relay = _sync_annotation_add(widget, field_path, annotations_data, doc_id, new_index)
 
         elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-delete":
             delete_index = ctx.triggered_id.get("index")
             if delete_index in indices:
                 del_position = indices.index(delete_index)
                 if doc_id and _get_ann(annotations_data, doc_id) is not None:
-                    new_annotations_data = _sync_annotation_delete(field_path, annotations_data, doc_id, del_position)
+                    ann_relay = _sync_annotation_delete(field_path, annotations_data, doc_id, del_position)
                 indices = list(range(len(indices) - 1))
                 active_value = str(indices[0]) if indices else None
                 is_delete = True
 
         # Use updated annotations_data for rendering if we modified it
-        render_annotations = new_annotations_data if new_annotations_data is not no_update else annotations_data
+        render_annotations = ann_relay if ann_relay is not no_update else annotations_data
         new_data = {"indices": indices, "next_index": len(indices)}
         new_change = (change_count or 0) + 1 if is_delete else no_update
-        return new_data, widget._render_items(indices, ta, doc_id, active_value=active_value, annotations_data=render_annotations), new_change, new_annotations_data
+        return new_data, widget._render_items(indices, ta, doc_id, active_value=active_value, annotations_data=render_annotations), new_change, ann_relay
+
+    # --- Relay repeater-ann-relay → annotations-store (static outputs only) ---
+    @app.callback(
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "repeater-ann-relay", "field": ALL}, "data"),
+        prevent_initial_call=True,
+    )
+    def relay_repeater_ann(all_updates):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update
+        return ctx.triggered[0]["value"]
 
     # --- Relay repeater deletes → span-any-change so doc viewer re-renders ---
     @app.callback(

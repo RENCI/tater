@@ -200,6 +200,7 @@ class RepeaterWidget(ContainerWidget):
             ),
             dcc.Store(id={"type": "repeater-store", "field": pipe_field}, data=store_data),
             dcc.Store(id={"type": "repeater-change", "field": pipe_field}, data=0),
+            dcc.Store(id={"type": "repeater-ann-relay", "field": pipe_field}, data=None),
         ], gap="sm", mt="md")
 
     # ------------------------------------------------------------------
