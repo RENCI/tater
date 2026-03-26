@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from tater.widgets.base import TaterWidget
 
 
-from tater.ui.callbacks import _has_any_span as _has_any_span_widgets
 
 # Header: 48px content row + 4px progress bar
 _HEADER_HEIGHT = 52
@@ -29,14 +28,12 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
     is_hosted = tater_app.is_hosted
 
-    # Global span stores — one set shared by all SpanAnnotationWidgets
-    span_stores = []
-    if _has_any_span_widgets(tater_app.widgets):
-        span_stores = [
-            dcc.Store(id="span-any-change", data=0),
-            dcc.Store(id="span-delete-store", data=None),
-            html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
-        ]
+    # Global span stores — always included so span callbacks are always registered
+    span_stores = [
+        dcc.Store(id="span-any-change", data=0),
+        dcc.Store(id="span-delete-store", data=None),
+        html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
+    ]
 
     content_grid = dmc.Grid([
         dmc.GridCol([
