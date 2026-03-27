@@ -293,7 +293,6 @@ def _upload_zone(
         ),
         id=upload_id,
         multiple=False,
-        accept=".json",
         style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
         style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
     )
@@ -329,7 +328,6 @@ def _compact_upload_zone(upload_id) -> dcc.Upload:
         ),
         id=upload_id,
         multiple=False,
-        accept=".yaml,.yml,.json",
         style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
         style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
     )
@@ -363,6 +361,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def validate_schema(contents, filename):
         if not contents:
             return None, None, {}, {}
+        if not (filename or "").lower().endswith(".json"):
+            return None, _error_text(f"'{filename}' is not a JSON file. Please upload a .json schema file."), {}, {}
         result, error = _decode_json_upload(contents, filename)
         if error:
             return None, _error_text(error), {}, {}
@@ -438,6 +438,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def handle_one_hierarchy(contents, filename, pending):
         if not contents:
             return no_update, no_update, no_update
+        if not any((filename or "").lower().endswith(ext) for ext in (".yaml", ".yml", ".json")):
+            return None, _error_text(f"'{filename}' is not a supported ontology file. Please upload a .yaml or .json file."), None
         ref_name = ctx.triggered_id["ref"]
         expected = (pending or {}).get(ref_name, "")
         if filename != expected:
@@ -474,6 +476,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def validate_documents(contents, filename):
         if not contents:
             return None, None
+        if not (filename or "").lower().endswith(".json"):
+            return None, _error_text(f"'{filename}' is not a JSON file. Please upload a .json documents file.")
         result, error = _decode_json_upload(contents, filename)
         if error:
             return None, _error_text(error)
@@ -506,6 +510,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def validate_annotations(contents, filename):
         if not contents:
             return None, None
+        if not (filename or "").lower().endswith(".json"):
+            return None, _error_text(f"'{filename}' is not a JSON file. Please upload a .json annotations file.")
         result, error = _decode_json_upload(contents, filename)
         if error:
             return None, _error_text(error)
