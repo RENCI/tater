@@ -129,10 +129,26 @@ the Dash app that looks up the calling user's `TaterApp` from `_session_cache` v
 `flask.session` at callback invocation time. This avoids re-registering callbacks for each
 upload session (Dash only allows each output to be registered once).
 
+**`_tater_app` vs `_tater_get_current_app`:** two different mechanisms are used to give
+callbacks access to the right `TaterApp` instance, depending on mode:
+- *Single mode*: `TaterApp.set_annotation_widgets` stores `self` directly on the Dash app as
+  `app._tater_app`. Callbacks capture it via closure at registration time — safe because there
+  is only one `TaterApp` for the lifetime of the process.
+- *Hosted mode*: the Dash app is shared across sessions, so a single `_tater_app` reference
+  would always point to the last session's app. Instead, `runner.py` stores a callable on the
+  Dash app as `app._tater_get_current_app`. This callable does a per-request lookup:
+  `flask.session["tater_session"]["session_id"]` → `_session_cache[session_id]`. Callbacks
+  that must be session-aware capture this callable at registration time and call it inside the
+  callback body (i.e. at request time, not at registration time).
+
 **Relay store pattern:** Dash prohibits mixing MATCH dict-ID outputs with static string
 outputs in the same callback (e.g. `{"type": "span-trigger", "field": MATCH}` + `"annotations-store"`).
-The solution used throughout: embed the annotation update in the MATCH relay store data, then
-a separate ALL-input relay callback reads from all relay stores and writes to `annotations-store`.
+The reason is that MATCH callbacks fire once per matched component instance, while a static
+output is a single component — Dash cannot fan-in multiple MATCH firings into one static write
+within a single callback. The solution used throughout: embed the annotation update in the
+MATCH relay store data, then a separate ALL-input relay callback reads from all relay stores
+and writes to `annotations-store`. Simple (non-MATCH) widgets write directly to
+`annotations-store` and do not need a relay store.
 Widgets that use this pattern each include a relay store in their rendered output:
 - Repeater: `{"type": "repeater-ann-relay", "field": pipe_field}`
 - Nested repeater: `{"type": "nested-repeater-ann-relay", "ld": ld, "li": li}`
