@@ -260,16 +260,12 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
                 rightSection=DashIconify(icon="tabler:arrow-right", width=16),
                 style={"flex": "1"},
             ),
-            dmc.Tooltip(
-                dmc.Button(
-                    DashIconify(icon="tabler:download", width=16),
-                    id="btn-download",
-                    variant="outline",
-                    size="sm",
-                    px="xs",
-                ),
-                label="Download annotations",
-                withArrow=True,
+            dmc.Button(
+                DashIconify(icon="tabler:download", width=16),
+                id="btn-download",
+                variant="outline",
+                size="sm",
+                px="xs",
             ),
         ], gap="xs", wrap="nowrap", style={"flex": "1"})
         save_right = None
