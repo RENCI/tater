@@ -1,0 +1,43 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - coarse breast label",
+  "description": "Assign a coarse pathology label to breast pathology reports using the FDX classification ontology.",
+  "instructions": "## Instructions\n\nFor each report, assign:\n1. **Diagnosis** \u2014 navigate the FDX ontology to select the primary pathological entity. Use search to find a term quickly.\n2. **Laterality** \u2014 the affected side(s) as stated in the report.\n3. **Notes** \u2014 optional free text for edge cases or ambiguity.\n",
+  "hierarchies": {
+    "fdx": "breast_fdx_ontology.yaml"
+  },
+  "data_schema": [
+    {
+      "id": "diagnosis",
+      "type": "hierarchical_label",
+      "widget": {
+        "type": "hierarchical_label_compact",
+        "label": "Diagnosis",
+        "description": "Select the primary pathological diagnosis from the FDX ontology.",
+        "hierarchy_ref": "fdx",
+        "searchable": true,
+        "required": true
+      }
+    },
+    {
+      "id": "laterality",
+      "type": "choice",
+      "options": ["left", "right", "bilateral"],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Laterality",
+        "required": true
+      }
+    },
+    {
+      "id": "notes",
+      "type": "text",
+      "widget": {
+        "type": "text_area",
+        "label": "Notes",
+        "description": "Optional notes on ambiguity or edge cases.",
+        "placeholder": "Enter any relevant notes..."
+      }
+    }
+  ]
+}

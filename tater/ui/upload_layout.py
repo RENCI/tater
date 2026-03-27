@@ -1,13 +1,13 @@
 """Upload page layout and callbacks for hosted mode.
 
 Flow:
-  1. User visits / → sees two dcc.Upload zones (schema JSON + documents JSON)
-     and an optional annotations JSON upload zone
-  2. Validation feedback shown inline; if schema references hierarchy files,
-     a compact ontology upload section appears automatically
-  3. On valid submit → schema+docs+hierarchy files (+ optional annotations)
-     written to a temp dir, paths stored in flask.session, browser redirected
-     to /annotate
+  1. User visits / → sees two tabs: "Upload files" and "Browse examples"
+  2. Upload tab: schema JSON + documents JSON + optional annotations JSON.
+     Validation feedback shown inline; if schema references hierarchy files,
+     a compact ontology upload section appears automatically.
+  3. Examples tab: clickable cards for built-in example sets.
+  4. On valid submit (upload tab) or card click (examples tab) → files written
+     to a temp dir, paths stored in flask.session, browser redirected to /annotate
 """
 from __future__ import annotations
 
@@ -24,11 +24,109 @@ from dash_iconify import DashIconify
 
 
 # ---------------------------------------------------------------------------
+# Built-in examples
+# ---------------------------------------------------------------------------
+
+def _get_builtin_examples() -> list[dict]:
+    """Scan tater/examples/ and return list of example metadata dicts, sorted by order."""
+    examples_dir = Path(__file__).parent.parent / "examples"
+    if not examples_dir.exists():
+        return []
+    examples = []
+    for folder in examples_dir.iterdir():
+        if not folder.is_dir():
+            continue
+        meta_file = folder / "meta.json"
+        schema_file = folder / "schema.json"
+        docs_file = folder / "documents.json"
+        if not meta_file.exists() or not schema_file.exists() or not docs_file.exists():
+            continue
+        try:
+            meta = json.loads(meta_file.read_text())
+            meta["folder"] = folder.name
+            examples.append(meta)
+        except Exception:
+            continue
+    return sorted(examples, key=lambda m: (m.get("order", 999), m.get("name", "")))
+
+
+def _example_card(meta: dict) -> html.Div:
+    return html.Div(
+        dmc.Paper(
+            dmc.Stack(
+                [
+                    dmc.Text(meta.get("name", meta["folder"]), fw=600, size="sm"),
+                    dmc.Text(meta.get("description", ""), size="xs", c="dimmed"),
+                ],
+                gap="xs",
+            ),
+            withBorder=True,
+            radius="md",
+            p="md",
+            style={"cursor": "pointer"},
+        ),
+        id={"type": "example-card", "name": meta["folder"]},
+        n_clicks=0,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
 
 def build_upload_layout() -> dmc.MantineProvider:
     """Return the upload page root component."""
+    examples = _get_builtin_examples()
+
+    upload_tab = dmc.Stack(
+        [
+            _upload_zone(
+                upload_id="upload-schema",
+                label="Schema (JSON)",
+                hint="A tater JSON schema file describing the annotation fields.",
+                icon="tabler:file-code",
+            ),
+            html.Div(id="schema-feedback"),
+            # Ontology section — rendered dynamically when schema has file refs
+            html.Div(id="hierarchy-upload-section"),
+            _upload_zone(
+                upload_id="upload-documents",
+                label="Documents (JSON)",
+                hint="A JSON array of document objects with at least an 'id' and 'text' field.",
+                icon="tabler:file-text",
+            ),
+            html.Div(id="documents-feedback"),
+            _upload_zone(
+                upload_id="upload-annotations",
+                label="Existing Annotations (JSON) — optional",
+                hint="A tater annotations file to resume from. Leave empty to start fresh.",
+                icon="tabler:restore",
+            ),
+            html.Div(id="annotations-feedback"),
+            dmc.Button(
+                "Start Annotating",
+                id="btn-start",
+                fullWidth=True,
+                disabled=True,
+                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+            ),
+            html.Div(id="submit-feedback"),
+        ],
+        gap="md",
+    )
+
+    examples_tab = dmc.Stack(
+        [
+            dmc.SimpleGrid(
+                [_example_card(ex) for ex in examples],
+                cols=2,
+                spacing="md",
+            ) if examples else dmc.Text("No built-in examples found.", size="sm", c="dimmed"),
+            html.Div(id="example-feedback"),
+        ],
+        gap="md",
+    )
+
     return dmc.MantineProvider(
         defaultColorScheme="light",
         children=[
@@ -38,52 +136,36 @@ def build_upload_layout() -> dmc.MantineProvider:
                     [
                         dmc.Title("tater", order=1, ta="center", mt="xl"),
                         dmc.Text(
-                            "Document annotation — upload your schema and documents to get started.",
+                            "Document annotation — upload your schema and documents or choose a built-in example.",
                             size="sm", c="dimmed", ta="center",
                         ),
                         dmc.Paper(
-                            dmc.Stack(
+                            dmc.Tabs(
                                 [
-                                    _upload_zone(
-                                        upload_id="upload-schema",
-                                        label="Schema (JSON)",
-                                        hint="A tater JSON schema file describing the annotation fields.",
-                                        icon="tabler:file-code",
+                                    dmc.TabsList(
+                                        [
+                                            dmc.TabsTab(
+                                                "Upload files",
+                                                value="upload",
+                                                leftSection=DashIconify(icon="tabler:upload", width=16),
+                                            ),
+                                            dmc.TabsTab(
+                                                "Browse examples",
+                                                value="examples",
+                                                leftSection=DashIconify(icon="tabler:layout-grid", width=16),
+                                            ),
+                                        ],
                                     ),
-                                    html.Div(id="schema-feedback"),
-                                    # Ontology section — rendered dynamically when schema has file refs
-                                    html.Div(id="hierarchy-upload-section"),
-                                    _upload_zone(
-                                        upload_id="upload-documents",
-                                        label="Documents (JSON)",
-                                        hint="A JSON array of document objects with at least an 'id' and 'text' field.",
-                                        icon="tabler:file-text",
-                                    ),
-                                    html.Div(id="documents-feedback"),
-                                    _upload_zone(
-                                        upload_id="upload-annotations",
-                                        label="Existing Annotations (JSON) — optional",
-                                        hint="A tater annotations file to resume from. Leave empty to start fresh.",
-                                        icon="tabler:file-check",
-                                    ),
-                                    html.Div(id="annotations-feedback"),
-                                    dmc.Button(
-                                        "Start Annotating",
-                                        id="btn-start",
-                                        fullWidth=True,
-                                        disabled=True,
-                                        rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                                    ),
-                                    html.Div(id="submit-feedback"),
+                                    dmc.TabsPanel(upload_tab, value="upload", p="xl", pt="md"),
+                                    dmc.TabsPanel(examples_tab, value="examples", p="xl", pt="md"),
                                 ],
-                                gap="md",
+                                value="upload",
                             ),
-                            p="xl",
                             withBorder=True,
                             shadow="sm",
                             radius="md",
                         ),
-                        # Stores
+                        # Stores (outside tabs so they persist across tab switches)
                         dcc.Store(id="schema-store", data=None),
                         dcc.Store(id="documents-store", data=None),
                         dcc.Store(id="annotations-upload-store", data=None),
@@ -137,7 +219,7 @@ def _compact_upload_zone(upload_id) -> dcc.Upload:
         dmc.Paper(
             dmc.Group(
                 [
-                    DashIconify(icon="tabler:file-upload", width=18, color="gray"),
+                    DashIconify(icon="tabler:file-vector", width=18, color="gray"),
                     dmc.Text("Drag and drop or click to select", size="xs", c="dimmed"),
                 ],
                 gap="xs",
@@ -338,7 +420,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
 
     # Handle submit: write temp files, store paths in flask.session, redirect
     @app.callback(
-        Output("upload-location", "href"),
+        Output("upload-location", "href", allow_duplicate=True),
         Output("submit-feedback", "children"),
         Input("btn-start", "n_clicks"),
         State("schema-store", "data"),
@@ -386,6 +468,53 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error starting session: {e}")
+
+    # Handle example card click: write example files to temp dir, redirect
+    @app.callback(
+        Output("upload-location", "href", allow_duplicate=True),
+        Output("example-feedback", "children"),
+        Input({"type": "example-card", "name": ALL}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def load_example(n_clicks_list):
+        if not ctx.triggered or not any(n_clicks_list):
+            return no_update, no_update
+
+        example_name = ctx.triggered_id["name"]
+        example_dir = Path(__file__).parent.parent / "examples" / example_name
+
+        try:
+            import flask
+            schema_data = json.loads((example_dir / "schema.json").read_text())
+            docs_data = json.loads((example_dir / "documents.json").read_text())
+
+            tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
+
+            # Resolve hierarchy file references relative to the example folder
+            for ref_name, source in list(schema_data.get("hierarchies", {}).items()):
+                if isinstance(source, str):
+                    src_path = example_dir / source
+                    dst_path = os.path.join(tmp_dir, src_path.name)
+                    Path(dst_path).write_text(src_path.read_text())
+                    schema_data["hierarchies"][ref_name] = dst_path
+
+            schema_path = os.path.join(tmp_dir, "schema.json")
+            docs_path = os.path.join(tmp_dir, "documents.json")
+            Path(schema_path).write_text(json.dumps(schema_data))
+            Path(docs_path).write_text(json.dumps(docs_data))
+
+            session_id = secrets.token_hex(16)
+            session_info = {
+                "session_id": session_id,
+                "schema_path": schema_path,
+                "docs_path": docs_path,
+            }
+            flask.session["tater_session"] = session_info
+            if on_session_ready is not None:
+                on_session_ready(session_info)
+            return "/annotate", no_update
+        except Exception as e:
+            return no_update, _error_text(f"Error loading example '{example_name}': {e}")
 
 
 # ---------------------------------------------------------------------------
