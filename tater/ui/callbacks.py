@@ -310,10 +310,20 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             import json as _json
             return {"content": _json.dumps(save_dict, indent=2), "filename": "annotations.json"}
 
-        # Start over: clear Flask session and redirect to upload page
+        # Start over: open confirmation modal
+        @app.callback(
+            Output("modal-start-over", "opened"),
+            Input("btn-start-over", "n_clicks"),
+            Input("btn-start-over-cancel", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def toggle_start_over_modal(open_clicks, cancel_clicks):
+            return ctx.triggered_id == "btn-start-over"
+
+        # Confirm start over: clear Flask session and redirect
         @app.callback(
             Output("annotate-location", "href"),
-            Input("btn-start-over", "n_clicks"),
+            Input("btn-start-over-confirm", "n_clicks"),
             prevent_initial_call=True,
         )
         def start_over(n_clicks):
@@ -779,7 +789,7 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
                 return no_update
 
         new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
-        new_spans = list(current_spans) + [new_span]
+        new_spans = list(current_spans) + [new_span.model_dump()]
         value_helpers.set_model_value(ann, field_path, new_spans)
         new_annotations_data = {**(annotations_data or {}), doc_id: ann}
 
@@ -1895,6 +1905,7 @@ def _render_document_content(text: str, doc_id: str, tater_app, annotations_data
                     "data-end": s_end,
                     "data-field": pipe_field,
                     "data-tag": tag,
+                    "data-color": color,
                     "style": {
                         "backgroundColor": color,
                         "cursor": "pointer",

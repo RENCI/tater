@@ -149,7 +149,13 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         ok, msg = _validate_schema_json(result)
         if not ok:
             return None, _error_text(msg)
-        field_names = [f.get("id", "?") for f in result.get("data_schema", [])]
+        def _field_name(f):
+            if f.get("id"):
+                return f["id"]
+            if f.get("type") == "divider" or f.get("widget", {}).get("type") == "divider":
+                return "divider"
+            return None
+        field_names = [n for f in result.get("data_schema", []) if (n := _field_name(f))]
         summary = f"✓ {len(field_names)} field(s): {', '.join(field_names[:8])}" + (
             f" …and {len(field_names) - 8} more" if len(field_names) > 8 else ""
         )
@@ -259,7 +265,10 @@ def _validate_schema_json(data: dict) -> tuple[bool, str]:
     if not isinstance(fields, list) or not fields:
         return False, "Schema 'data_schema' must be a non-empty array."
     for i, f in enumerate(fields):
-        if not isinstance(f, dict) or "id" not in f or "type" not in f:
+        if not isinstance(f, dict):
+            return False, f"Field at index {i} is missing 'id' or 'type'."
+        is_divider = f.get("type") == "divider" or f.get("widget", {}).get("type") == "divider"
+        if not is_divider and ("id" not in f or "type" not in f):
             return False, f"Field at index {i} is missing 'id' or 'type'."
     return True, ""
 
