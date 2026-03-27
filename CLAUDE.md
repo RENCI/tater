@@ -23,6 +23,11 @@ tater/                  # Library package
     json_loader.py      # JSON schema → (Pydantic model, partial widget list)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
     upload_layout.py    # Hosted-mode upload page layout + callbacks
+  examples/             # Built-in example sets for hosted mode "Browse examples" tab
+    simple/             # meta.json + schema.json + documents.json
+    gallery/            # meta.json + schema.json + documents.json
+    hierarchical/       # meta.json + schema.json + documents.json + pet_ontology.yaml
+    coarse_breast_label/ # meta.json + schema.json + documents.json + breast_fdx_ontology.yaml
   widgets/              # All widget classes
     base.py             # Widget base class hierarchy (see Widget conventions)
     repeater.py         # RepeaterWidget (abstract), ListableWidget, TabsWidget
@@ -86,11 +91,30 @@ CLI flags: `--documents` (required in single mode), `--config` or `--schema` (on
 `--hosted` launches a multi-user server. The Dash app is shared; per-user state is isolated
 via Flask session cookies and a server-side `_session_cache` dict.
 
-**Session flow:** user uploads schema JSON + documents JSON (+ optional ontology YAML files if
-the schema has file-path `hierarchies` references) → server writes them to a `tempfile.mkdtemp`
-directory → paths stored in `flask.session["tater_session"]` → redirect to `/annotate` →
-`serve_layout()` reads the session, retrieves or builds the `TaterApp` from the temp files,
-returns the annotation layout.
+**Upload page:** two tabs — "Upload files" and "Browse examples".
+- *Upload files*: schema JSON + documents JSON + optional existing annotations JSON. If the
+  schema has file-path `hierarchies` references, per-file ontology upload zones appear
+  automatically. Each zone has a status icon (grey outline → filled blue check on success).
+- *Browse examples*: clickable cards for built-in example sets in `tater/examples/`. Clicking
+  a card immediately creates a session and redirects — no submit button needed.
+
+**Session flow (upload tab):** user uploads schema + documents (+ optional ontology files +
+optional annotations) → files written to `tempfile.mkdtemp` → paths stored in
+`flask.session["tater_session"]` → redirect to `/annotate` → `serve_layout()` reads the
+session, retrieves or builds the `TaterApp`, returns the annotation layout.
+
+**Session flow (examples tab):** user clicks a card → `load_example` callback reads the
+example's files directly from `tater/examples/<name>/`, resolves hierarchy paths to the same
+temp dir, creates session, redirects.
+
+**Adding a built-in example:** create a subfolder under `tater/examples/` with at minimum
+`meta.json` (`name`, `description`, `order`), `schema.json`, and `documents.json`. Ontology
+YAML files referenced in the schema should be placed alongside and referenced by filename only
+(not relative path). The example is discovered automatically at layout-build time.
+
+**Annotations preload in hosted mode:** if `session_info["annotations_path"]` is set (from
+an uploaded annotations file), `_build_session_app` temporarily sets `tater_app.annotations_path`,
+calls `_load_annotations_from_file()`, then clears it back to `None` so no auto-save occurs.
 
 **Ontology files in hosted mode:** `hierarchies` entries in a JSON schema that reference
 external YAML files (e.g. `"ontology": "../data/pets.yaml"`) cannot be resolved from temp
@@ -122,7 +146,12 @@ DMC is pinned at **v2.6 (Mantine v7)**. Before using a DMC component, verify it 
 this version:
 
 - `dmc.TabsTab` is the tab trigger (v2.x API) — `dmc.Tab` does not exist.
+- `dmc.Tabs` uses `value` (not `defaultValue`) for the initially active tab.
 - `dmc.Badge(circle=True)` clips double-digit numbers — avoid `circle=True`.
+- `dmc.ColorSchemeToggle` handles dark/light toggling and persists the choice in `localStorage`.
+  Both pages use `defaultColorScheme="auto"` on their `dmc.MantineProvider`; the toggle is
+  consistent across pages without server-side coordination. There is no `theme` parameter on
+  `TaterApp` or in config files.
 - Component prop names follow Mantine v7 conventions (e.g. `leftSection`/`rightSection`, not
   `icon`).
 
@@ -149,6 +178,9 @@ output must also use `allow_duplicate=True`. Missing it on one will cause Dash t
 - **`annotations-store` / `data`** — written by the main save callback and by multiple relay
   callbacks (repeater, nested repeater, HL, HL tags, span). All use `allow_duplicate=True`.
   New callbacks writing to `annotations-store` must also use it.
+
+- **`upload-location` / `href`** — written by both `handle_submit` (upload tab) and
+  `load_example` (examples tab) in `upload_layout.py`. Both use `allow_duplicate=True`.
 
 - **Widget value props** (e.g. `annotation-<field>` / `value` or `checked`) — when a widget
   has `_condition` set, two callbacks both write to its value prop: `update_widget_value`

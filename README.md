@@ -114,7 +114,7 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget` and hierarchical label widgets cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
-| `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
+| `instructions` | no | Markdown help text shown in the instructions drawer |
 | `register_callbacks` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks and setting `app.on_save` |
 
 ## Widgets
@@ -434,18 +434,23 @@ Hosted mode lets multiple users upload their own schema and documents and annota
 tater --hosted --host 0.0.0.0 --port 8050
 ```
 
-**Flow:**
-1. User visits `/` → upload page with schema (JSON) and documents (JSON) upload zones
-2. If the schema references external hierarchy files, per-file upload zones appear automatically
-3. Click **Start Annotating** → redirected to `/annotate`
-4. Annotate documents; click **Download** in the footer to save annotations as JSON
-5. Click the home icon in the header to start over with a new schema/documents pair
+**Flow — upload your own files:**
+1. User visits `/` → upload page, "Upload files" tab
+2. Upload schema JSON and documents JSON; status icons confirm each file is valid
+3. If the schema references external hierarchy files, per-file upload zones appear automatically
+4. Optionally upload an existing annotations JSON to resume from a previous session
+5. Click **Start Annotating** → redirected to `/annotate`
+6. Annotate documents; click **Download** in the footer to save annotations as JSON
+7. Click the home icon in the header to start over
+
+**Flow — built-in examples:**
+1. User visits `/` → click the "Browse examples" tab
+2. Click any example card → immediately redirected to `/annotate` with that example loaded
 
 **Hosted mode constraints vs. single mode:**
 - No auto-save — annotations live in the browser (`dcc.Store`) and must be downloaded explicitly
 - `file_path` is not supported in documents — use inline `text` instead
 - Hierarchy files referenced by path in the schema must be uploaded separately (inline hierarchy dicts work without upload)
-- `register_callbacks` in Python config files is not called — use JSON schemas for hosted deployments
 
 ## Testing
 
