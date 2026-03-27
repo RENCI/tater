@@ -178,6 +178,14 @@ def _build_session_app(dash_app, session_info: dict):
     if not tater_app.load_documents(docs_path):
         return None
 
+    # Load existing annotations from the uploaded file (if any), then clear
+    # annotations_path so hosted mode stays read-only (no auto-save).
+    annotations_path = session_info.get("annotations_path")
+    if annotations_path and Path(annotations_path).exists():
+        tater_app.annotations_path = annotations_path
+        tater_app._load_annotations_from_file()
+        tater_app.annotations_path = None
+
     tater_app.set_annotation_widgets(widgets)
     return tater_app
 

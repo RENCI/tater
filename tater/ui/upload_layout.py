@@ -2,10 +2,12 @@
 
 Flow:
   1. User visits / → sees two dcc.Upload zones (schema JSON + documents JSON)
+     and an optional annotations JSON upload zone
   2. Validation feedback shown inline; if schema references hierarchy files,
      a compact ontology upload section appears automatically
-  3. On valid submit → schema+docs+hierarchy files written to a temp dir,
-     paths stored in flask.session, browser redirected to /annotate
+  3. On valid submit → schema+docs+hierarchy files (+ optional annotations)
+     written to a temp dir, paths stored in flask.session, browser redirected
+     to /annotate
 """
 from __future__ import annotations
 
@@ -58,6 +60,13 @@ def build_upload_layout() -> dmc.MantineProvider:
                                         icon="tabler:file-text",
                                     ),
                                     html.Div(id="documents-feedback"),
+                                    _upload_zone(
+                                        upload_id="upload-annotations",
+                                        label="Existing Annotations (JSON) — optional",
+                                        hint="A tater annotations file to resume from. Leave empty to start fresh.",
+                                        icon="tabler:file-check",
+                                    ),
+                                    html.Div(id="annotations-feedback"),
                                     dmc.Button(
                                         "Start Annotating",
                                         id="btn-start",
@@ -77,6 +86,7 @@ def build_upload_layout() -> dmc.MantineProvider:
                         # Stores
                         dcc.Store(id="schema-store", data=None),
                         dcc.Store(id="documents-store", data=None),
+                        dcc.Store(id="annotations-upload-store", data=None),
                         dcc.Store(id="pending-hierarchies", data={}),
                         dcc.Store(id="hierarchy-files-store", data={}),
                     ],
@@ -293,6 +303,24 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             )
         return result, _success_text(f"✓ {len(result)} document(s) loaded.")
 
+    # Validate annotations upload (optional)
+    @app.callback(
+        Output("annotations-upload-store", "data"),
+        Output("annotations-feedback", "children"),
+        Input("upload-annotations", "contents"),
+        State("upload-annotations", "filename"),
+        prevent_initial_call=True,
+    )
+    def validate_annotations(contents, filename):
+        if not contents:
+            return None, None
+        result, error = _decode_json_upload(contents, filename)
+        if error:
+            return None, _error_text(error)
+        if not isinstance(result, dict):
+            return None, _error_text("Annotations file must be a JSON object.")
+        return result, _success_text(f"✓ {len(result)} document annotation(s) loaded.")
+
     # Enable start button when all required uploads are present
     @app.callback(
         Output("btn-start", "disabled"),
@@ -316,9 +344,10 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         State("schema-store", "data"),
         State("documents-store", "data"),
         State("hierarchy-files-store", "data"),
+        State("annotations-upload-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_submit(n_clicks, schema_data, documents_data, hierarchy_files):
+    def handle_submit(n_clicks, schema_data, documents_data, hierarchy_files, annotations_data):
         if not n_clicks:
             return no_update, no_update
         if not schema_data or not documents_data:
@@ -345,6 +374,12 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
                 "schema_path": schema_path,
                 "docs_path": docs_path,
             }
+
+            if annotations_data:
+                annotations_path = os.path.join(tmp_dir, "annotations.json")
+                Path(annotations_path).write_text(json.dumps(annotations_data))
+                session_info["annotations_path"] = annotations_path
+
             flask.session["tater_session"] = session_info
             if on_session_ready is not None:
                 on_session_ready(session_info)
