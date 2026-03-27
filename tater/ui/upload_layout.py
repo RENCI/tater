@@ -376,9 +376,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
                 return "divider"
             return None
         field_names = [n for f in result.get("data_schema", []) if (n := _field_name(f))]
-        summary = f"✓ {len(field_names)} field(s): {', '.join(field_names[:8])}" + (
-            f" …and {len(field_names) - 8} more" if len(field_names) > 8 else ""
-        )
+        n = len([n for n in field_names if n != "divider"])
+        summary = f"✓ {filename} — {n} top-level field(s)"
         # Collect file-path hierarchy references: {ref_name: filename}
         pending = {
             name: Path(source).name
@@ -494,7 +493,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             return None, _error_text(
                 f"Document(s) at index {missing_text[:3]} are missing required 'text' field."
             )
-        return result, _success_text(f"✓ {len(result)} document(s) loaded.")
+        return result, _success_text(f"✓ {filename} — {len(result)} document(s)")
 
     # Validate annotations upload (optional)
     @app.callback(
@@ -512,7 +511,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             return None, _error_text(error)
         if not isinstance(result, dict):
             return None, _error_text("Annotations file must be a JSON object.")
-        return result, _success_text(f"✓ {len(result)} document annotation(s) loaded.")
+        return result, _success_text(f"✓ {filename} — {len(result)} document(s) with annotations")
 
     # Enable start button when all required uploads are present
     @app.callback(
