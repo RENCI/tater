@@ -50,6 +50,10 @@ def _get_builtin_examples() -> list[dict]:
     return sorted(examples, key=lambda m: (m.get("order", 999), m.get("name", "")))
 
 
+_GITHUB_REPO = "https://github.com/RENCI/tater"
+_GITHUB_EXAMPLES = f"{_GITHUB_REPO}/tree/main/tater/examples"
+
+
 def _example_card(meta: dict) -> html.Div:
     return html.Div(
         dmc.Paper(
@@ -67,6 +71,36 @@ def _example_card(meta: dict) -> html.Div:
         ),
         id={"type": "example-card", "name": meta["folder"]},
         n_clicks=0,
+    )
+
+
+def _tab_links(justify: str = "flex-end") -> dmc.Group:
+    """GitHub repo and examples folder links."""
+    return dmc.Group(
+        [
+            dmc.Anchor(
+                dmc.Group(
+                    [DashIconify(icon="tabler:brand-github", width=13), dmc.Text("Repo", size="xs")],
+                    gap="3",
+                ),
+                href=_GITHUB_REPO,
+                target="_blank",
+                underline="never",
+                c="dimmed",
+            ),
+            dmc.Anchor(
+                dmc.Group(
+                    [DashIconify(icon="tabler:folder", width=13), dmc.Text("Example files", size="xs")],
+                    gap="3",
+                ),
+                href=_GITHUB_EXAMPLES,
+                target="_blank",
+                underline="never",
+                c="dimmed",
+            ),
+        ],
+        gap="sm",
+        justify=justify,
     )
 
 
@@ -100,7 +134,7 @@ def build_upload_layout() -> dmc.MantineProvider:
                 upload_id="upload-annotations",
                 label="Existing Annotations (JSON) — optional",
                 hint="A tater annotations file to resume from. Leave empty to start fresh.",
-                icon="tabler:restore",
+                icon="tabler:file-arrow-right",
             ),
             html.Div(id="annotations-feedback"),
             dmc.Button(
@@ -131,10 +165,15 @@ def build_upload_layout() -> dmc.MantineProvider:
         defaultColorScheme="light",
         children=[
             dcc.Location(id="upload-location", refresh=True),
+            dmc.Box(
+                _tab_links(justify="flex-end"),
+                px="xl",
+                py="xs",
+            ),
             dmc.Container(
                 dmc.Stack(
                     [
-                        dmc.Title("tater", order=1, ta="center", mt="xl"),
+                        dmc.Title("tater", order=1, ta="center"),
                         dmc.Text(
                             "Document annotation — upload your schema and documents or choose a built-in example.",
                             size="sm", c="dimmed", ta="center",
