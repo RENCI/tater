@@ -2,9 +2,10 @@
 
 Flow:
   1. User visits / → sees two dcc.Upload zones (schema JSON + documents JSON)
-  2. Validation feedback shown inline
-  3. On valid submit → schema+docs written to a temp dir, paths stored in
-     flask.session, browser redirected to /annotate
+  2. Validation feedback shown inline; if schema references hierarchy files,
+     a compact ontology upload section appears automatically
+  3. On valid submit → schema+docs+hierarchy files written to a temp dir,
+     paths stored in flask.session, browser redirected to /annotate
 """
 from __future__ import annotations
 
@@ -48,6 +49,8 @@ def build_upload_layout() -> dmc.MantineProvider:
                                         icon="tabler:file-code",
                                     ),
                                     html.Div(id="schema-feedback"),
+                                    # Ontology section — rendered dynamically when schema has file refs
+                                    html.Div(id="hierarchy-upload-section"),
                                     _upload_zone(
                                         upload_id="upload-documents",
                                         label="Documents (JSON)",
@@ -71,9 +74,11 @@ def build_upload_layout() -> dmc.MantineProvider:
                             shadow="sm",
                             radius="md",
                         ),
-                        # Hidden stores for validated file contents
+                        # Stores
                         dcc.Store(id="schema-store", data=None),
                         dcc.Store(id="documents-store", data=None),
+                        dcc.Store(id="pending-hierarchies", data={}),
+                        dcc.Store(id="hierarchy-files-store", data={}),
                     ],
                     gap="md",
                     align="stretch",
@@ -116,6 +121,31 @@ def _upload_zone(upload_id: str, label: str, hint: str, icon: str) -> dmc.Stack:
     )
 
 
+def _compact_upload_zone(upload_id: str) -> dcc.Upload:
+    """Smaller upload zone for ontology files."""
+    return dcc.Upload(
+        dmc.Paper(
+            dmc.Group(
+                [
+                    DashIconify(icon="tabler:file-upload", width=18, color="gray"),
+                    dmc.Text("Drag and drop or click to select", size="xs", c="dimmed"),
+                ],
+                gap="xs",
+                justify="center",
+            ),
+            p="xs",
+            withBorder=True,
+            radius="md",
+            style={"cursor": "pointer", "borderStyle": "dashed"},
+        ),
+        id=upload_id,
+        multiple=True,
+        accept=".yaml,.yml,.json",
+        style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
+        style_active={"borderStyle": "solid", "borderColor": "#6c6", "borderRadius": 10},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Callbacks
 # ---------------------------------------------------------------------------
@@ -135,20 +165,20 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     @app.callback(
         Output("schema-store", "data"),
         Output("schema-feedback", "children"),
+        Output("pending-hierarchies", "data"),
         Input("upload-schema", "contents"),
         State("upload-schema", "filename"),
         prevent_initial_call=True,
     )
     def validate_schema(contents, filename):
         if not contents:
-            return None, None
+            return None, None, {}
         result, error = _decode_json_upload(contents, filename)
         if error:
-            return None, _error_text(error)
-        # Validate it's a tater schema (must have a "fields" key or similar)
+            return None, _error_text(error), {}
         ok, msg = _validate_schema_json(result)
         if not ok:
-            return None, _error_text(msg)
+            return None, _error_text(msg), {}
         def _field_name(f):
             if f.get("id"):
                 return f["id"]
@@ -159,7 +189,75 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         summary = f"✓ {len(field_names)} field(s): {', '.join(field_names[:8])}" + (
             f" …and {len(field_names) - 8} more" if len(field_names) > 8 else ""
         )
-        return result, _success_text(summary)
+        # Collect file-path hierarchy references: {ref_name: filename}
+        pending = {
+            name: Path(source).name
+            for name, source in result.get("hierarchies", {}).items()
+            if isinstance(source, str)
+        }
+        return result, _success_text(summary), pending
+
+    # Render ontology upload section when schema has file-path hierarchy refs
+    @app.callback(
+        Output("hierarchy-upload-section", "children"),
+        Input("pending-hierarchies", "data"),
+    )
+    def render_hierarchy_section(pending):
+        if not pending:
+            return None
+        filenames = list(pending.values())
+        return dmc.Stack(
+            [
+                dmc.Divider(),
+                dmc.Text("Ontology Files", fw=500, size="sm"),
+                dmc.Text(
+                    f"Required: {', '.join(filenames)}",
+                    size="xs", c="dimmed",
+                ),
+                _compact_upload_zone("upload-hierarchies"),
+                html.Div(id="hierarchy-feedback"),
+                dmc.Divider(),
+            ],
+            gap="xs",
+        )
+
+    # Handle ontology file uploads
+    @app.callback(
+        Output("hierarchy-files-store", "data"),
+        Output("hierarchy-feedback", "children"),
+        Input("upload-hierarchies", "contents"),
+        State("upload-hierarchies", "filename"),
+        State("pending-hierarchies", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_hierarchy_uploads(contents_list, filenames, pending):
+        if not contents_list or not pending:
+            return {}, None
+        if not isinstance(contents_list, list):
+            contents_list, filenames = [contents_list], [filenames]
+
+        filename_to_ref = {v: k for k, v in pending.items()}
+        result = {}
+        for contents, filename in zip(contents_list, filenames):
+            try:
+                _header, encoded = contents.split(",", 1)
+                decoded = base64.b64decode(encoded).decode("utf-8")
+            except Exception:
+                return {}, _error_text(f"Could not decode '{filename}'.")
+            ref = filename_to_ref.get(filename)
+            if ref:
+                result[ref] = {"filename": filename, "content": decoded}
+
+        missing = [pending[k] for k in pending if k not in result]
+        if missing:
+            loaded = len(result)
+            msg = f"✓ {loaded} file(s) loaded." if loaded else ""
+            return result, dmc.Stack([
+                _success_text(msg) if msg else None,
+                _error_text(f"Still needed: {', '.join(missing)}"),
+            ], gap=0)
+
+        return result, _success_text(f"✓ {len(result)} ontology file(s) loaded.")
 
     # Validate documents upload
     @app.callback(
@@ -193,14 +291,20 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             )
         return result, _success_text(f"✓ {len(result)} document(s) loaded.")
 
-    # Enable start button when both stores are valid
+    # Enable start button when all required uploads are present
     @app.callback(
         Output("btn-start", "disabled"),
         Input("schema-store", "data"),
         Input("documents-store", "data"),
+        Input("pending-hierarchies", "data"),
+        Input("hierarchy-files-store", "data"),
     )
-    def toggle_start(schema_data, documents_data):
-        return not (schema_data and documents_data)
+    def toggle_start(schema_data, documents_data, pending, hierarchy_files):
+        if not schema_data or not documents_data:
+            return True
+        if pending and set(pending.keys()) != set((hierarchy_files or {}).keys()):
+            return True
+        return False
 
     # Handle submit: write temp files, store paths in flask.session, redirect
     @app.callback(
@@ -209,9 +313,10 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         Input("btn-start", "n_clicks"),
         State("schema-store", "data"),
         State("documents-store", "data"),
+        State("hierarchy-files-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_submit(n_clicks, schema_data, documents_data):
+    def handle_submit(n_clicks, schema_data, documents_data, hierarchy_files):
         if not n_clicks:
             return no_update, no_update
         if not schema_data or not documents_data:
@@ -220,6 +325,13 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         try:
             import flask
             tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
+
+            # Write hierarchy files and rewrite schema paths to absolute temp paths
+            for ref_name, file_info in (hierarchy_files or {}).items():
+                hierarchy_path = os.path.join(tmp_dir, file_info["filename"])
+                Path(hierarchy_path).write_text(file_info["content"])
+                schema_data["hierarchies"][ref_name] = hierarchy_path
+
             schema_path = os.path.join(tmp_dir, "schema.json")
             docs_path = os.path.join(tmp_dir, "documents.json")
             Path(schema_path).write_text(json.dumps(schema_data))
