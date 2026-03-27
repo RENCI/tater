@@ -108,6 +108,8 @@ def _upload_zone(upload_id: str, label: str, hint: str, icon: str) -> dmc.Stack:
                 id=upload_id,
                 multiple=False,
                 accept=".json",
+                style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
+                style_active={"borderStyle": "solid", "borderColor": "#6c6", "borderRadius": 10},
             ),
         ],
         gap="xs",
