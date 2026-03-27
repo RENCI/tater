@@ -246,6 +246,7 @@ class HierarchicalLabelWidget(TaterWidget):
                     ),
                     dmc.Stack(initial_sections, id={"type": "hier-sections", "field": pipe_field}, gap="sm"),
                     dcc.Store(id={"type": "hier-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hier-ann-relay", "field": pipe_field}, data=None),
                 ],
                 gap="xs",
             ), self.label)
@@ -404,6 +405,7 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
                     ),
                     dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
                     dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hl-tags-ann-relay", "field": pipe_field}, data=None),
                 ],
                 gap="xs",
             ), self.label)

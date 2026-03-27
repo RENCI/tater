@@ -1,0 +1,5 @@
+{
+  "name": "Simple",
+  "description": "A minimal two-field task: annotate pet mood and flag records needing attention.",
+  "order": 1
+}

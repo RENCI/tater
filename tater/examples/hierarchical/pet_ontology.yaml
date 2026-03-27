@@ -1,0 +1,223 @@
+Domestic Animals:
+    Dogs:
+        Sporting Group:
+        - Labrador Retriever
+        - Golden Retriever
+        - English Springer Spaniel
+        - Cocker Spaniel
+        - Brittany
+        - Irish Setter
+        - Pointer
+        - Weimaraner
+        Hound Group:
+        - Beagle
+        - Bloodhound
+        - Basset Hound
+        - Dachshund
+        - Greyhound
+        - Whippet
+        - Rhodesian Ridgeback
+        - Afghan Hound
+        Working Group:
+        - Siberian Husky
+        - Alaskan Malamute
+        - Bernese Mountain Dog
+        - Boxer
+        - Great Dane
+        - Mastiff
+        - Rottweiler
+        - Saint Bernard
+        - Doberman Pinscher
+        Terrier Group:
+        - Airedale Terrier
+        - Bull Terrier
+        - Scottish Terrier
+        - West Highland White Terrier
+        - Yorkshire Terrier
+        - Jack Russell Terrier
+        - Staffordshire Bull Terrier
+        Toy Group:
+        - Chihuahua
+        - Pomeranian
+        - Pug
+        - Shih Tzu
+        - Maltese
+        - Toy Poodle
+        - Papillon
+        - Cavalier King Charles Spaniel
+        Non-Sporting Group:
+        - Bulldog
+        - Poodle
+        - Dalmatian
+        - French Bulldog
+        - Boston Terrier
+        - Chow Chow
+        - Shar Pei
+        Herding Group:
+        - Australian Shepherd
+        - Border Collie
+        - German Shepherd
+        - Collie
+        - Shetland Sheepdog
+        - Belgian Malinois
+        - Old English Sheepdog
+        - Corgi
+        Mixed Breeds:
+        - Labradoodle
+        - Goldendoodle
+        - Cockapoo
+        - Puggle
+        - Mixed breed unknown lineage
+    Cats:
+        Long-haired Breeds:
+        - Persian
+        - Maine Coon
+        - Ragdoll
+        - Norwegian Forest Cat
+        - Himalayan
+        - Birman
+        - Turkish Angora
+        Short-haired Breeds:
+        - Siamese
+        - British Shorthair
+        - American Shorthair
+        - Abyssinian
+        - Bengal
+        - Russian Blue
+        - Burmese
+        - Bombay
+        - Exotic Shorthair
+        Hairless and Rex Breeds:
+        - Sphynx
+        - Devon Rex
+        - Cornish Rex
+        Domestic Mixed:
+        - Domestic Shorthair
+        - Domestic Longhair
+        - Tabby (pattern)
+        - Calico (pattern)
+        - Tuxedo (pattern)
+    Small Mammals:
+        Rodents:
+        - Syrian Hamster
+        - Dwarf Hamster
+        - Guinea Pig
+        - Gerbil
+        - Mouse
+        - Rat (domestic)
+        - Chinchilla
+        - Degu
+        Rabbits:
+        - Holland Lop
+        - Netherland Dwarf
+        - Mini Rex
+        - Flemish Giant
+        - Lionhead
+        - Angora
+        - Mixed breed rabbit
+        Other Small Mammals:
+        - Ferret
+        - Hedgehog
+        - Sugar Glider
+    Birds:
+        Parrots and Hookbills:
+        - Budgerigar (Parakeet)
+        - Cockatiel
+        - Lovebird
+        - Conure
+        - African Grey Parrot
+        - Amazon Parrot
+        - Macaw
+        - Cockatoo
+        Finches and Canaries:
+        - Zebra Finch
+        - Society Finch
+        - Canary
+        - Gouldian Finch
+        Doves and Pigeons:
+        - Diamond Dove
+        - Ringneck Dove
+        - Pigeon (domestic)
+        Other Pet Birds:
+        - Quaker Parrot
+        - Lorikeet
+        - Eclectus
+    Reptiles and Amphibians:
+        Lizards:
+        - Bearded Dragon
+        - Leopard Gecko
+        - Crested Gecko
+        - Blue-tongued Skink
+        - Iguana
+        - Chameleon
+        - Anole
+        Snakes:
+        - Ball Python
+        - Corn Snake
+        - King Snake
+        - Milk Snake
+        - Boa Constrictor
+        - Garter Snake
+        Turtles and Tortoises:
+        - Red-eared Slider
+        - Box Turtle
+        - Russian Tortoise
+        - Sulcata Tortoise
+        - Painted Turtle
+        Amphibians:
+        - Axolotl
+        - Fire-bellied Newt
+        - Tree Frog
+        - Pacman Frog
+        - African Dwarf Frog
+    Fish:
+        Freshwater Fish:
+            Tropical Community:
+            - Guppy
+            - Platy
+            - Molly
+            - Tetra (Neon, Cardinal)
+            - Danio
+            - Rasbora
+            - Corydoras Catfish
+            Goldfish and Koi:
+            - Common Goldfish
+            - Fancy Goldfish
+            - Koi
+            - Shubunkin
+            Cichlids:
+            - Angelfish
+            - Discus
+            - Oscar
+            - African Cichlid
+            Bettas and Gouramis:
+            - Betta (Siamese Fighting Fish)
+            - Dwarf Gourami
+            - Pearl Gourami
+            Other Freshwater:
+            - Plecostomus
+            - Rainbow Shark
+            - Loach
+        Saltwater Fish:
+        - Clownfish
+        - Tang
+        - Damselfish
+        - Goby
+        - Blenny
+        - Angelfish (marine)
+        - Wrasse
+Exotic and Specialty Pets:
+    Farm Animals (miniature):
+    - Miniature Pig
+    - Miniature Goat
+    - Miniature Horse
+    - Miniature Donkey
+    - Chicken (bantam)
+    Arachnids:
+    - Tarantula
+    - Emperor Scorpion
+    Invertebrates:
+    - Hermit Crab
+    - Madagascar Hissing Cockroach
+    - Stick Insect
+    - Mantis

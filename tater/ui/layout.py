@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from tater.widgets.base import TaterWidget
 
 
-from tater.ui.callbacks import _has_any_span as _has_any_span_widgets
 
 # Header: 48px content row + 4px progress bar
 _HEADER_HEIGHT = 52
@@ -27,15 +26,14 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_viewer = _build_document_viewer()
     document_controls = _build_document_controls()
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
+    is_hosted = tater_app.is_hosted
 
-    # Global span stores — one set shared by all SpanAnnotationWidgets
-    span_stores = []
-    if _has_any_span_widgets(tater_app.widgets):
-        span_stores = [
-            dcc.Store(id="span-any-change", data=0),
-            dcc.Store(id="span-delete-store", data=None),
-            html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
-        ]
+    # Global span stores — always included so span callbacks are always registered
+    span_stores = [
+        dcc.Store(id="span-any-change", data=0),
+        dcc.Store(id="span-delete-store", data=None),
+        html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
+    ]
 
     content_grid = dmc.Grid([
         dmc.GridCol([
@@ -62,7 +60,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
 
     app_shell = dmc.AppShell(
         [
-            _build_app_header(tater_app, has_instructions),
+            _build_app_header(tater_app, has_instructions, is_hosted=is_hosted),
             dmc.AppShellMain(
                 dmc.Container([
                     dmc.Stack([
@@ -72,7 +70,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     ], gap="lg"),
                 ], size="xl", pt="xs", px="xs", fluid=True),
             ),
-            _build_app_footer(),
+            _build_app_footer(is_hosted=is_hosted),
         ],
         header={"height": _HEADER_HEIGHT},
         footer={"height": _FOOTER_HEIGHT},
@@ -80,7 +78,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     )
 
     return dmc.MantineProvider(
-        defaultColorScheme=tater_app.theme,
+        defaultColorScheme="auto",
         children=[
             dmc.NotificationContainer(
                 id="notification-container",
@@ -89,11 +87,38 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 zIndex=1000,
                 withinPortal=True,
             ),
+            dcc.Location(id="annotate-location", refresh=True),
+            dcc.Download(id="download-annotations") if is_hosted else None,
+            dmc.Modal(
+                title="Start over?",
+                id="modal-start-over",
+                opened=False,
+                centered=True,
+                children=[
+                    dmc.Text("All progress will be lost. Download annotations first if you want to keep them."),
+                    dmc.Group(
+                        [
+                            dmc.Button("Cancel", id="btn-start-over-cancel", variant="default"),
+                            dmc.Button("Start over", id="btn-start-over-confirm"),
+                        ],
+                        justify="flex-end",
+                        mt="md",
+                    ),
+                ],
+            ) if is_hosted else None,
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
             dcc.Store(id="auto-advance-store", data=0),
             dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
+            dcc.Store(id="annotations-store", data={
+                doc_id: ann.model_dump()
+                for doc_id, ann in tater_app.annotations.items()
+            }),
+            dcc.Store(id="metadata-store", data={
+                doc_id: meta.model_dump()
+                for doc_id, meta in tater_app.metadata.items()
+            }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
             *span_stores,
             app_shell,
@@ -104,7 +129,10 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 position="top",
                 size="lg",
                 padding="md",
-                children=dcc.Markdown(tater_app.instructions or ""),
+                children=[
+                    dmc.Divider(mb="md"),
+                    dcc.Markdown(tater_app.instructions or ""),
+                ],
             ) if has_instructions else None,
         ],
     )
@@ -161,7 +189,7 @@ def _build_document_controls() -> dmc.Stack:
 
 
 
-def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShellHeader:
+def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bool = False) -> dmc.AppShellHeader:
     """Sticky header: app title (left) + document title / status badge (right)
     with a full-width progress bar flush to the bottom edge."""
     help_button = (
@@ -185,7 +213,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
     )
 
     theme_toggle = dmc.ColorSchemeToggle(
-        computedColorScheme=tater_app.theme,
+        computedColorScheme="auto",
         lightIcon=DashIconify(icon="tabler:sun", width=20),
         darkIcon=DashIconify(icon="tabler:moon", width=20),
         size="sm",
@@ -194,6 +222,15 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
     right_children = [theme_toggle]
     if help_button:
         right_children.append(help_button)
+    if is_hosted:
+        right_children.append(
+            dmc.ActionIcon(
+                DashIconify(icon="tabler:home", width=20),
+                id="btn-start-over",
+                variant="subtle",
+                size="sm",
+            )
+        )
 
     right = dmc.Group(
         right_children,
@@ -215,8 +252,45 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool) -> dmc.AppShe
     style={"boxShadow": "0 2px 6px rgba(0,0,0,0.1)"})
 
 
-def _build_app_footer() -> dmc.AppShellFooter:
+def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
     """Sticky footer: save status + timer (left), navigation controls (right)."""
+    # Right side of nav row: Next+Save (single mode) or Next+Download+StartOver (hosted)
+    if is_hosted:
+        right_nav = dmc.Group([
+            dmc.Button(
+                "Next", id="btn-next", variant="outline", size="sm",
+                fullWidth=True,
+                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                style={"flex": "1"},
+            ),
+            dmc.Button(
+                DashIconify(icon="tabler:download", width=16),
+                id="btn-download",
+                variant="outline",
+                size="sm",
+                px="xs",
+            ),
+        ], gap="xs", wrap="nowrap", style={"flex": "1"})
+        save_right = None
+    else:
+        right_nav = dmc.Group([
+            dmc.Button(
+                "Next", id="btn-next", variant="outline", size="sm",
+                fullWidth=True,
+                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+            ),
+            dmc.Button(
+                DashIconify(icon="tabler:device-floppy", width=16),
+                id="btn-save",
+                variant="outline",
+                size="sm",
+                px="xs",
+                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+            ),
+        ], gap=0, wrap="nowrap", style={"flex": "1"})
+        save_right = dmc.Text(id="save-status-text", size="sm", c="dimmed")
+
     return dmc.AppShellFooter(
         dmc.Stack(
             [
@@ -256,23 +330,8 @@ def _build_app_footer() -> dmc.AppShellFooter:
                                 style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
                             ),
                         ], gap=0, wrap="nowrap", style={"flex": "1"}),
-                        # Next + save (grows)
-                        dmc.Group([
-                            dmc.Button(
-                                "Next", id="btn-next", variant="outline", size="sm",
-                                fullWidth=True,
-                                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
-                            ),
-                            dmc.Button(
-                                DashIconify(icon="tabler:device-floppy", width=16),
-                                id="btn-save",
-                                variant="outline",
-                                size="sm",
-                                px="xs",
-                                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
-                            ),
-                        ], gap=0, wrap="nowrap", style={"flex": "1"}),
+                        # Right nav group
+                        right_nav,
                     ],
                     gap="sm",
                     align="center",
@@ -289,7 +348,7 @@ def _build_app_footer() -> dmc.AppShellFooter:
                             ),
                             dmc.Text(id="timing-text", size="sm", c="dimmed"),
                         ], gap="xs"),
-                        dmc.Text(id="save-status-text", size="sm", c="dimmed"),
+                        save_right or dmc.Text(id="save-status-text", size="sm", c="dimmed"),
                     ],
                     justify="space-between",
                 ),

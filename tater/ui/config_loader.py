@@ -33,9 +33,6 @@ def load_config_module(path: str) -> dict[str, Any]:
     ``instructions``
         Optional markdown help text shown in the app instructions drawer.
 
-    ``theme``
-        ``"light"`` or ``"dark"`` (optional, defaults to ``"light"``).
-
     ``register_callbacks``
         A callable ``(app: TaterApp) -> None`` called after
         ``set_annotation_widgets()``.  Use for escape-hatch Dash callbacks
@@ -63,6 +60,5 @@ def load_config_module(path: str) -> dict[str, Any]:
         "title": getattr(module, "title", None),
         "description": getattr(module, "description", None),
         "instructions": getattr(module, "instructions", None),
-        "theme": getattr(module, "theme", "light"),
         "register_callbacks": getattr(module, "register_callbacks", None),
     }

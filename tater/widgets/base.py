@@ -65,20 +65,16 @@ def _build_conditional_callbacks(
     """
     from dash import Output, Input, no_update
 
-    if isinstance(target_value, bool):
-        target_js = "true" if target_value else "false"
-    else:
-        target_js = f'"{target_value}"'
+    _empty = empty_value
+    _target = target_value
 
-    app.clientside_callback(
-        f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
+    @app.callback(
         Output(wrapper_id, "style"),
         Input(controlling_id, controlling_prop),
         prevent_initial_call=False,
     )
-
-    _empty = empty_value
-    _target = target_value
+    def _show_when_matching(v):
+        return {} if v == _target else {"display": "none"}
 
     @app.callback(
         Output(self_id, value_prop, allow_duplicate=True),

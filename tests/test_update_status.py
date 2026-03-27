@@ -46,6 +46,13 @@ def make_app(schema_model, widgets, docs, tmp_path):
     return app
 
 
+def make_stores(app):
+    """Build annotations_data and metadata_data dicts from app server-side state."""
+    annotations_data = {doc_id: ann.model_dump() for doc_id, ann in app.annotations.items()}
+    metadata_data = {doc_id: meta.model_dump() for doc_id, meta in app.metadata.items()}
+    return annotations_data, metadata_data
+
+
 # ---------------------------------------------------------------------------
 # _has_value
 # ---------------------------------------------------------------------------
@@ -87,28 +94,32 @@ class TestUpdateStatusForDoc:
     def test_not_started_when_not_visited(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
         # metadata.visited defaults to False
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "not_started"
+        annotations_data, metadata_data = make_stores(app)
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "not_started"
 
     def test_no_required_widgets_is_complete(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label")], ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "complete"
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "complete"
 
     def test_required_filled_is_complete(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
-        app.annotations["d1"].label = "pos"
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "complete"
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
+        annotations_data["d1"]["label"] = "pos"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "complete"
 
     def test_required_empty_is_in_progress(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
         # label stays None
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "in_progress"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "in_progress"
 
     def test_all_required_must_be_filled(self, tmp_path):
         widgets = [
@@ -116,53 +127,58 @@ class TestUpdateStatusForDoc:
             TextInputWidget("notes", required=True),
         ]
         app = make_app(Simple, widgets, ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
-        app.annotations["d1"].label = "pos"
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
+        annotations_data["d1"]["label"] = "pos"
         # notes still None
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "in_progress"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "in_progress"
 
-        app.annotations["d1"].notes = "some text"
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "complete"
+        annotations_data["d1"]["notes"] = "some text"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "complete"
 
     def test_boolean_required_does_not_gate_completion(self, tmp_path):
         # required=True on a bool widget should not block complete status
         app = make_app(BoolOnly, [CheckboxWidget("reviewed", required=True)], ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
         # reviewed stays None (unchecked = False in practice, but type is bool)
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "complete"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "complete"
 
     def test_no_doc_id_is_noop(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
+        annotations_data, metadata_data = make_stores(app)
         # Should not raise
-        update_status_for_doc(app, "")
-        update_status_for_doc(app, None)
+        update_status_for_doc(app, "", annotations_data, metadata_data)
+        update_status_for_doc(app, None, annotations_data, metadata_data)
 
     def test_status_updates_independently_per_doc(self, tmp_path):
         widgets = [RadioGroupWidget("label", required=True)]
         app = make_app(Simple, widgets, ["d1", "d2"], tmp_path)
-        app.metadata["d1"].visited = True
-        app.metadata["d2"].visited = True
-        app.annotations["d1"].label = "pos"
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
+        metadata_data["d2"]["visited"] = True
+        annotations_data["d1"]["label"] = "pos"
         # d2 label stays None
 
-        update_status_for_doc(app, "d1")
-        update_status_for_doc(app, "d2")
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        update_status_for_doc(app, "d2", annotations_data, metadata_data)
 
-        assert app.metadata["d1"].status == "complete"
-        assert app.metadata["d2"].status == "in_progress"
+        assert metadata_data["d1"]["status"] == "complete"
+        assert metadata_data["d2"]["status"] == "in_progress"
 
     def test_required_in_group_widget(self, tmp_path):
         sub_widget = SelectWidget("value", required=True)
         group = GroupWidget("sub", label="Sub", children=[sub_widget])
         app = make_app(WithGroup, [group], ["d1"], tmp_path)
-        app.metadata["d1"].visited = True
+        annotations_data, metadata_data = make_stores(app)
+        metadata_data["d1"]["visited"] = True
 
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "in_progress"
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "in_progress"
 
-        app.annotations["d1"].sub = WithGroup.Sub(value="a")
-        update_status_for_doc(app, "d1")
-        assert app.metadata["d1"].status == "complete"
+        annotations_data["d1"]["sub"] = {"value": "a"}
+        update_status_for_doc(app, "d1", annotations_data, metadata_data)
+        assert metadata_data["d1"]["status"] == "complete"
