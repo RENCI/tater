@@ -78,7 +78,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     )
 
     return dmc.MantineProvider(
-        defaultColorScheme=tater_app.theme,
+        defaultColorScheme="auto",
         children=[
             dmc.NotificationContainer(
                 id="notification-container",
@@ -213,7 +213,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     )
 
     theme_toggle = dmc.ColorSchemeToggle(
-        computedColorScheme=tater_app.theme,
+        computedColorScheme="auto",
         lightIcon=DashIconify(icon="tabler:sun", width=20),
         darkIcon=DashIconify(icon="tabler:moon", width=20),
         size="sm",

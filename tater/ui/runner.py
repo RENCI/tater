@@ -27,7 +27,6 @@ def run_single(args) -> None:
     title = config.get("title")
     description = config.get("description")
     instructions = config.get("instructions")
-    theme = config.get("theme", "light")
     register_callbacks = config.get("register_callbacks")
 
     if schema_model is None:
@@ -52,7 +51,6 @@ def run_single(args) -> None:
         title=title,
         description=description,
         instructions=instructions,
-        theme=theme,
         annotations_path=args.annotations,
         schema_model=schema_model,
     )
@@ -169,7 +167,6 @@ def _build_session_app(dash_app, session_info: dict):
         title=config.get("title", "tater"),
         description=config.get("description"),
         instructions=config.get("instructions"),
-        theme=config.get("theme", "light"),
         annotations_path=None,  # no auto-save in hosted mode
         schema_model=schema_model,
         is_hosted=True,

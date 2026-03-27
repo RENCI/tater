@@ -24,7 +24,6 @@ class TaterApp:
         title: Optional[str] = None,
         description: Optional[str] = None,
         instructions: Optional[str] = None,
-        theme: str = "light",
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
         on_save: Optional[OnSaveHook] = None,
@@ -38,7 +37,6 @@ class TaterApp:
             title: Application title
             description: Optional subtitle shown below the title
             instructions: Optional markdown instructions shown in a help drawer
-            theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
             is_hosted: If True, running in hosted mode (no auto-save, download button shown)
@@ -47,7 +45,6 @@ class TaterApp:
         self.title = title or "tater - document annotation"
         self.description = description
         self.instructions = instructions
-        self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model
         self.on_save = on_save

@@ -200,13 +200,25 @@ def build_upload_layout() -> dmc.MantineProvider:
     )
 
     return dmc.MantineProvider(
-        defaultColorScheme="light",
+        defaultColorScheme="auto",
         children=[
             dcc.Location(id="upload-location", refresh=True),
             dmc.Box(
-                _tab_links(justify="flex-end"),
+                dmc.Group(
+                    [
+                        _tab_links(),
+                        dmc.ColorSchemeToggle(
+                            lightIcon=DashIconify(icon="tabler:sun", width=18),
+                            darkIcon=DashIconify(icon="tabler:moon", width=18),
+                            size="sm",
+                        ),
+                    ],
+                    justify="flex-end",
+                    gap="sm",
+                ),
                 px="xl",
                 py="xs",
+                style={"borderBottom": "1px solid var(--mantine-color-gray-3)"},
             ),
             dmc.Container(
                 dmc.Stack(
