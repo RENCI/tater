@@ -22,6 +22,7 @@ tater/                  # Library package
                         #   _widget_from_field_type, _humanize
     json_loader.py      # JSON schema → (Pydantic model, partial widget list)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
+    upload_layout.py    # Hosted-mode upload page layout + callbacks
   widgets/              # All widget classes
     base.py             # Widget base class hierarchy (see Widget conventions)
     repeater.py         # RepeaterWidget (abstract), ListableWidget, TabsWidget
@@ -45,8 +46,15 @@ tater --config apps/examples/config/hooks.py  --documents data/documents.json
 tater --schema apps/examples/schema/simple.json --documents data/documents.json
 ```
 
-CLI flags: `--documents` (required), `--config` or `--schema` (one required),
-`--annotations`, `--port`, `--host`, `--debug` (also via `TATER_DEBUG` / `TATER_PORT` / `TATER_HOST` env vars).
+Hosted mode (upload page at `/`, annotation UI at `/annotate`):
+
+```bash
+tater --hosted [--port 8050] [--host 0.0.0.0]
+```
+
+CLI flags: `--documents` (required in single mode), `--config` or `--schema` (one required in single mode),
+`--annotations`, `--port`, `--host`, `--debug`, `--hosted`
+(also via `TATER_DEBUG` / `TATER_PORT` / `TATER_HOST` env vars).
 
 ## Architecture
 
@@ -62,7 +70,9 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
   by the Python config path.
 - **Callbacks**: each widget registers its own Dash callbacks in `register_callbacks(app)`.
   The central `callbacks.py` handles navigation, doc loading, and metadata (flag/notes/status).
-- **Persistence**: `TaterApp._save_annotations_to_file()` is called eagerly on every change.
+- **Persistence**: `TaterApp._save_annotations_to_file()` is called eagerly on every change
+  in single mode. In hosted mode `annotations_path` is `None` — no auto-save; annotations live
+  in `dcc.Store` client-side and the user downloads them explicitly.
   Format: `{doc_id: {annotations: {...}, metadata: {...}}}`.
 - **value_helpers**: `get_model_value` / `set_model_value` in `tater/ui/value_helpers.py`
   handle dot-path reads/writes into nested Pydantic model instances.
@@ -70,6 +80,41 @@ CLI flags: `--documents` (required), `--config` or `--schema` (one required),
   change and populates both `flag-document` (checked) and `document-notes` (value) from
   `tater_app.metadata`. This is the only callback that writes to these outputs on navigation —
   the corresponding `save_flag` / `save_notes` callbacks only write on user interaction.
+
+## Hosted mode
+
+`--hosted` launches a multi-user server. The Dash app is shared; per-user state is isolated
+via Flask session cookies and a server-side `_session_cache` dict.
+
+**Session flow:** user uploads schema JSON + documents JSON (+ optional ontology YAML files if
+the schema has file-path `hierarchies` references) → server writes them to a `tempfile.mkdtemp`
+directory → paths stored in `flask.session["tater_session"]` → redirect to `/annotate` →
+`serve_layout()` reads the session, retrieves or builds the `TaterApp` from the temp files,
+returns the annotation layout.
+
+**Ontology files in hosted mode:** `hierarchies` entries in a JSON schema that reference
+external YAML files (e.g. `"ontology": "../data/pets.yaml"`) cannot be resolved from temp
+storage. The upload page detects these file-path references, shows a compact per-file upload
+zone for each, and rewrites the paths in the schema to absolute temp paths before writing
+`schema.json`. Inline hierarchy dicts work without any upload.
+
+**Always-register callbacks:** span, repeater, nested-repeater, hierarchical-label, and
+hierarchical-label-tags callbacks are registered once at server startup (not per-session).
+They use a `_ta()` runtime resolver — `app._tater_get_current_app` is a function stored on
+the Dash app that looks up the calling user's `TaterApp` from `_session_cache` via
+`flask.session` at callback invocation time. This avoids re-registering callbacks for each
+upload session (Dash only allows each output to be registered once).
+
+**Relay store pattern:** Dash prohibits mixing MATCH dict-ID outputs with static string
+outputs in the same callback (e.g. `{"type": "span-trigger", "field": MATCH}` + `"annotations-store"`).
+The solution used throughout: embed the annotation update in the MATCH relay store data, then
+a separate ALL-input relay callback reads from all relay stores and writes to `annotations-store`.
+Widgets that use this pattern each include a relay store in their rendered output:
+- Repeater: `{"type": "repeater-ann-relay", "field": pipe_field}`
+- Nested repeater: `{"type": "nested-repeater-ann-relay", "ld": ld, "li": li}`
+- HierarchicalLabel (full/compact): `{"type": "hier-ann-relay", "field": pipe_field}`
+- HierarchicalLabelTags: `{"type": "hl-tags-ann-relay", "field": pipe_field}`
+- Span: span-trigger store data carries `{"count": N, "annotations_update": {...}}`
 
 ## DMC version constraints
 
@@ -95,11 +140,15 @@ if not ctx.triggered or not ctx.triggered[0].get("value"):
 **`allow_duplicate` must be consistent**: if *any* callback uses
 `Output(component_id, prop, allow_duplicate=True)`, then *all* callbacks writing to that same
 output must also use `allow_duplicate=True`. Missing it on one will cause Dash to raise a
-`DuplicateCallback` error at startup. Two specific outputs in this codebase are affected:
+`DuplicateCallback` error at startup. Outputs in this codebase that use `allow_duplicate=True`:
 
 - **`current-doc-id` / `data`** — written by the prev/next buttons and the document-menu
   selector. All three already use `allow_duplicate=True`; any new navigation callback must too.
   See the comment block on the first such callback in `callbacks.py`.
+
+- **`annotations-store` / `data`** — written by the main save callback and by multiple relay
+  callbacks (repeater, nested repeater, HL, HL tags, span). All use `allow_duplicate=True`.
+  New callbacks writing to `annotations-store` must also use it.
 
 - **Widget value props** (e.g. `annotation-<field>` / `value` or `checked`) — when a widget
   has `_condition` set, two callbacks both write to its value prop: `update_widget_value`

@@ -385,7 +385,7 @@ JSON file listing documents to annotate. Document text can be provided inline or
 
 Each document may have:
 - `text` — inline document text (use this or `file_path`, not both)
-- `file_path` — path to a `.txt` file (use this or `text`, not both)
+- `file_path` — path to a `.txt` file; resolved relative to the documents file (use this or `text`, not both; **not supported in hosted mode**)
 - `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
 - `name` — display name
 - `info` — arbitrary metadata dict shown in the UI
@@ -410,19 +410,42 @@ Status values: `"not_started"`, `"in_progress"`, `"complete"`.
 ```
 tater --config CONFIG --documents PATH [options]
 tater --schema SCHEMA --documents PATH [options]
+tater --hosted [options]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--config PATH` | Python config file (one of `--config` / `--schema` required) |
-| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required) |
-| `--documents PATH` | Documents JSON file (required) |
+| `--config PATH` | Python config file (one of `--config` / `--schema` required in single mode) |
+| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required in single mode) |
+| `--documents PATH` | Documents JSON file (required in single mode) |
 | `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
+| `--hosted` | Run in hosted mode (upload page at `/`, annotation UI at `/annotate`) |
 | `--port INT` | Server port (default: `8050`) |
 | `--host STR` | Bind address (default: `127.0.0.1`) |
 | `--debug` | Enable debug/hot-reload mode |
 
-Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
+Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`, `TATER_SECRET_KEY`.
+
+## Hosted mode
+
+Hosted mode lets multiple users upload their own schema and documents and annotate independently — no server-side annotation state is kept between sessions.
+
+```bash
+tater --hosted --host 0.0.0.0 --port 8050
+```
+
+**Flow:**
+1. User visits `/` → upload page with schema (JSON) and documents (JSON) upload zones
+2. If the schema references external hierarchy files, per-file upload zones appear automatically
+3. Click **Start Annotating** → redirected to `/annotate`
+4. Annotate documents; click **Download** in the footer to save annotations as JSON
+5. Click the home icon in the header to start over with a new schema/documents pair
+
+**Hosted mode constraints vs. single mode:**
+- No auto-save — annotations live in the browser (`dcc.Store`) and must be downloaded explicitly
+- `file_path` is not supported in documents — use inline `text` instead
+- Hierarchy files referenced by path in the schema must be uploaded separately (inline hierarchy dicts work without upload)
+- `register_callbacks` in Python config files is not called — use JSON schemas for hosted deployments
 
 ## Testing
 
