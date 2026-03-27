@@ -105,6 +105,25 @@ def _tab_links(justify: str = "flex-end") -> dmc.Group:
 
 
 # ---------------------------------------------------------------------------
+# Layout helpers
+# ---------------------------------------------------------------------------
+
+def _status_icon(complete: bool, optional: bool = False, size: int = 52) -> dmc.ThemeIcon:
+    icon = "tabler:check" if (complete or not optional) else "tabler:question-mark"
+    variant = "filled" if complete else "outline"
+    color = "blue" if complete else "gray"
+    return dmc.ThemeIcon(
+        DashIconify(icon=icon, width=size // 2),
+        size=size,
+        radius="xl",
+        variant=variant,
+        color=color,
+    )
+
+
+
+
+# ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
 
@@ -114,29 +133,48 @@ def build_upload_layout() -> dmc.MantineProvider:
 
     upload_tab = dmc.Stack(
         [
-            _upload_zone(
-                upload_id="upload-schema",
-                label="Schema (JSON)",
-                hint="A tater JSON schema file describing the annotation fields.",
-                icon="tabler:file-code",
+            dmc.Stack(
+                [
+                    _upload_zone(
+                        upload_id="upload-schema",
+                        label="Schema (JSON)",
+                        hint="A tater JSON schema file describing the annotation fields.",
+                        icon="tabler:file-code",
+                        status_id="schema-status",
+                    ),
+                    html.Div(id="schema-feedback", style={"minHeight": "20px"}),
+                    # Ontology section — rendered dynamically when schema has file refs
+                    html.Div(id="hierarchy-upload-section"),
+                ],
+                gap="xs",
             ),
-            html.Div(id="schema-feedback"),
-            # Ontology section — rendered dynamically when schema has file refs
-            html.Div(id="hierarchy-upload-section"),
-            _upload_zone(
-                upload_id="upload-documents",
-                label="Documents (JSON)",
-                hint="A JSON array of document objects with at least an 'id' and 'text' field.",
-                icon="tabler:file-text",
+            dmc.Stack(
+                [
+                    _upload_zone(
+                        upload_id="upload-documents",
+                        label="Documents (JSON)",
+                        hint="A JSON array of document objects with at least an 'id' and 'text' field.",
+                        icon="tabler:file-text",
+                        status_id="documents-status",
+                    ),
+                    html.Div(id="documents-feedback", style={"minHeight": "20px"}),
+                ],
+                gap="xs",
             ),
-            html.Div(id="documents-feedback"),
-            _upload_zone(
-                upload_id="upload-annotations",
-                label="Existing Annotations (JSON) — optional",
-                hint="A tater annotations file to resume from. Leave empty to start fresh.",
-                icon="tabler:file-arrow-right",
+            dmc.Stack(
+                [
+                    _upload_zone(
+                        upload_id="upload-annotations",
+                        label="Existing Annotations (JSON) — optional",
+                        hint="A tater annotations file to resume from. Leave empty to start fresh.",
+                        icon="tabler:file-arrow-right",
+                        status_id="annotations-status",
+                        optional=True,
+                    ),
+                    html.Div(id="annotations-feedback", style={"minHeight": "20px"}),
+                ],
+                gap="xs",
             ),
-            html.Div(id="annotations-feedback"),
             dmc.Button(
                 "Start Annotating",
                 id="btn-start",
@@ -221,35 +259,43 @@ def build_upload_layout() -> dmc.MantineProvider:
     )
 
 
-def _upload_zone(upload_id: str, label: str, hint: str, icon: str) -> dmc.Stack:
-    return dmc.Stack(
-        [
-            dmc.Text(label, fw=500, size="sm"),
-            dcc.Upload(
-                dmc.Paper(
-                    dmc.Stack(
-                        [
-                            DashIconify(icon=icon, width=32, color="gray"),
-                            dmc.Text("Drag and drop or click to select", size="sm", c="dimmed"),
-                            dmc.Text(hint, size="xs", c="dimmed", ta="center"),
-                        ],
-                        align="center",
-                        gap="xs",
-                    ),
-                    p="md",
-                    withBorder=True,
-                    radius="md",
-                    style={"cursor": "pointer", "borderStyle": "dashed"},
-                ),
-                id=upload_id,
-                multiple=False,
-                accept=".json",
-                style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
-                style_active={"borderStyle": "solid", "borderColor": "#6c6", "borderRadius": 10},
+def _upload_zone(
+    upload_id: str, label: str, hint: str, icon: str,
+    status_id: str | None = None, optional: bool = False,
+) -> dmc.Stack:
+    upload = dcc.Upload(
+        dmc.Paper(
+            dmc.Stack(
+                [
+                    DashIconify(icon=icon, width=32, color="gray"),
+                    dmc.Text("Drag and drop or click to select", size="sm", c="dimmed"),
+                    dmc.Text(hint, size="xs", c="dimmed", ta="center"),
+                ],
+                align="center",
+                gap="xs",
             ),
-        ],
-        gap="xs",
+            p="md",
+            withBorder=True,
+            radius="md",
+            style={"cursor": "pointer", "borderStyle": "dashed"},
+        ),
+        id=upload_id,
+        multiple=False,
+        accept=".json",
+        style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
+        style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
     )
+    upload_row = (
+        html.Div(
+            [
+                html.Div(upload, style={"flex": "1", "minWidth": 0}),
+                html.Div(id=status_id, children=_status_icon(False, optional=optional)),
+            ],
+            style={"display": "flex", "alignItems": "center", "gap": "12px"},
+        )
+        if status_id else upload
+    )
+    return dmc.Stack([dmc.Text(label, fw=500, size="sm"), upload_row], gap="xs")
 
 
 def _compact_upload_zone(upload_id) -> dcc.Upload:
@@ -273,7 +319,7 @@ def _compact_upload_zone(upload_id) -> dcc.Upload:
         multiple=False,
         accept=".yaml,.yml,.json",
         style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
-        style_active={"borderStyle": "solid", "borderColor": "#6c6", "borderRadius": 10},
+        style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
     )
 
 
@@ -342,8 +388,22 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             rows.append(dmc.Stack(
                 [
                     dmc.Text(filename, size="xs", c="dimmed"),
-                    _compact_upload_zone({"type": "hierarchy-upload", "ref": ref_name}),
-                    html.Div(id={"type": "hierarchy-feedback", "ref": ref_name}),
+                    dmc.Group(
+                        [
+                            dmc.Box(
+                                _compact_upload_zone({"type": "hierarchy-upload", "ref": ref_name}),
+                                style={"flex": "1", "minWidth": 0},
+                            ),
+                            html.Div(
+                                id={"type": "hierarchy-status", "ref": ref_name},
+                                children=_status_icon(False, size=28),
+                            ),
+                        ],
+                        align="center",
+                        gap="sm",
+                        wrap="nowrap",
+                    ),
+                    html.Div(id={"type": "hierarchy-feedback", "ref": ref_name}, style={"minHeight": "20px"}),
                     dcc.Store(id={"type": "hierarchy-relay", "ref": ref_name}, data=None),
                 ],
                 gap="4",
@@ -456,6 +516,27 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         if pending and set(pending.keys()) != set((hierarchy_files or {}).keys()):
             return True
         return False
+
+    # Update ontology file status icons
+    @app.callback(
+        Output({"type": "hierarchy-status", "ref": MATCH}, "children"),
+        Input({"type": "hierarchy-relay", "ref": MATCH}, "data"),
+    )
+    def hierarchy_status(data):
+        return _status_icon(data is not None, size=28)
+
+    # Update upload zone status icons
+    @app.callback(Output("schema-status", "children"), Input("schema-store", "data"))
+    def schema_status(data):
+        return _status_icon(data is not None)
+
+    @app.callback(Output("documents-status", "children"), Input("documents-store", "data"))
+    def documents_status(data):
+        return _status_icon(data is not None)
+
+    @app.callback(Output("annotations-status", "children"), Input("annotations-upload-store", "data"))
+    def annotations_status(data):
+        return _status_icon(data is not None, optional=True)
 
     # Handle submit: write temp files, store paths in flask.session, redirect
     @app.callback(
@@ -591,8 +672,8 @@ def _validate_schema_json(data: dict) -> tuple[bool, str]:
 
 
 def _error_text(msg: str):
-    return dmc.Text(msg, size="xs", c="red", mt="xs")
+    return dmc.Text(msg, size="xs", c="red")
 
 
 def _success_text(msg: str):
-    return dmc.Text(msg, size="xs", c="teal", mt="xs")
+    return dmc.Text(msg, size="xs", c="blue")
