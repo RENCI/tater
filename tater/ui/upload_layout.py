@@ -16,7 +16,7 @@ import secrets
 import tempfile
 from pathlib import Path
 
-from dash import Dash, Input, Output, State, dcc, html, no_update
+from dash import ALL, MATCH, Dash, Input, Output, State, ctx, dcc, html, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
@@ -121,7 +121,7 @@ def _upload_zone(upload_id: str, label: str, hint: str, icon: str) -> dmc.Stack:
     )
 
 
-def _compact_upload_zone(upload_id: str) -> dcc.Upload:
+def _compact_upload_zone(upload_id) -> dcc.Upload:
     """Smaller upload zone for ontology files."""
     return dcc.Upload(
         dmc.Paper(
@@ -139,7 +139,7 @@ def _compact_upload_zone(upload_id: str) -> dcc.Upload:
             style={"cursor": "pointer", "borderStyle": "dashed"},
         ),
         id=upload_id,
-        multiple=True,
+        multiple=False,
         accept=".yaml,.yml,.json",
         style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
         style_active={"borderStyle": "solid", "borderColor": "#6c6", "borderRadius": 10},
@@ -166,19 +166,20 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         Output("schema-store", "data"),
         Output("schema-feedback", "children"),
         Output("pending-hierarchies", "data"),
+        Output("hierarchy-files-store", "data", allow_duplicate=True),
         Input("upload-schema", "contents"),
         State("upload-schema", "filename"),
         prevent_initial_call=True,
     )
     def validate_schema(contents, filename):
         if not contents:
-            return None, None, {}
+            return None, None, {}, {}
         result, error = _decode_json_upload(contents, filename)
         if error:
-            return None, _error_text(error), {}
+            return None, _error_text(error), {}, {}
         ok, msg = _validate_schema_json(result)
         if not ok:
-            return None, _error_text(msg), {}
+            return None, _error_text(msg), {}, {}
         def _field_name(f):
             if f.get("id"):
                 return f["id"]
@@ -195,9 +196,9 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             for name, source in result.get("hierarchies", {}).items()
             if isinstance(source, str)
         }
-        return result, _success_text(summary), pending
+        return result, _success_text(summary), pending, {}
 
-    # Render ontology upload section when schema has file-path hierarchy refs
+    # Render ontology upload section — one compact zone per hierarchy file
     @app.callback(
         Output("hierarchy-upload-section", "children"),
         Input("pending-hierarchies", "data"),
@@ -205,59 +206,60 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def render_hierarchy_section(pending):
         if not pending:
             return None
-        filenames = list(pending.values())
+        rows = []
+        for ref_name, filename in pending.items():
+            rows.append(dmc.Stack(
+                [
+                    dmc.Text(filename, size="xs", c="dimmed"),
+                    _compact_upload_zone({"type": "hierarchy-upload", "ref": ref_name}),
+                    html.Div(id={"type": "hierarchy-feedback", "ref": ref_name}),
+                    dcc.Store(id={"type": "hierarchy-relay", "ref": ref_name}, data=None),
+                ],
+                gap="4",
+            ))
         return dmc.Stack(
-            [
-                dmc.Divider(),
-                dmc.Text("Ontology Files", fw=500, size="sm"),
-                dmc.Text(
-                    f"Required: {', '.join(filenames)}",
-                    size="xs", c="dimmed",
-                ),
-                _compact_upload_zone("upload-hierarchies"),
-                html.Div(id="hierarchy-feedback"),
-                dmc.Divider(),
-            ],
+            [dmc.Divider(), dmc.Text("Ontology Files", fw=500, size="sm")] + rows + [dmc.Divider()],
             gap="xs",
         )
 
-    # Handle ontology file uploads
+    # Handle each ontology file upload independently via MATCH.
+    # Resets contents to None after each upload so re-uploading always fires.
     @app.callback(
-        Output("hierarchy-files-store", "data"),
-        Output("hierarchy-feedback", "children"),
-        Input("upload-hierarchies", "contents"),
-        State("upload-hierarchies", "filename"),
+        Output({"type": "hierarchy-relay", "ref": MATCH}, "data"),
+        Output({"type": "hierarchy-feedback", "ref": MATCH}, "children"),
+        Output({"type": "hierarchy-upload", "ref": MATCH}, "contents"),
+        Input({"type": "hierarchy-upload", "ref": MATCH}, "contents"),
+        State({"type": "hierarchy-upload", "ref": MATCH}, "filename"),
         State("pending-hierarchies", "data"),
         prevent_initial_call=True,
     )
-    def handle_hierarchy_uploads(contents_list, filenames, pending):
-        if not contents_list or not pending:
-            return {}, None
-        if not isinstance(contents_list, list):
-            contents_list, filenames = [contents_list], [filenames]
+    def handle_one_hierarchy(contents, filename, pending):
+        if not contents:
+            return no_update, no_update, no_update
+        ref_name = ctx.triggered_id["ref"]
+        expected = (pending or {}).get(ref_name, "")
+        if filename != expected:
+            return None, _error_text(f"Expected '{expected}', got '{filename}'."), None
+        try:
+            _header, encoded = contents.split(",", 1)
+            content = base64.b64decode(encoded).decode("utf-8")
+        except Exception:
+            return None, _error_text(f"Could not decode '{filename}'."), None
+        return {"filename": filename, "content": content}, _success_text(f"✓ {filename}"), None
 
-        filename_to_ref = {v: k for k, v in pending.items()}
-        result = {}
-        for contents, filename in zip(contents_list, filenames):
-            try:
-                _header, encoded = contents.split(",", 1)
-                decoded = base64.b64decode(encoded).decode("utf-8")
-            except Exception:
-                return {}, _error_text(f"Could not decode '{filename}'.")
-            ref = filename_to_ref.get(filename)
-            if ref:
-                result[ref] = {"filename": filename, "content": decoded}
-
-        missing = [pending[k] for k in pending if k not in result]
-        if missing:
-            loaded = len(result)
-            msg = f"✓ {loaded} file(s) loaded." if loaded else ""
-            return result, dmc.Stack([
-                _success_text(msg) if msg else None,
-                _error_text(f"Still needed: {', '.join(missing)}"),
-            ], gap=0)
-
-        return result, _success_text(f"✓ {len(result)} ontology file(s) loaded.")
+    # Relay all per-hierarchy uploads into hierarchy-files-store
+    @app.callback(
+        Output("hierarchy-files-store", "data", allow_duplicate=True),
+        Input({"type": "hierarchy-relay", "ref": ALL}, "data"),
+        prevent_initial_call=True,
+    )
+    def relay_hierarchy_files(relay_data_list):
+        ref_names = [t["id"]["ref"] for t in ctx.inputs_list[0]]
+        return {
+            ref: data
+            for ref, data in zip(ref_names, relay_data_list)
+            if data is not None
+        }
 
     # Validate documents upload
     @app.callback(
