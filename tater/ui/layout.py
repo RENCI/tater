@@ -129,7 +129,10 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 position="top",
                 size="lg",
                 padding="md",
-                children=dcc.Markdown(tater_app.instructions or ""),
+                children=[
+                    dmc.Divider(mb="md"),
+                    dcc.Markdown(tater_app.instructions or ""),
+                ],
             ) if has_instructions else None,
         ],
     )
