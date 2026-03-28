@@ -1,0 +1,32 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - simple",
+  "description": "All widgets specified explicitly.",
+  "instructions": "**Annotate the pet's current mood** using the segmented control.\n\n**Mark 'Needs Attention'** if this pet requires immediate care.",
+  "data_schema": [
+    {
+      "id": "pet_mood",
+      "type": "choice",
+      "options": [
+        "happy",
+        "anxious",
+        "calm"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Pet Mood",
+        "description": "Overall mood of the pet in this record",
+        "required": true
+      }
+    },
+    {
+      "id": "needs_attention",
+      "type": "boolean",
+      "widget": {
+        "type": "checkbox",
+        "label": "Needs Attention?",
+        "description": "Does this pet require immediate attention?"
+      }
+    }
+  ]
+}

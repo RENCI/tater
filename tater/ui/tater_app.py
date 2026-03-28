@@ -24,10 +24,11 @@ class TaterApp:
         title: Optional[str] = None,
         description: Optional[str] = None,
         instructions: Optional[str] = None,
-        theme: str = "light",
         annotations_path: Optional[str] = None,
         schema_model: Optional[Type[BaseModel]] = None,
         on_save: Optional[OnSaveHook] = None,
+        is_hosted: bool = False,
+        dash_app: Optional[Any] = None,
     ):
         """
         Initialize the Tater app.
@@ -36,18 +37,22 @@ class TaterApp:
             title: Application title
             description: Optional subtitle shown below the title
             instructions: Optional markdown instructions shown in a help drawer
-            theme: Color theme ("light" or "dark")
             annotations_path: Path to save/load annotations
             schema_model: Optional Pydantic model class for annotations
+            is_hosted: If True, running in hosted mode (no auto-save, download button shown)
+            dash_app: External Dash app to register callbacks on (hosted mode)
         """
         self.title = title or "tater - document annotation"
         self.description = description
         self.instructions = instructions
-        self.theme = theme
         self.annotations_path = annotations_path
         self.schema_model = schema_model
         self.on_save = on_save
-        self.app = Dash(__name__, title="tater", suppress_callback_exceptions=True)
+        self.is_hosted = is_hosted
+        self.app = dash_app if dash_app is not None else Dash(__name__, title="tater", suppress_callback_exceptions=True)
+        # In hosted mode the shared Dash app carries a callable that resolves
+        # the current user's TaterApp from the Flask session at callback runtime.
+        self._get_current_app = getattr(self.app, '_tater_get_current_app', None)
         self.widgets: list[TaterWidget] = []
         self.documents: list[Document] = []
         self.current_doc_index = 0
@@ -89,8 +94,8 @@ class TaterApp:
             
             self.documents = documents
             
-            # Set default annotations path if not provided
-            if self.annotations_path is None:
+            # Set default annotations path if not provided (skip in hosted mode)
+            if self.annotations_path is None and not self.is_hosted:
                 doc_path = Path(source)
                 self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
@@ -166,17 +171,23 @@ class TaterApp:
             for widget in self.widgets:
                 widget.bind_schema(self.schema_model)
 
-        # Register any widget-specific callbacks
-        for widget in self.widgets:
-            widget.register_callbacks(self.app)
-            widget._register_conditional_callbacks(self.app)
+        if not self.is_hosted:
+            self._setup_layout()
 
-        self._setup_layout()
-        self._setup_callbacks()
-        self._setup_value_capture_callbacks()
-        self._setup_span_callbacks()
-        self._setup_repeater_callbacks()
-        self._setup_hl_callbacks()
+        # In hosted mode the Dash app is shared across sessions; only register
+        # callbacks once (the first session sets them up for the shared app).
+        _already = self.is_hosted and getattr(self.app, '_tater_callbacks_registered', False)
+        if not _already:
+            for widget in self.widgets:
+                widget.register_callbacks(self.app)
+                widget._register_conditional_callbacks(self.app)
+            self._setup_callbacks()
+            self._setup_value_capture_callbacks()
+            self._setup_span_callbacks()
+            self._setup_repeater_callbacks()
+            self._setup_hl_callbacks()
+            if self.is_hosted:
+                self.app._tater_callbacks_registered = True
 
     def _setup_layout(self) -> None:
         """Create the Dash layout with navigation and annotation panel."""
@@ -225,6 +236,47 @@ class TaterApp:
             print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
             print(f"Error loading annotations: {e}")
+
+    def _save_stores_to_file(
+        self,
+        annotations_data: dict,
+        metadata_data: dict,
+        doc_id: Optional[str] = None,
+    ) -> None:
+        """Save annotations and metadata from dcc.Store dicts to the annotations file.
+
+        Args:
+            annotations_data: {doc_id: annotation_dict} from annotations-store
+            metadata_data: {doc_id: metadata_dict} from metadata-store
+            doc_id: The document whose annotation triggered this save. When provided
+                and an ``on_save`` hook is configured, the hook is called after writing.
+        """
+        try:
+            path = Path(self.annotations_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+            save_dict = {}
+            all_doc_ids = set(annotations_data or {}) | set(metadata_data or {})
+            for d_id in all_doc_ids:
+                save_dict[d_id] = {
+                    "annotations": (annotations_data or {}).get(d_id, {}),
+                    "metadata": (metadata_data or {}).get(d_id, {}),
+                }
+
+            with open(path, "w") as f:
+                json.dump(save_dict, f, indent=2)
+            self._save_error = None
+
+            if self.on_save and doc_id and (annotations_data or {}).get(doc_id) is not None:
+                try:
+                    if self.schema_model:
+                        ann_obj = self.schema_model(**(annotations_data[doc_id]))
+                        self.on_save(doc_id, ann_obj)
+                except Exception as hook_err:
+                    print(f"on_save hook error: {hook_err}")
+        except Exception as e:
+            self._save_error = str(e)
+            print(f"Error saving annotations: {e}")
 
     def _save_annotations_to_file(self, doc_id: Optional[str] = None) -> None:
         """Save all annotations to the annotations file.
@@ -275,6 +327,7 @@ class TaterApp:
     def _setup_repeater_callbacks(self) -> None:
         """Setup unified MATCH-based repeater callbacks."""
         callbacks.setup_repeater_callbacks(self)
+        callbacks.setup_nested_repeater_callbacks(self)
 
     def _setup_hl_callbacks(self) -> None:
         """Setup unified MATCH-based HierarchicalLabel callbacks."""
@@ -315,12 +368,5 @@ class TaterApp:
         value_helpers.set_dict_value(obj, path, value)
 
     def run(self, debug: bool = False, port: int = 8050, host: str = "127.0.0.1") -> None:
-        """
-        Start the Dash development server.
-
-        Args:
-            debug: Enable debug mode
-            port: Port number
-            host: Host address
-        """
+        """Start the Dash development server."""
         self.app.run(debug=debug, port=port, host=host)

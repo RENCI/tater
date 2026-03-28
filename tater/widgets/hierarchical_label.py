@@ -181,9 +181,7 @@ class HierarchicalLabelWidget(TaterWidget):
 
     @property
     def renders_own_label(self) -> bool:
-        return False
-
-    _description_in_component = True
+        return True
 
     def to_python_type(self) -> type:
         return str
@@ -221,37 +219,37 @@ class HierarchicalLabelWidget(TaterWidget):
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         initial_sections = self._render_sections([], pipe_field, None)
-        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
 
-        return dmc.Stack(
-            description + [
-                dmc.TextInput(
-                    id={"type": "hier-search", "field": pipe_field},
-                    placeholder="Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…",
-                    size="xs",
-                    style={} if self.searchable else {"display": "none"},
-                    rightSection=dmc.ActionIcon(
-                        "×",
-                        id={"type": "hier-search-clear", "field": pipe_field},
+        return self._input_wrapper(dmc.Stack(
+                [
+                    dmc.TextInput(
+                        id={"type": "hier-search", "field": pipe_field},
+                        placeholder="Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…",
                         size="xs",
-                        variant="transparent",
-                        c="dimmed",
-                        style={"display": "none"},
+                        style={} if self.searchable else {"display": "none"},
+                        rightSection=dmc.ActionIcon(
+                            "×",
+                            id={"type": "hier-search-clear", "field": pipe_field},
+                            size="xs",
+                            variant="transparent",
+                            c="dimmed",
+                            style={"display": "none"},
+                        ),
+                        rightSectionPointerEvents="all",
                     ),
-                    rightSectionPointerEvents="all",
-                ),
-                dmc.Text(
-                    "",
-                    id={"type": "hier-breadcrumb", "field": pipe_field},
-                    size="xs",
-                    fw=600,
-                    style={} if self._show_breadcrumb else {"display": "none"},
-                ),
-                dmc.Stack(initial_sections, id={"type": "hier-sections", "field": pipe_field}, gap="sm"),
-                dcc.Store(id={"type": "hier-nav", "field": pipe_field}, data=[]),
-            ],
-            gap="xs",
-        )
+                    dmc.Text(
+                        "",
+                        id={"type": "hier-breadcrumb", "field": pipe_field},
+                        size="xs",
+                        fw=600,
+                        style={} if self._show_breadcrumb else {"display": "none"},
+                    ),
+                    dmc.Stack(initial_sections, id={"type": "hier-sections", "field": pipe_field}, gap="sm"),
+                    dcc.Store(id={"type": "hier-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hier-ann-relay", "field": pipe_field}, data=None),
+                ],
+                gap="xs",
+            ), self.label)
 
     # register_callbacks is a no-op: setup_hl_callbacks in callbacks.py
     # registers a single MATCH callback handling all HL instances.
@@ -364,53 +362,53 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
 
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
-        description = [dmc.Text(self.description, size="xs", c="dimmed")] if self.description else []
-        return dmc.Stack(
-            description + [
-                html.Div(
-                    [
-                        html.Div(
-                            [],
-                            id={"type": "hl-tags-pills", "field": pipe_field},
-                            style={"display": "contents"},
-                        ),
-                        dcc.Input(
-                            id={"type": "hl-tags-search", "field": pipe_field},
-                            type="text",
-                            value="",
-                            placeholder=("Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…") if self.searchable else "",
-                            debounce=False,
-                            style={
-                                "border": "none",
-                                "outline": "none",
-                                "flex": "1 1 60px",
-                                "minWidth": "60px",
-                                "background": "transparent",
-                                "color": "inherit",
-                                "fontSize": "var(--mantine-font-size-xs)",
-                                "alignSelf": "center",
-                                "padding": "0",
-                                "height": "22px",
-                            } if self.searchable else {"display": "none"},
-                        ),
-                    ],
-                    style={
-                        "display": "flex",
-                        "flexWrap": "wrap",
-                        "alignItems": "center",
-                        "gap": "4px",
-                        "padding": "4px 2px",
-                        "border": "1px solid var(--mantine-color-default-border)",
-                        "borderRadius": "var(--mantine-radius-sm)",
-                        "backgroundColor": "var(--mantine-color-default)",
-                        "cursor": "text",
-                    },
-                ),
-                dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
-                dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
-            ],
-            gap="xs",
-        )
+        return self._input_wrapper(dmc.Stack(
+                [
+                    html.Div(
+                        [
+                            html.Div(
+                                [],
+                                id={"type": "hl-tags-pills", "field": pipe_field},
+                                style={"display": "contents"},
+                            ),
+                            dcc.Input(
+                                id={"type": "hl-tags-search", "field": pipe_field},
+                                type="text",
+                                value="",
+                                placeholder=("Search all nodes…" if self.allow_non_leaf else "Search leaf nodes…") if self.searchable else "",
+                                debounce=False,
+                                style={
+                                    "border": "none",
+                                    "outline": "none",
+                                    "flex": "1 1 60px",
+                                    "minWidth": "60px",
+                                    "background": "transparent",
+                                    "color": "inherit",
+                                    "fontSize": "var(--mantine-font-size-xs)",
+                                    "alignSelf": "center",
+                                    "padding": "0",
+                                    "height": "22px",
+                                } if self.searchable else {"display": "none"},
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexWrap": "wrap",
+                            "alignItems": "center",
+                            "gap": "4px",
+                            "padding": "4px 2px",
+                            "border": "1px solid var(--mantine-color-default-border)",
+                            "borderRadius": "var(--mantine-radius-sm)",
+                            "backgroundColor": "var(--mantine-color-default)",
+                            "cursor": "text",
+                        },
+                    ),
+                    dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
+                    dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hl-tags-ann-relay", "field": pipe_field}, data=None),
+                ],
+                gap="xs",
+            ), self.label)
 
     def _render_sections(self, path, pipe_field, selected_value):
         return []  # Tags widget renders via callbacks, not _render_sections

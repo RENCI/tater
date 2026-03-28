@@ -192,7 +192,7 @@ def set_dict_value(obj: dict, path: str, value: Any) -> None:
                 current.append({})
             current = current[index]
         else:
-            if key not in current:
+            if key not in current or current[key] is None:
                 next_key = keys[i + 1]
                 if next_key.isdigit():
                     current[key] = []

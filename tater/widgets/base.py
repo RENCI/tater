@@ -65,20 +65,16 @@ def _build_conditional_callbacks(
     """
     from dash import Output, Input, no_update
 
-    if isinstance(target_value, bool):
-        target_js = "true" if target_value else "false"
-    else:
-        target_js = f'"{target_value}"'
+    _empty = empty_value
+    _target = target_value
 
-    app.clientside_callback(
-        f"function(v) {{ return v === {target_js} ? {{}} : {{'display': 'none'}}; }}",
+    @app.callback(
         Output(wrapper_id, "style"),
         Input(controlling_id, controlling_prop),
         prevent_initial_call=False,
     )
-
-    _empty = empty_value
-    _target = target_value
+    def _show_when_matching(v):
+        return {} if v == _target else {"display": "none"}
 
     @app.callback(
         Output(self_id, value_prop, allow_duplicate=True),
@@ -182,42 +178,17 @@ class TaterWidget:
         return content
 
     def _build_field_content(self, mt: str = "md") -> Any:
-        required = getattr(self, "required", False)
-        if self.renders_own_label:
-            comp = self.component()
-            if required:
-                row = dmc.Group([dmc.Text("*", size="sm", c="red"), comp], gap=4, align="self-start")
-                items = [row]
-            else:
-                items = [comp]
-            # ContainerWidget subclasses render their own description inside component();
-            # only leaf (ControlWidget) widgets need it appended here.
-            if self.description and not isinstance(self, ContainerWidget):
-                items.append(dmc.Text(self.description, size="xs", c="dimmed"))
-            return dmc.Stack(items, gap="xs", mt=mt)
-        else:
-            auto_advance = getattr(self, "auto_advance", False)
-            label_row = dmc.Group(
-                [
-                    *([dmc.Text("*", size="sm", c="red")] if required else []),
-                    dmc.Text(self.label, fw=500, size="sm"),
-                    *(
-                        [dmc.Tooltip(
-                            DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
-                            label="Auto-advances to next document",
-                            position="right",
-                            withArrow=True,
-                        )]
-                        if auto_advance else []
-                    ),
-                ],
-                gap=4,
-            )
-            items = [label_row]
-            if self.description and not getattr(self, "_description_in_component", False):
-                items.append(dmc.Text(self.description, size="xs", c="dimmed"))
-            items.append(self.component())
-            return dmc.Stack(items, gap="xs", mt=mt)
+        return dmc.Stack([self.component()], gap="xs", mt=mt)
+
+    def _input_wrapper(self, children: Any, label: Any, withAsterisk: bool = False) -> dmc.InputWrapper:
+        """Wrap a component in a dmc.InputWrapper with consistent label/description/asterisk."""
+        return dmc.InputWrapper(
+            label=label,
+            description=self.description,
+            withAsterisk=withAsterisk,
+            styles={"description": {"marginBottom": "4px"}} if self.description else None,
+            children=[children],
+        )
 
     def _register_conditional_callbacks(self, app: Any) -> None:
         """Register clientside + server callbacks for conditional visibility.
@@ -340,9 +311,26 @@ class ControlWidget(TaterWidget):
             return self.field_path[len(prefix):].replace(".", "|")
         return self.schema_field.replace(".", "|")
 
+    def _label_with_tooltip(self) -> Any:
+        """Return label string, decorated with auto_advance tooltip if needed."""
+        if not self.auto_advance:
+            return self.label
+        return dmc.Group([
+            dmc.Text(self.label, size="sm"),
+            dmc.Tooltip(
+                DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
+                label="Auto-advances to next document",
+                position="right",
+                withArrow=True,
+            ),
+        ], gap=4)
+
+    def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
+        return super()._input_wrapper(children, self._label_with_tooltip(), self.required)
+
     @property
     def renders_own_label(self) -> bool:
-        return False
+        return True
 
     @property
     def value_prop(self) -> str:

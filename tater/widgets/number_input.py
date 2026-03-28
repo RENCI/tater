@@ -28,6 +28,9 @@ class NumberInputWidget(NumericWidget):
             step=self.step,
             hideControls=False,
             style={"maxWidth": 200},
+            label=self._label_with_tooltip(),
+            description=self.description,
+            withAsterisk=self.required,
         )
 
     def to_python_type(self) -> type:

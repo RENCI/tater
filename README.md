@@ -114,7 +114,7 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget` and hierarchical label widgets cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
-| `theme` | no | `"light"` or `"dark"` (default: `"light"`) |
+| `instructions` | no | Markdown help text shown in the instructions drawer |
 | `register_callbacks` | no | Callable `(app: TaterApp) -> None` called after widgets are registered; use for custom Dash callbacks and setting `app.on_save` |
 
 ## Widgets
@@ -385,7 +385,7 @@ JSON file listing documents to annotate. Document text can be provided inline or
 
 Each document may have:
 - `text` — inline document text (use this or `file_path`, not both)
-- `file_path` — path to a `.txt` file (use this or `text`, not both)
+- `file_path` — path to a `.txt` file; resolved relative to the documents file (use this or `text`, not both; **not supported in hosted mode**)
 - `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
 - `name` — display name
 - `info` — arbitrary metadata dict shown in the UI
@@ -410,19 +410,47 @@ Status values: `"not_started"`, `"in_progress"`, `"complete"`.
 ```
 tater --config CONFIG --documents PATH [options]
 tater --schema SCHEMA --documents PATH [options]
+tater --hosted [options]
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--config PATH` | Python config file (one of `--config` / `--schema` required) |
-| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required) |
-| `--documents PATH` | Documents JSON file (required) |
+| `--config PATH` | Python config file (one of `--config` / `--schema` required in single mode) |
+| `--schema PATH` | JSON schema file (one of `--config` / `--schema` required in single mode) |
+| `--documents PATH` | Documents JSON file (required in single mode) |
 | `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
+| `--hosted` | Run in hosted mode (upload page at `/`, annotation UI at `/annotate`) |
 | `--port INT` | Server port (default: `8050`) |
 | `--host STR` | Bind address (default: `127.0.0.1`) |
 | `--debug` | Enable debug/hot-reload mode |
 
-Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`.
+Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`, `TATER_SECRET_KEY`.
+
+## Hosted mode
+
+Hosted mode lets multiple users upload their own schema and documents and annotate independently — no server-side annotation state is kept between sessions.
+
+```bash
+tater --hosted --host 0.0.0.0 --port 8050
+```
+
+**Flow — upload your own files:**
+1. User visits `/` → upload page, "Upload files" tab
+2. Upload schema JSON and documents JSON; status icons confirm each file is valid
+3. If the schema references external hierarchy files, per-file upload zones appear automatically
+4. Optionally upload an existing annotations JSON to resume from a previous session
+5. Click **Start Annotating** → redirected to `/annotate`
+6. Annotate documents; click **Download** in the footer to save annotations as JSON
+7. Click the home icon in the header to start over
+
+**Flow — built-in examples:**
+1. User visits `/` → click the "Browse examples" tab
+2. Click any example card → immediately redirected to `/annotate` with that example loaded
+
+**Hosted mode constraints vs. single mode:**
+- No auto-save — annotations live in the browser (`dcc.Store`) and must be downloaded explicitly
+- `file_path` is not supported in documents — use inline `text` instead
+- Hierarchy files referenced by path in the schema must be uploaded separately (inline hierarchy dicts work without upload)
 
 ## Testing
 

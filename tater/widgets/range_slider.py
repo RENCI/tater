@@ -48,14 +48,14 @@ class RangeSliderWidget(ControlWidget):
     def empty_value(self) -> list:
         return self.default
 
-    def component(self) -> dmc.RangeSlider:
-        return dmc.RangeSlider(
+    def component(self) -> dmc.InputWrapper:
+        return self._input_wrapper(dmc.RangeSlider(
             id=self.schema_id,
             value=self.default,
             min=self.min_value,
             max=self.max_value,
             step=self.step,
-        )
+        ))
 
     def to_python_type(self) -> type:
         return list

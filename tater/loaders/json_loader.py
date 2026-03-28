@@ -408,7 +408,7 @@ def _build_widget_from_spec(
         w.auto_advance = True
     condition = widget_spec.get("conditional_on")
     if condition is not None:
-        w.conditional_on(condition["field"], bool(condition["value"]))
+        w.conditional_on(condition["field"], condition["value"])
 
     return w
 

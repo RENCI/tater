@@ -1,3 +1,9 @@
+/* Suppress dcc.Upload drag-active border (causes layout shift) */
+#upload-schema,
+#upload-documents {
+  border: none !important;
+}
+
 /* HierarchicalLabelTagsWidget search input placeholder */
 [id*="hl-tags-search"]::placeholder {
   color: var(--mantine-color-placeholder);

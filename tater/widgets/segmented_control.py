@@ -11,15 +11,15 @@ class SegmentedControlWidget(ChoiceWidget):
 
     vertical: bool = False
 
-    def component(self) -> dmc.SegmentedControl:
+    def component(self) -> dmc.InputWrapper:
         data = [{"label": opt, "value": opt} for opt in self.options]
-        return dmc.SegmentedControl(
+        return self._input_wrapper(dmc.SegmentedControl(
             id=self.schema_id,
             data=data,
             value=self.default,
             fullWidth=True,
             orientation="vertical" if self.vertical else "horizontal",
-        )
+        ))
 
     def to_python_type(self) -> type:
         return str
