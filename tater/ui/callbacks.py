@@ -62,6 +62,13 @@ def setup_callbacks(tater_app: TaterApp) -> None:
                 return result
         return tater_app
 
+    # Scroll to top on document navigation.
+    app.clientside_callback(
+        "function(docId) { window.scrollTo({top: 0, behavior: 'instant'}); }",
+        Input("current-doc-id", "data"),
+        prevent_initial_call=True,
+    )
+
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app, _ta)
 
