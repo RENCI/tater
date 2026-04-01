@@ -120,7 +120,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 for doc_id, meta in tater_app.metadata.items()
             }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
-            *span_stores,
+*span_stores,
             app_shell,
             dmc.Drawer(
                 title="Instructions",

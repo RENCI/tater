@@ -2,14 +2,39 @@
 from __future__ import annotations
 
 import copy
+import json
+from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
 import time
+import flask
 
-from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html
+from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html, ClientsideFunction
+from dash.exceptions import PreventUpdate
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from tater.ui import value_helpers
+from tater.models.span import SpanAnnotation
+from tater.widgets.base import ContainerWidget, ControlWidget
+from tater.widgets.group import GroupWidget
+from tater.widgets.hierarchical_label import (
+    HierarchicalLabelWidget,
+    HierarchicalLabelTagsWidget,
+    _find_path,
+    _make_buttons,
+    _make_tags_option_buttons,
+    _make_tags_pill,
+    _node_at,
+    _section,
+)
+from tater.widgets.repeater import (
+    RepeaterWidget,
+    _NESTED_ADD_TYPE,
+    _NESTED_DELETE_TYPE,
+    _NESTED_STORE_TYPE,
+    _NESTED_ITEMS_TYPE,
+)
+from tater.widgets.span import SpanAnnotationWidget
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -61,6 +86,13 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             if result is not None:
                 return result
         return tater_app
+
+    # Scroll to top on document navigation.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="autoScrollTop"),
+        Input("current-doc-id", "data"),
+        prevent_initial_call=True,
+    )
 
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app, _ta)
@@ -307,8 +339,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
                     "annotations": (annotations_data or {}).get(d_id, {}),
                     "metadata": (metadata_data or {}).get(d_id, {}),
                 }
-            import json as _json
-            return {"content": _json.dumps(save_dict, indent=2), "filename": "annotations.json"}
+            return {"content": json.dumps(save_dict, indent=2), "filename": "annotations.json"}
 
         # Start over: open confirmation modal
         @app.callback(
@@ -329,7 +360,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         def start_over(n_clicks):
             if not n_clicks:
                 return no_update
-            import flask
             flask.session.pop("tater_session", None)
             return "/"
 
@@ -436,7 +466,6 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         Input("timing-store", "data"),
     )
     def update_save_status(timing_data):
-        from datetime import datetime
         if _ta()._save_error:
             save_text = f"Save failed: {tater_app._save_error}"
             save_color = "red"
@@ -453,7 +482,6 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
     # there is no server round-trip and no "Updating..." tab-title flicker.
     # Reads annotation_seconds_at_load from timing-store (written on doc load,
     # navigation, and pause) so it never needs to call back to Python.
-    from dash import ClientsideFunction
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="updateTimer"),
         Output("timing-text", "children"),
@@ -701,8 +729,7 @@ def _decode_field_path(ld: str, path: str, tf: str) -> str:
 
 def setup_span_callbacks(tater_app: TaterApp) -> None:
     """Register unified MATCH-based callbacks for all SpanAnnotationWidgets."""
-    from tater.widgets.span import SpanAnnotationWidget
-    from dash import MATCH, ALL
+
 
     app = tater_app.app
     _get_current_app_fn = tater_app._get_current_app
@@ -715,7 +742,6 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         return tater_app
 
     # ---- Clientside: relay pending delete from global proxy to delete store ----
-    from dash import ClientsideFunction
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="captureDelete"),
         Output("span-delete-store", "data"),
@@ -776,7 +802,6 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         start = start_js + trim_start
         end = start + len(text)
 
-        from tater.models.span import SpanAnnotation
         ann = _get_ann(annotations_data, doc_id)
         if ann is None:
             return no_update
@@ -891,9 +916,6 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
     When any SpanAnnotationWidget is present, also registers a relay that increments
     span-any-change whenever a list item is deleted so the doc viewer re-renders.
     """
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget, ControlWidget
-    from dash.exceptions import PreventUpdate
 
     app = tater_app.app
     _get_current_app_fn = tater_app._get_current_app
@@ -1052,7 +1074,6 @@ def _find_repeater_template(widgets: list, field_path: str):
 
 
 def _find_by_segments(widgets: list, segments: list):
-    from tater.widgets.repeater import RepeaterWidget
     if not segments:
         return None
     for w in widgets:
@@ -1072,7 +1093,6 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     Component IDs use pipe-encoded field paths so the ``field`` key uniquely
     identifies each HL instance without per-widget registration.
     """
-    from tater.widgets.hierarchical_label import HierarchicalLabelWidget, HierarchicalLabelTagsWidget, _find_path, _make_buttons, _section, _node_at
 
     app = tater_app.app
     _get_current_app_fn = tater_app._get_current_app
@@ -1256,9 +1276,6 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
 def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     """Register MATCH callbacks for all HierarchicalLabelTagsWidget instances."""
-    from tater.widgets.hierarchical_label import (
-        HierarchicalLabelTagsWidget, _find_path, _node_at, _make_tags_option_buttons, _make_tags_pill,
-    )
 
     app = tater_app.app
     _get_current_app_fn = tater_app._get_current_app
@@ -1460,12 +1477,6 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
     encodes the nesting structure as dash-joined field names
     (e.g. ``"findings-annotations"``).
     """
-    from tater.widgets.repeater import (
-        RepeaterWidget,
-        _NESTED_ADD_TYPE, _NESTED_DELETE_TYPE, _NESTED_STORE_TYPE, _NESTED_ITEMS_TYPE,
-    )
-    from tater.widgets.base import ContainerWidget, ControlWidget
-    from dash.exceptions import PreventUpdate
 
     app = tater_app.app
     _get_current_app_fn = tater_app._get_current_app
@@ -1588,9 +1599,6 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
 
 def _collect_hl_templates(widgets: list) -> list:
     """Recursively collect all HierarchicalLabelWidget templates at any nesting depth."""
-    from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
     result = []
     for w in widgets:
         if isinstance(w, HierarchicalLabelWidget):
@@ -1608,9 +1616,6 @@ def _find_hl_template(widgets: list, field_path: str):
     Strips numeric segments so ``"findings.0.label"`` resolves the same template
     as ``"findings.label"``.
     """
-    from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
     segments = [s for s in field_path.split(".") if not s.isdigit()]
     if not segments:
         return None
@@ -1628,9 +1633,6 @@ def _find_hl_template(widgets: list, field_path: str):
 
 def _has_any_span(widgets: list) -> bool:
     """Return True if any SpanAnnotationWidget exists at any nesting depth."""
-    from tater.widgets.span import SpanAnnotationWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
     for w in widgets:
         if isinstance(w, SpanAnnotationWidget):
             return True
@@ -1643,9 +1645,6 @@ def _has_any_span(widgets: list) -> bool:
 
 def _collect_all_span_templates(widgets: list) -> list:
     """Recursively collect all unique SpanAnnotationWidget templates."""
-    from tater.widgets.span import SpanAnnotationWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
     result = []
     for w in widgets:
         if isinstance(w, SpanAnnotationWidget):
@@ -1663,9 +1662,6 @@ def _collect_span_instances(widgets: list, annotation, path_prefix: str = ""):
     Traverses the widget tree, expanding repeater items based on the annotation's
     actual list length.  Supports arbitrary nesting depth.
     """
-    from tater.widgets.span import SpanAnnotationWidget
-    from tater.widgets.repeater import RepeaterWidget
-    from tater.widgets.base import ContainerWidget
     for w in widgets:
         w_path = f"{path_prefix}.{w.schema_field}" if path_prefix else w.schema_field
         if isinstance(w, SpanAnnotationWidget):
@@ -1688,10 +1684,6 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
     for status checking. Skips RepeaterWidget children (their items are
     handled dynamically via unified ALL callbacks).
     """
-    from tater.widgets.base import ControlWidget
-    from tater.widgets.group import GroupWidget
-    from tater.widgets.repeater import RepeaterWidget
-
     captured = []
     for widget in widgets:
         if isinstance(widget, RepeaterWidget):
@@ -1709,10 +1701,6 @@ def _collect_all_control_templates(widgets: list[TaterWidget]) -> list[TaterWidg
 
     Used to build empty_value lookups for load callbacks.
     """
-    from tater.widgets.base import ControlWidget
-    from tater.widgets.group import GroupWidget
-    from tater.widgets.repeater import RepeaterWidget
-
     captured = []
     for widget in widgets:
         if isinstance(widget, RepeaterWidget):
