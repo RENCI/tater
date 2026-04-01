@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 
 import time
 
-from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html
+from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html, ClientsideFunction
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from tater.ui import value_helpers
@@ -64,7 +64,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
     # Scroll to top on document navigation.
     app.clientside_callback(
-        "function(docId) { window.scrollTo({top: 0, behavior: 'instant'}); }",
+        ClientsideFunction(namespace="tater", function_name="autoScrollTop"),
         Input("current-doc-id", "data"),
         prevent_initial_call=True,
     )
@@ -460,7 +460,6 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
     # there is no server round-trip and no "Updating..." tab-title flicker.
     # Reads annotation_seconds_at_load from timing-store (written on doc load,
     # navigation, and pause) so it never needs to call back to Python.
-    from dash import ClientsideFunction
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="updateTimer"),
         Output("timing-text", "children"),
@@ -722,7 +721,6 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         return tater_app
 
     # ---- Clientside: relay pending delete from global proxy to delete store ----
-    from dash import ClientsideFunction
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="captureDelete"),
         Output("span-delete-store", "data"),
