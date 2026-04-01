@@ -15,7 +15,7 @@ from tater.ui.callbacks.repeater import (
     setup_repeater_callbacks,
     setup_nested_repeater_callbacks,
 )
-from tater.ui.callbacks.hl import (
+from tater.ui.callbacks.hierarchical_label import (
     setup_hl_callbacks,
     setup_hl_tags_callbacks,
 )
