@@ -121,8 +121,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         if selected_value:
             computed_path = _find_path(widget.root, selected_value)
             if computed_path:
-                node = _node_at(widget.root, computed_path)
-                return computed_path[:-1] if node.is_leaf else computed_path
+                return computed_path  # update_display trims leaf tip when rendering
         return []
 
     # ---- 3. Handle node button click → update path, write if leaf ----
@@ -171,16 +170,20 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
         if clicked.is_leaf:
             current_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            is_deselect = (current_value == node_name)
 
+            # Include the leaf in the path when selecting so update_display can derive
+            # selected_value from the path itself, avoiding a race with annotations-store.
+            # On deselect, navigate back to the parent (exclude leaf).
             if is_search_result:
                 full_path = _find_path(root, node_name)
-                new_path = full_path[:-1]
+                new_path = full_path[:-1] if is_deselect else full_path
             else:
-                new_path = path[:depth]
+                new_path = path[:depth] if is_deselect else path[:depth] + [node_name]
 
             ann_relay = no_update
             if ann is not None:
-                if current_value == node_name:
+                if is_deselect:
                     value_helpers.set_model_value(ann, field_path, None)
                 else:
                     value_helpers.set_model_value(ann, field_path, node_name)
@@ -235,13 +238,24 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
         root = widget.root
 
+        # If the path tip is a leaf it encodes the current selection — derive
+        # selected_value directly so we don't race against annotations-store.
+        # Trim it off for rendering (the parent level shows the leaf's siblings).
         selected_value = None
-        if doc_id:
+        render_path = path
+        if path:
+            tip = _node_at(root, path)
+            if tip and tip.is_leaf:
+                selected_value = path[-1]
+                render_path = path[:-1]
+
+        # Fall back to annotations-store for initial load and deselected state.
+        if selected_value is None and doc_id:
             ann = _get_ann(annotations_data, doc_id)
             if ann is not None:
                 selected_value = value_helpers.get_model_value(ann, field_path)
 
-        breadcrumb = " → ".join(path) if path else "None selected"
+        breadcrumb = " → ".join(render_path) if render_path else "None selected"
 
         if search_query and search_query.strip():
             q = search_query.strip().lower()
@@ -249,7 +263,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             matches = [n for n in candidates if q in n.name.lower()]
             return [_section("Search results", _make_buttons(matches, pipe_field, 0, selected_value=selected_value))], breadcrumb
 
-        return widget._render_sections(path, pipe_field, selected_value), breadcrumb
+        return widget._render_sections(render_path, pipe_field, selected_value), breadcrumb
 
 
 def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:

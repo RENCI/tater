@@ -22,7 +22,7 @@
       "id": "primary_breed",
       "type": "hierarchical_label",
       "widget": {
-        "type": "hierarchical_label_tags",
+        "type": "hierarchical_label_compact",
         "label": "Primary Breed",
         "description": "Navigate the ontology to select a breed or type.",
         "hierarchy_ref": "ontology",
