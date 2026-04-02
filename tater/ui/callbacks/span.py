@@ -131,12 +131,7 @@ def _render_document_content(text: str, doc_id: str, tater_app, annotations_data
                     "data-field": pipe_field,
                     "data-tag": tag,
                     "data-color": color,
-                    "style": {
-                        "backgroundColor": color,
-                        "cursor": "pointer",
-                        "borderRadius": "3px",
-                        "padding": "0 2px",
-                    },
+                    "style": { "backgroundColor": color },
                 },
             )
         )

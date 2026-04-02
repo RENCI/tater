@@ -1,0 +1,6 @@
+{
+  "name": "IHC Test Results",
+  "description": "Annotate immunohistochemical (IHC) test results with stain, result, block location, and span highlights.",
+  "order": 10,
+  "category": "Pathology"
+}

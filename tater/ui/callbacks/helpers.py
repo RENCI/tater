@@ -112,10 +112,7 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: di
         return
 
     # Booleans always have a value (True/False), so they cannot meaningfully gate completion.
-    required_widgets = [
-        w for w in _collect_value_capture_widgets(tater_app.widgets)
-        if w.required and w.to_python_type() is not bool
-    ]
+    required_widgets = tater_app._required_widgets
     if not required_widgets:
         meta["status"] = "complete"
         return
@@ -187,7 +184,11 @@ def _perform_navigation(
     annotations_data: dict | None,
     metadata_data: dict | None,
 ) -> tuple:
-    """Shared navigation logic: accumulate timing, update status, return new doc_id, timing, metadata."""
+    """Shared navigation logic: accumulate timing, update status, return (doc_id, timing, metadata, status).
+
+    Also marks the new document as visited and computes its initial status, so that
+    on_doc_change can detect this was a navigation event and skip redundant writes.
+    """
     now = time.time()
     metadata_data = dict(metadata_data or {})
     if current_doc_id:
@@ -199,14 +200,25 @@ def _perform_navigation(
         update_status_for_doc(tater_app, current_doc_id, annotations_data, metadata_data)
 
     doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""
+
+    # Mark the new doc as visited and compute its status here, so on_doc_change
+    # can skip its own metadata/timing writes when it sees _nav_init=True.
+    if doc_id:
+        new_meta = dict(_get_meta(metadata_data, doc_id))
+        new_meta["visited"] = True
+        metadata_data[doc_id] = new_meta
+        update_status_for_doc(tater_app, doc_id, annotations_data, metadata_data)
+
+    status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+
     if timing_data is None:
         timing_data = {}
     timing_data["last_save_time"] = now
     timing_data["doc_start_time"] = now
     timing_data["paused"] = False
+    timing_data["_nav_init"] = True
     if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
         timing_data["session_start_time"] = now
-    new_meta = _get_meta(metadata_data, doc_id)
-    timing_data["annotation_seconds_at_load"] = new_meta.get("annotation_seconds", 0.0)
+    timing_data["annotation_seconds_at_load"] = _get_meta(metadata_data, doc_id).get("annotation_seconds", 0.0) if doc_id else 0.0
 
-    return doc_id, timing_data, metadata_data
+    return doc_id, timing_data, metadata_data, status

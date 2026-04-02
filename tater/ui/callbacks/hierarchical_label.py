@@ -255,7 +255,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             if ann is not None:
                 selected_value = value_helpers.get_model_value(ann, field_path)
 
-        breadcrumb = " → ".join(render_path) if render_path else "None selected"
+        breadcrumb = " → ".join(path) if path else "None selected"
 
         if search_query and search_query.strip():
             q = search_query.strip().lower()
