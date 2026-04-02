@@ -130,6 +130,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("current-doc-id", "data"),
         Output("timing-store", "data"),
         Output("metadata-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
         [Input("btn-prev", "n_clicks"),
          Input("btn-next", "n_clicks")],
         State("current-doc-id", "data"),
@@ -141,7 +142,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     def navigate_buttons(prev_clicks, next_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
         ta = _ta()
         if not ctx.triggered or not ta.documents:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
 
         current_index = next((i for i, d in enumerate(ta.documents) if d.id == current_doc_id), 0)
 
@@ -150,18 +151,16 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         elif ctx.triggered_id == "btn-next" and current_index < len(ta.documents) - 1:
             current_index += 1
         else:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
 
-        doc_id, new_timing, new_metadata = _perform_navigation(
-            ta, current_doc_id, current_index, timing_data, annotations_data, metadata_data
-        )
-        return doc_id, new_timing, new_metadata
+        return _perform_navigation(ta, current_doc_id, current_index, timing_data, annotations_data, metadata_data)
 
     # Menu item navigation (allow_duplicate=True required — see note above)
     @app.callback(
         Output("current-doc-id", "data", allow_duplicate=True),
         Output("timing-store", "data", allow_duplicate=True),
         Output("metadata-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
         Input({"type": "document-menu-item", "index": ALL}, "n_clicks"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
@@ -172,17 +171,13 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     def navigate_menu_item(menu_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
         ta = _ta()
         if not ctx.triggered or not ta.documents:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
 
         if not ctx.triggered[0]["value"]:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
 
         new_index = ctx.triggered_id["index"]
-
-        doc_id, new_timing, new_metadata = _perform_navigation(
-            ta, current_doc_id, new_index, timing_data, annotations_data, metadata_data
-        )
-        return doc_id, new_timing, new_metadata
+        return _perform_navigation(ta, current_doc_id, new_index, timing_data, annotations_data, metadata_data)
 
     # Auto-advance: navigate to next doc when an auto_advance widget gets a value.
     # (allow_duplicate=True required — see note above)
@@ -190,6 +185,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("current-doc-id", "data", allow_duplicate=True),
         Output("timing-store", "data", allow_duplicate=True),
         Output("metadata-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
         Input("auto-advance-store", "data"),
         State("current-doc-id", "data"),
         State("timing-store", "data"),
@@ -199,17 +195,14 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     )
     def navigate_auto_advance(trigger, current_doc_id, timing_data, annotations_data, metadata_data):
         if not trigger:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
         ta = _ta()
         current_index = next(
             (i for i, d in enumerate(ta.documents) if d.id == current_doc_id), 0
         )
         if current_index >= len(ta.documents) - 1:
-            return no_update, no_update, no_update
-        doc_id, new_timing, new_metadata = _perform_navigation(
-            ta, current_doc_id, current_index + 1, timing_data, annotations_data, metadata_data
-        )
-        return doc_id, new_timing, new_metadata
+            return no_update, no_update, no_update, no_update
+        return _perform_navigation(ta, current_doc_id, current_index + 1, timing_data, annotations_data, metadata_data)
 
     # Refresh menu dropdown with status badges after any navigation or status change
     @app.callback(
@@ -408,6 +401,14 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         prevent_initial_call='initial_duplicate',
     )
     def on_doc_change(doc_id, timing_data, annotations_data, metadata_data):
+        # Navigation callbacks (_perform_navigation) already initialized timing,
+        # metadata (visited=True), and status for this doc.  Just return the
+        # status computed there and leave the stores untouched.
+        if timing_data and timing_data.get("_nav_init"):
+            status = (metadata_data or {}).get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+            return no_update, status, no_update
+
+        # Initial page load path: no navigation callback has run yet.
         metadata_data = dict(metadata_data or {})
         if doc_id:
             meta = dict(_get_meta(metadata_data, doc_id))
