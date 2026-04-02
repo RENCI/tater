@@ -55,34 +55,27 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app, _ta)
 
-    # Update document display and info.
-    # span-any-change fires whenever a span is added or deleted, causing re-render.
-    span_trigger_inputs = [Input("span-any-change", "data")]
-
+    # Update document display and info on navigation.
     @app.callback(
-        [Output("document-content", "children"),
-         Output("document-title", "children"),
-         Output("document-metadata", "children"),
-         Output("document-progress", "value"),
-         Output("btn-prev", "disabled"),
-         Output("btn-next", "disabled")],
-        [Input("current-doc-id", "data")] + span_trigger_inputs,
+        Output("document-content", "children", allow_duplicate=True),
+        Output("document-title", "children"),
+        Output("document-metadata", "children"),
+        Output("document-progress", "value"),
+        Output("btn-prev", "disabled"),
+        Output("btn-next", "disabled"),
+        Input("current-doc-id", "data"),
         State("annotations-store", "data"),
+        prevent_initial_call="initial_duplicate",
     )
-    def update_document(doc_id, *args):
-        # Last positional arg is annotations_data (State); span triggers precede it.
-        annotations_data = args[-1]
-
+    def update_document(doc_id, annotations_data):
         if not doc_id:
             return "No document loaded", "No document", "", 0, True, True
 
         ta = _ta()
-        # Find document by ID
         doc = next((d for d in ta.documents if d.id == doc_id), None)
         if not doc:
             return "Document not found", "Error", "", 0, True, True
 
-        # Load document content
         try:
             raw_text = doc.load_content()
         except Exception as e:
@@ -93,7 +86,6 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         doc_index = next((i for i, d in enumerate(ta.documents) if d.id == doc_id), 0)
         title = f"{doc_index + 1} / {len(ta.documents)}"
 
-        # Format metadata from document info dict (without document count)
         metadata_parts = []
         if doc.info:
             for key, value in doc.info.items():
@@ -105,6 +97,29 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         is_first = doc_index == 0
         is_last = doc_index == len(ta.documents) - 1
         return content, title, metadata, progress, is_first, is_last
+
+    # Re-render document content only when a span is added or deleted.
+    # Separated from update_document to avoid recomputing title/metadata/progress/nav
+    # on every span change.
+    @app.callback(
+        Output("document-content", "children", allow_duplicate=True),
+        Input("span-any-change", "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )
+    def update_document_spans(_, doc_id, annotations_data):
+        if not doc_id:
+            return no_update
+        ta = _ta()
+        doc = next((d for d in ta.documents if d.id == doc_id), None)
+        if not doc:
+            return no_update
+        try:
+            raw_text = doc.load_content()
+        except Exception as e:
+            raw_text = f"Error loading file: {e}"
+        return _render_document_content(raw_text, doc_id, ta, annotations_data)
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".
