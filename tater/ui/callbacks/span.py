@@ -4,9 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dash import Input, Output, State, ALL, MATCH, ctx, no_update, html, ClientsideFunction
-import dash_mantine_components as dmc
 
-from tater.models.span import SpanAnnotation
 from tater.ui import value_helpers
 from tater.ui.callbacks.helpers import _get_ann
 from tater.widgets.base import ContainerWidget
@@ -175,13 +173,11 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # ---- Server: add span → MATCH-only output ----
-    # Dash disallows mixing MATCH dict-ID outputs with static string-ID outputs
-    # in the same callback.  add_span therefore writes only to the per-item
-    # span-trigger store (embedding the annotation update in the store data).
-    # relay_span_triggers then unpacks the annotation update and writes to
-    # annotations-store (both static string outputs — no MATCH mixing issue).
-    @app.callback(
+    # ---- Clientside: add span → span-trigger store (MATCH) ----
+    # Whitespace trimming, overlap check, and annotation update all run in the
+    # browser.  The relay callback unpacks the annotation update.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="addSpan"),
         Output({"type": "span-trigger", "field": MATCH}, "data"),
         Input({"type": "span-selection", "field": MATCH}, "data"),
         State("current-doc-id", "data"),
@@ -189,77 +185,17 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def add_span(selection, doc_id, trigger_data, annotations_data):
-        if not selection or not doc_id:
-            return no_update
 
-        pipe_field = ctx.triggered_id["field"]
-        field_path = pipe_field.replace("|", ".")
-
-        start_js = selection.get("start")
-        end_js = selection.get("end")
-        tag = selection.get("tag")
-
-        if start_js is None or end_js is None or not tag:
-            return no_update
-
-        doc = next((d for d in _ta().documents if d.id == doc_id), None)
-        if not doc:
-            return no_update
-
-        full_text = doc.load_content()
-        if not (0 <= start_js < end_js <= len(full_text)):
-            return no_update
-
-        raw_slice = full_text[start_js:end_js]
-        text = raw_slice.strip()
-        if not text:
-            return no_update
-
-        trim_start = raw_slice.find(text)
-        start = start_js + trim_start
-        end = start + len(text)
-
-        ann = _get_ann(annotations_data, doc_id)
-        if ann is None:
-            return no_update
-        current_spans = value_helpers.get_model_value(ann, field_path) or []
-
-        for existing in current_spans:
-            ex_start = existing.start if hasattr(existing, "start") else existing.get("start")
-            ex_end = existing.end if hasattr(existing, "end") else existing.get("end")
-            if start < ex_end and end > ex_start:
-                return no_update
-
-        new_span = SpanAnnotation(start=start, end=end, text=text, tag=tag)
-        new_spans = list(current_spans) + [new_span.model_dump()]
-        value_helpers.set_model_value(ann, field_path, new_spans)
-        new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-
-        prev_count = trigger_data.get("count", 0) if isinstance(trigger_data, dict) else (trigger_data or 0)
-        return {"count": prev_count + 1, "annotations_update": new_annotations_data}
-
-    # ---- Server: relay any per-item trigger → global span-any-change + annotations-store ----
-    # This is the first writer of span-any-change (no allow_duplicate needed).
-    # Both outputs are static string IDs — no MATCH mixing issue.
-    @app.callback(
+    # ---- Clientside: relay span-trigger → span-any-change + annotations-store ----
+    # First writer of span-any-change (no allow_duplicate needed).
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="relaySpanTriggers"),
         Output("span-any-change", "data"),
         Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "span-trigger", "field": ALL}, "data"),
         State("span-any-change", "data"),
         prevent_initial_call=True,
     )
-    def relay_span_triggers(all_triggers, global_count):
-        if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update, no_update
-        triggered_value = ctx.triggered[0]["value"]
-        annotations_update = (
-            triggered_value.get("annotations_update")
-            if isinstance(triggered_value, dict)
-            else None
-        )
-        new_count = (global_count or 0) + 1
-        return new_count, (annotations_update if annotations_update is not None else no_update)
 
     # ---- Server: refresh entity-button counts on add, delete, or doc navigation ----
     @app.callback(
@@ -288,9 +224,10 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
                     counts[tag] = counts.get(tag, 0) + 1
         return widget._make_buttons(pipe_field, counts)
 
-    # ---- Server: delete span → increment global span-any-change ----
-    # Must be registered AFTER relay_span_triggers (which is the first writer).
-    @app.callback(
+    # ---- Clientside: delete span → span-any-change + annotations-store ----
+    # Must be registered AFTER relaySpanTriggers (which is the first writer of span-any-change).
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="deleteSpan"),
         Output("span-any-change", "data", allow_duplicate=True),
         Output("annotations-store", "data", allow_duplicate=True),
         Input("span-delete-store", "data"),
@@ -299,30 +236,16 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def delete_span(delete_data, doc_id, global_count, annotations_data):
-        if not delete_data or not doc_id:
-            return no_update, no_update
 
-        pipe_field = delete_data.get("field")
-        del_start = delete_data.get("start")
-        del_end = delete_data.get("end")
-        if not pipe_field or del_start is None or del_end is None:
-            return no_update, no_update
-
-        field_path = pipe_field.replace("|", ".")
-        ann = _get_ann(annotations_data, doc_id)
-        if ann is None:
-            return no_update, no_update
-
-        current_spans = value_helpers.get_model_value(ann, field_path) or []
-        new_spans = [
-            s for s in current_spans
-            if not (
-                (s.start if hasattr(s, "start") else s.get("start")) == del_start
-                and (s.end if hasattr(s, "end") else s.get("end")) == del_end
-            )
-        ]
-        value_helpers.set_model_value(ann, field_path, new_spans)
-        new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-
-        return (global_count or 0) + 1, new_annotations_data
+    # ---- Clientside: re-render document marks on span change ----
+    # Reads raw text and color map from stores; no server round-trip needed.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="renderDocumentSpans"),
+        Output("document-content", "children", allow_duplicate=True),
+        Input("span-any-change", "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        State("document-text-store", "data"),
+        State("span-color-map", "data"),
+        prevent_initial_call=True,
+    )
