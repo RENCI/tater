@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget,
-    HierarchicalLabelTagsWidget, GroupWidget, ListableWidget, AccordionWidget,
+    HierarchicalLabelTagsWidget, ListableWidget, AccordionWidget,
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 

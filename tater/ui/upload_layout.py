@@ -187,13 +187,32 @@ def build_upload_layout() -> dmc.MantineProvider:
         gap="md",
     )
 
+    # Group examples by category, preserving within-category order
+    categories: dict[str, list] = {}
+    for ex in examples:
+        cat = ex.get("category", "Examples")
+        categories.setdefault(cat, []).append(ex)
+
+    category_sections = []
+    for cat_name, cat_examples in categories.items():
+        category_sections.append(
+            dmc.Stack(
+                [
+                    dmc.Text(cat_name, fw=600, size="sm", c="dimmed"),
+                    dmc.SimpleGrid(
+                        [_example_card(ex) for ex in cat_examples],
+                        cols=2,
+                        spacing="md",
+                    ),
+                ],
+                gap="xs",
+            )
+        )
+
     examples_tab = dmc.Stack(
         [
-            dmc.SimpleGrid(
-                [_example_card(ex) for ex in examples],
-                cols=2,
-                spacing="md",
-            ) if examples else dmc.Text("No built-in examples found.", size="sm", c="dimmed"),
+            dmc.Stack(category_sections, gap="lg") if category_sections
+            else dmc.Text("No built-in examples found.", size="sm", c="dimmed"),
             html.Div(id="example-feedback"),
         ],
         gap="md",

@@ -1,0 +1,6 @@
+{
+  "name": "Span Annotation",
+  "description": "Highlight named entities in text — pets, breeds, behaviors, and activities — using the span annotation widget.",
+  "order": 4,
+  "category": "General"
+}
