@@ -154,6 +154,7 @@ class SpanAnnotationWidget(TaterWidget):
                 size=16,
                 disabled=counts.get(et.name, 0) == 0,
                 inline=True,
+                zIndex=199,
             )
             for et in self.entity_types
         ]

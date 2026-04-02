@@ -63,18 +63,19 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("document-progress", "value"),
         Output("btn-prev", "disabled"),
         Output("btn-next", "disabled"),
+        Output("document-text-store", "data"),
         Input("current-doc-id", "data"),
         State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
     def update_document(doc_id, annotations_data):
         if not doc_id:
-            return "No document loaded", "No document", "", 0, True, True
+            return "No document loaded", "No document", "", 0, True, True, ""
 
         ta = _ta()
         doc = next((d for d in ta.documents if d.id == doc_id), None)
         if not doc:
-            return "Document not found", "Error", "", 0, True, True
+            return "Document not found", "Error", "", 0, True, True, ""
 
         try:
             raw_text = doc.load_content()
@@ -96,30 +97,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
         is_first = doc_index == 0
         is_last = doc_index == len(ta.documents) - 1
-        return content, title, metadata, progress, is_first, is_last
-
-    # Re-render document content only when a span is added or deleted.
-    # Separated from update_document to avoid recomputing title/metadata/progress/nav
-    # on every span change.
-    @app.callback(
-        Output("document-content", "children", allow_duplicate=True),
-        Input("span-any-change", "data"),
-        State("current-doc-id", "data"),
-        State("annotations-store", "data"),
-        prevent_initial_call=True,
-    )
-    def update_document_spans(_, doc_id, annotations_data):
-        if not doc_id:
-            return no_update
-        ta = _ta()
-        doc = next((d for d in ta.documents if d.id == doc_id), None)
-        if not doc:
-            return no_update
-        try:
-            raw_text = doc.load_content()
-        except Exception as e:
-            raw_text = f"Error loading file: {e}"
-        return _render_document_content(raw_text, doc_id, ta, annotations_data)
+        return content, title, metadata, progress, is_first, is_last, raw_text
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".

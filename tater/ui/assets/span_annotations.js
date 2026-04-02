@@ -29,7 +29,211 @@
 window.dash_clientside = window.dash_clientside || {};
 window.dash_clientside.tater = window.dash_clientside.tater || {};
 
+// ---------- dot-path helpers used by span callbacks ----------
+
+function _taterGet(obj, dotPath) {
+    var keys = dotPath.split('.');
+    var cur = obj;
+    for (var i = 0; i < keys.length; i++) {
+        if (cur == null) { return null; }
+        cur = cur[keys[i]];
+    }
+    return cur != null ? cur : null;
+}
+
+function _taterSet(obj, dotPath, value) {
+    var keys = dotPath.split('.');
+    var cur = obj;
+    for (var i = 0; i < keys.length - 1; i++) {
+        var k = keys[i];
+        if (cur[k] == null) { cur[k] = isNaN(keys[i + 1]) ? {} : []; }
+        cur = cur[k];
+    }
+    cur[keys[keys.length - 1]] = value;
+    return obj;
+}
+
+// Collect {dotPath, pipePath, spans, colors} for every span field in an annotation.
+// colorMap keys are template pipe paths with numeric segments removed,
+// e.g. "tests|relevant_spans".
+function _taterSpanInstances(ann, colorMap) {
+    var instances = [];
+    function walk(obj, dot, pipe) {
+        if (obj == null || typeof obj !== 'object') { return; }
+        if (Array.isArray(obj)) {
+            for (var i = 0; i < obj.length; i++) {
+                walk(obj[i], dot ? dot + '.' + i : String(i), pipe ? pipe + '|' + i : String(i));
+            }
+        } else {
+            var keys = Object.keys(obj);
+            for (var j = 0; j < keys.length; j++) {
+                var k = keys[j];
+                var val = obj[k];
+                var newDot = dot ? dot + '.' + k : k;
+                var newPipe = pipe ? pipe + '|' + k : k;
+                var templateKey = newPipe.split('|').filter(function(s) { return isNaN(s); }).join('|');
+                if (templateKey in colorMap) {
+                    instances.push({
+                        dotPath: newDot,
+                        pipePath: newPipe,
+                        spans: Array.isArray(val) ? val : [],
+                        colors: colorMap[templateKey] || {}
+                    });
+                } else {
+                    walk(val, newDot, newPipe);
+                }
+            }
+        }
+    }
+    walk(ann, '', '');
+    return instances;
+}
+
+
 Object.assign(window.dash_clientside.tater, {
+
+    // ---- addSpan: trim whitespace, check overlaps, append to annotation ----
+    addSpan: function(selection, docId, triggerData, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        if (!selection || !docId || !annotationsData) { return nu; }
+
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+
+        var propId = ctx.triggered[0].prop_id;
+        var triggeredId;
+        try { triggeredId = JSON.parse(propId.split('.data')[0]); } catch(e) { return nu; }
+        var pipeField = triggeredId.field;
+        if (!pipeField) { return nu; }
+        var dotField = pipeField.replace(/\|/g, '.');
+
+        var start = selection.start;
+        var end   = selection.end;
+        var tag   = selection.tag;
+        var text  = selection.text || '';
+        if (start == null || end == null || !tag) { return nu; }
+
+        // Trim leading/trailing whitespace and adjust offsets
+        var trimmed = text.replace(/^\s+/, '');
+        start += text.length - trimmed.length;
+        trimmed = trimmed.replace(/\s+$/, '');
+        end = start + trimmed.length;
+        text = trimmed;
+        if (!text) { return nu; }
+
+        var ann = annotationsData[docId];
+        if (!ann) { return nu; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        for (var i = 0; i < currentSpans.length; i++) {
+            var s = currentSpans[i];
+            if (start < s.end && end > s.start) { return nu; }
+        }
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        var newSpans = (JSON.parse(JSON.stringify(currentSpans))).concat([
+            {start: start, end: end, text: text, tag: tag}
+        ]);
+        _taterSet(newAnn, dotField, newSpans);
+        var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var prevCount = (triggerData && typeof triggerData === 'object') ? (triggerData.count || 0) : (triggerData || 0);
+        return {count: prevCount + 1, annotations_update: newAnnotationsData};
+    },
+
+    // ---- relaySpanTriggers: unpack annotation update, increment span-any-change ----
+    relaySpanTriggers: function(_allTriggers, globalCount) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length || !ctx.triggered[0].value) {
+            return [nu, nu];
+        }
+        var val = ctx.triggered[0].value;
+        var annUpdate = (val && typeof val === 'object') ? (val.annotations_update || nu) : nu;
+        return [(globalCount || 0) + 1, annUpdate];
+    },
+
+    // ---- deleteSpan: remove matching span from annotation ----
+    deleteSpan: function(deleteData, docId, globalCount, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        if (!deleteData || !docId || !annotationsData) { return [nu, nu]; }
+
+        var pipeField = deleteData.field;
+        var delStart  = deleteData.start;
+        var delEnd    = deleteData.end;
+        if (!pipeField || delStart == null || delEnd == null) { return [nu, nu]; }
+
+        var dotField = pipeField.replace(/\|/g, '.');
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        var newSpans = currentSpans.filter(function(s) {
+            return !(s.start === delStart && s.end === delEnd);
+        });
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, newSpans);
+        var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
+        return [(globalCount || 0) + 1, newAnnotationsData];
+    },
+
+    // ---- renderDocumentSpans: rebuild document-content marks in the browser ----
+    renderDocumentSpans: function(_anyChange, docId, annotationsData, rawText, colorMap) {
+        var nu = window.dash_clientside.no_update;
+        if (!docId || !rawText || !annotationsData || !colorMap) { return nu; }
+
+        var ann = annotationsData[docId];
+        if (!ann) { return rawText; }
+
+        var instances = _taterSpanInstances(ann, colorMap);
+
+        var allSpans = [];
+        for (var i = 0; i < instances.length; i++) {
+            var inst = instances[i];
+            for (var j = 0; j < inst.spans.length; j++) {
+                var sp = inst.spans[j];
+                var color = inst.colors[sp.tag] || '#ffe066';
+                allSpans.push({
+                    start: sp.start, end: sp.end, text: sp.text, tag: sp.tag,
+                    pipePath: inst.pipePath, color: color
+                });
+            }
+        }
+
+        if (!allSpans.length) { return rawText; }
+
+        allSpans.sort(function(a, b) { return a.start - b.start; });
+
+        var components = [];
+        var pos = 0;
+        for (var k = 0; k < allSpans.length; k++) {
+            var sp = allSpans[k];
+            if (sp.start < pos) { continue; }
+            if (sp.start > pos) { components.push(rawText.slice(pos, sp.start)); }
+            components.push({
+                type: 'Mark',
+                namespace: 'dash_html_components',
+                props: {
+                    children: sp.text,
+                    'data-start': sp.start,
+                    'data-end': sp.end,
+                    'data-field': sp.pipePath,
+                    'data-tag': sp.tag,
+                    'data-color': sp.color,
+                    style: {
+                        backgroundColor: sp.color,
+                        cursor: 'pointer',
+                        borderRadius: '3px',
+                        padding: '0 2px'
+                    }
+                }
+            });
+            pos = sp.end;
+        }
+        if (pos < rawText.length) { components.push(rawText.slice(pos)); }
+        return components.length ? components : rawText;
+    },
 
     captureSelection: function (_n_clicks_list) {
         var ctx = window.dash_clientside.callback_context;

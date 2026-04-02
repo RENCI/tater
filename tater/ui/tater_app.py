@@ -20,6 +20,27 @@ from tater.ui.callbacks.helpers import (
 )
 
 
+def _build_span_color_map(widgets: list, parent_pipe: str = "") -> dict:
+    """Build {templatePipePath: {tagName: lightenedColor}} for all SpanAnnotationWidgets.
+
+    templatePipePath has numeric index segments stripped, e.g. "tests|relevant_spans".
+    Used by the clientside render callback to look up mark colors without a server call.
+    """
+    from tater.widgets.span import SpanAnnotationWidget, _lighten_hex
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    result = {}
+    for w in widgets:
+        w_pipe = f"{parent_pipe}|{w.schema_field}" if parent_pipe else w.schema_field
+        if isinstance(w, SpanAnnotationWidget):
+            result[w_pipe] = {et.name: _lighten_hex(et.color) for et in w.entity_types}
+        elif isinstance(w, RepeaterWidget):
+            result.update(_build_span_color_map(w.item_widgets, w_pipe))
+        elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
+            result.update(_build_span_color_map(w.children, w_pipe))
+    return result
+
+
 class TaterApp:
     """Main Tater application for document annotation."""
 
@@ -164,6 +185,7 @@ class TaterApp:
             w for w in _collect_value_capture_widgets(self.widgets)
             if w.required and w.to_python_type() is not bool
         ]
+        self._span_color_map: dict = _build_span_color_map(self.widgets)
 
         # Duplicate field check
         seen: set[str] = set()
