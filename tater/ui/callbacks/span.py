@@ -197,32 +197,15 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # ---- Server: refresh entity-button counts on add, delete, or doc navigation ----
-    @app.callback(
-        Output({"type": "span-entity-buttons", "field": MATCH}, "children"),
-        Input({"type": "span-trigger", "field": MATCH}, "data"),
+    # ---- Clientside: update count badges on span add/delete/doc navigation ----
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="updateSpanCounts"),
+        Output({"type": "span-count", "field": ALL, "tag": ALL}, "children"),
+        Output({"type": "span-count", "field": ALL, "tag": ALL}, "className"),
         Input("span-any-change", "data"),
         Input("current-doc-id", "data"),
         State("annotations-store", "data"),
     )
-    def update_entity_counts(item_trigger, any_change, doc_id, annotations_data):
-        pipe_field = ctx.outputs_list["id"]["field"]
-        field_path = pipe_field.replace("|", ".")
-        span_templates = _collect_all_span_templates(_ta().widgets)
-        span_by_schema_field = {w.schema_field: w for w in span_templates}
-        schema_field = field_path.split(".")[-1]
-        widget = span_by_schema_field.get(schema_field)
-        if widget is None:
-            return no_update
-        counts = {}
-        if doc_id:
-            ann = _get_ann(annotations_data, doc_id)
-            if ann is not None:
-                spans = value_helpers.get_model_value(ann, field_path) or []
-                for span in spans:
-                    tag = span.tag if hasattr(span, "tag") else span.get("tag")
-                    counts[tag] = counts.get(tag, 0) + 1
-        return widget._make_buttons(pipe_field, counts)
 
     # ---- Clientside: delete span → span-any-change + annotations-store ----
     # Must be registered AFTER relaySpanTriggers (which is the first writer of span-any-change).

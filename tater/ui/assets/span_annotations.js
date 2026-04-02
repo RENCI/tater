@@ -222,10 +222,7 @@ Object.assign(window.dash_clientside.tater, {
                     'data-tag': sp.tag,
                     'data-color': sp.color,
                     style: {
-                        backgroundColor: sp.color,
-                        cursor: 'pointer',
-                        borderRadius: '3px',
-                        padding: '0 2px'
+                        backgroundColor: sp.color
                     }
                 }
             });
@@ -233,6 +230,52 @@ Object.assign(window.dash_clientside.tater, {
         }
         if (pos < rawText.length) { components.push(rawText.slice(pos)); }
         return components.length ? components : rawText;
+    },
+
+    // ---- updateSpanCounts: update badge children + style for all span-count elements ----
+    updateSpanCounts: function(_anyChange, docId, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list || !ctx.outputs_list[0]) { return [nu, nu]; }
+
+        var countOutputs = ctx.outputs_list[0];
+        if (!countOutputs.length) { return [nu, nu]; }
+
+        // Build counts map: pipePath -> tag -> count directly from outputs field paths
+        var counts = {};
+        if (docId && annotationsData) {
+            var ann = annotationsData[docId];
+            if (ann) {
+                // Collect unique field paths from the outputs and count spans
+                var seenFields = {};
+                for (var fi = 0; fi < countOutputs.length; fi++) {
+                    var fld = countOutputs[fi].id.field;
+                    if (seenFields[fld]) { continue; }
+                    seenFields[fld] = true;
+                    var dotPath = fld.replace(/\|/g, '.');
+                    var spans = _taterGet(ann, dotPath);
+                    if (!Array.isArray(spans)) { continue; }
+                    counts[fld] = {};
+                    for (var si = 0; si < spans.length; si++) {
+                        var t = spans[si].tag;
+                        counts[fld][t] = (counts[fld][t] || 0) + 1;
+                    }
+                }
+            }
+        }
+
+        // Build parallel output arrays
+        var childrenArr = [];
+        var classArr = [];
+        for (var k = 0; k < countOutputs.length; k++) {
+            var id = countOutputs[k].id;
+            var field = id.field;
+            var tag = id.tag;
+            var count = (counts[field] && counts[field][tag]) ? counts[field][tag] : 0;
+            childrenArr.push(String(count));
+            classArr.push(count > 0 ? 'tater-count-badge tater-count-visible' : 'tater-count-badge');
+        }
+        return [childrenArr, classArr];
     },
 
     captureSelection: function (_n_clicks_list) {

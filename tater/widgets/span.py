@@ -130,34 +130,44 @@ class SpanAnnotationWidget(TaterWidget):
                 dcc.Store(id={"type": "span-trigger", "field": pipe_field}, data=0),
             ]), self.label)
 
-    def _make_buttons(self, pipe_field: str, counts: dict) -> Any:
-        """Build the entity-type button group with per-entity span counts.
+    def _make_buttons(self, pipe_field: str, counts: dict = None) -> Any:
+        """Build the entity-type button group with per-entity span count badges.
 
         ``pipe_field`` is the dot-path of this widget's field with dots replaced
         by pipes (e.g. ``"findings|0|spans"``), used as the shared key in all
         component dict IDs so that MATCH callbacks route correctly.
+
+        Count badges are absolutely-positioned ``html.Span`` elements updated
+        by a clientside callback — no server round-trip needed.
         """
         from dash import html
-        buttons = [
-            dmc.Indicator(
-                dmc.Button(
-                    et.name,
-                    id={"type": "span-add-btn", "field": pipe_field, "tag": et.name},
-                    size="xs",
-                    variant="outline",
-                    fw=600,
-                    style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
-                           "color": "var(--mantine-color-gray-9)"},
-                ),
-                label=str(counts.get(et.name, 0)),
-                color=et.color,
-                size=16,
-                disabled=counts.get(et.name, 0) == 0,
-                inline=True,
-                zIndex=199,
+        if counts is None:
+            counts = {}
+        buttons = []
+        for et in self.entity_types:
+            count = counts.get(et.name, 0)
+            buttons.append(
+                html.Div(
+                    [
+                        dmc.Button(
+                            et.name,
+                            id={"type": "span-add-btn", "field": pipe_field, "tag": et.name},
+                            size="xs",
+                            variant="outline",
+                            fw=600,
+                            style={"borderColor": et.color, "backgroundColor": _lighten_hex(et.color),
+                                   "color": "var(--mantine-color-gray-9)"},
+                        ),
+                        html.Span(
+                            "0",
+                            id={"type": "span-count", "field": pipe_field, "tag": et.name},
+                            className="tater-count-badge",
+                            style={"backgroundColor": et.color},
+                        ),
+                    ],
+                    style={"position": "relative", "display": "inline-block"},
+                )
             )
-            for et in self.entity_types
-        ]
         return html.Div(
             dmc.Group(buttons, gap="xs", wrap="wrap"),
             **{"data-tater-field": pipe_field},
