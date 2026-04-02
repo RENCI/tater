@@ -14,6 +14,10 @@ from tater.widgets.base import TaterWidget
 from tater.ui import callbacks
 from tater.ui import value_helpers
 from tater.ui.hooks import OnSaveHook
+from tater.ui.callbacks.helpers import (
+    _collect_all_control_templates,
+    _collect_value_capture_widgets,
+)
 
 
 class TaterApp:
@@ -143,6 +147,23 @@ class TaterApp:
 
         # Collect all widgets (including nested) for lookup by field_path
         self._all_widgets = self._collect_all_widgets(self.widgets)
+
+        # Cache derived widget-tree lookups used in hot-path callbacks.
+        # These are computed once here because the widget tree is immutable
+        # after set_annotation_widgets() completes.
+        self._ev_lookup: dict[str, object] = {
+            w.field_path.replace(".", "|"): w.empty_value
+            for w in _collect_all_control_templates(self.widgets)
+        }
+        self._aa_fields: set[str] = {
+            w.field_path
+            for w in _collect_value_capture_widgets(self.widgets)
+            if w.auto_advance
+        }
+        self._required_widgets = [
+            w for w in _collect_value_capture_widgets(self.widgets)
+            if w.required and w.to_python_type() is not bool
+        ]
 
         # Duplicate field check
         seen: set[str] = set()

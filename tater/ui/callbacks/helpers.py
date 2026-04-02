@@ -112,10 +112,7 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: di
         return
 
     # Booleans always have a value (True/False), so they cannot meaningfully gate completion.
-    required_widgets = [
-        w for w in _collect_value_capture_widgets(tater_app.widgets)
-        if w.required and w.to_python_type() is not bool
-    ]
+    required_widgets = tater_app._required_widgets
     if not required_widgets:
         meta["status"] = "complete"
         return

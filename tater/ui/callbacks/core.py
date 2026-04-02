@@ -17,8 +17,6 @@ from tater.ui.callbacks.helpers import (
     _build_menu_items,
     _perform_navigation,
     update_status_for_doc,
-    _collect_value_capture_widgets,
-    _collect_all_control_templates,
 )
 from tater.ui.callbacks.span import _render_document_content
 
@@ -554,8 +552,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     )
     def capture_values(all_values, doc_id, advance_count, annotations_data, metadata_data):
         ta = _ta()
-        aa_fields = {w.field_path for w in _collect_value_capture_widgets(ta.widgets) if w.auto_advance}
-        return _do_capture(doc_id, advance_count, ta, aa_fields,
+        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
                            annotations_data, metadata_data, convert_empty_str=True)
 
     # --- Capture: checked prop (BooleanWidgets) ---
@@ -573,8 +570,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     )
     def capture_checked(all_values, doc_id, advance_count, annotations_data, metadata_data):
         ta = _ta()
-        aa_fields = {w.field_path for w in _collect_value_capture_widgets(ta.widgets) if w.auto_advance}
-        return _do_capture(doc_id, advance_count, ta, aa_fields,
+        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
                            annotations_data, metadata_data, advance_requires_value=False)
 
     # --- Load: value prop --- push annotation values to widgets on doc change
@@ -589,8 +585,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     )
     def load_values(doc_id, all_ids, annotations_data):
         ta = _ta()
-        ev_lookup = {w.field_path.replace(".", "|"): w.empty_value for w in _collect_all_control_templates(ta.widgets)}
-        return _do_load(doc_id, all_ids, annotations_data, ev_lookup)
+        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup)
 
     # --- Load: checked prop ---
     @app.callback(
@@ -602,8 +597,7 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     )
     def load_checked(doc_id, all_ids, annotations_data):
         ta = _ta()
-        ev_lookup = {w.field_path.replace(".", "|"): w.empty_value for w in _collect_all_control_templates(ta.widgets)}
-        return _do_load(doc_id, all_ids, annotations_data, ev_lookup, as_bool=True)
+        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup, as_bool=True)
 
 
 def _do_capture(
