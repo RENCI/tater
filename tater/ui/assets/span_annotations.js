@@ -31,6 +31,29 @@ window.dash_clientside.tater = window.dash_clientside.tater || {};
 
 // ---------- dot-path helpers used by span callbacks ----------
 
+/**
+ * Decode a widget schema_id (ld, path, tf) to a dot-notation field path.
+ *
+ * Mirrors _decode_field_path() in tater/ui/callbacks/core.py.
+ *
+ * For standalone widgets (ld == ""):  tf is the full pipe-encoded path.
+ * For repeater items: ld = pipe-joined list fields, path = dot-joined indices,
+ * tf = item-relative pipe-encoded field (possibly group-prefixed).
+ */
+function _taterDecodePath(ld, path, tf) {
+    var tfDot = tf.replace(/\|/g, '.');
+    if (!ld) { return tfDot; }
+    var listFields = ld.split('|');
+    var indices = path.split('.');
+    var parts = [];
+    for (var i = 0; i < listFields.length; i++) {
+        parts.push(listFields[i]);
+        if (i < indices.length) { parts.push(indices[i]); }
+    }
+    parts.push(tfDot);
+    return parts.join('.');
+}
+
 function _taterGet(obj, dotPath) {
     var keys = dotPath.split('.');
     var cur = obj;
@@ -230,6 +253,92 @@ Object.assign(window.dash_clientside.tater, {
         }
         if (pos < rawText.length) { components.push(rawText.slice(pos)); }
         return components.length ? components : rawText;
+    },
+
+    // ---- captureValue: write non-boolean widget value to annotations-store ----
+    // Replaces the server-side capture_values callback.  Runs in the browser so
+    // annotations-store is always current (no stale-State race with span adds).
+    // Also handles auto-advance: increments auto-advance-store when the changed
+    // field is in aaFields and the value actually changed.
+    captureValue: function(_allValues, docId, annotationsData, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu]; }
+        var t = ctx.triggered[0];
+        if (!t || t.value === undefined) { return [nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu]; }
+
+        var tid;
+        try { tid = JSON.parse(t.prop_id.split('.value')[0]); } catch(e) { return [nu, nu]; }
+        var dotField = _taterDecodePath(tid.ld || '', tid.path || '', tid.tf || '');
+        var value = t.value === '' ? null : t.value;
+
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var oldValue = _taterGet(ann, dotField);
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, value);
+        var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var advanceUpdate = nu;
+        if (Array.isArray(aaFields) && aaFields.indexOf(dotField) !== -1) {
+            if (value !== oldValue && value !== null) {
+                advanceUpdate = (window._taterAutoAdvanceCount || 0) + 1;
+                window._taterAutoAdvanceCount = advanceUpdate;
+            }
+        }
+        return [newAnnotations, advanceUpdate];
+    },
+
+    // ---- captureChecked: write boolean widget value to annotations-store ----
+    // Same as captureValue but for the checked prop; no empty-string conversion,
+    // and auto-advance does not require a truthy value.
+    captureChecked: function(_allChecked, docId, annotationsData, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu]; }
+        var t = ctx.triggered[0];
+        if (!t || t.value === undefined) { return [nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu]; }
+
+        var tid;
+        try { tid = JSON.parse(t.prop_id.split('.checked')[0]); } catch(e) { return [nu, nu]; }
+        var dotField = _taterDecodePath(tid.ld || '', tid.path || '', tid.tf || '');
+        var value = t.value;
+
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var oldValue = _taterGet(ann, dotField);
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, value);
+        var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var advanceUpdate = nu;
+        if (Array.isArray(aaFields) && aaFields.indexOf(dotField) !== -1) {
+            if (value !== oldValue) {
+                advanceUpdate = (window._taterAutoAdvanceCount || 0) + 1;
+                window._taterAutoAdvanceCount = advanceUpdate;
+            }
+        }
+        return [newAnnotations, advanceUpdate];
+    },
+
+    // ---- applyFieldOp: apply a {field, value} descriptor to annotations-store ----
+    // Used by HL relay callbacks (hier-ann-relay, hl-tags-ann-relay).
+    applyFieldOp: function(_allRelays, docId, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+        var val = ctx.triggered[0].value;
+        if (!val || !val.field) { return nu; }
+        if (!docId || !annotationsData) { return nu; }
+        var ann = annotationsData[docId];
+        if (!ann) { return nu; }
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, val.field, val.value !== undefined ? val.value : null);
+        return Object.assign({}, annotationsData, {[docId]: newAnn});
     },
 
     // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----

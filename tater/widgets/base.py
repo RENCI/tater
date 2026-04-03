@@ -1,4 +1,5 @@
 """Base widget classes for Tater."""
+import json
 import typing
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -57,13 +58,13 @@ def _build_conditional_callbacks(
     value_prop: str,
     empty_value: Any,
 ) -> None:
-    """Register the clientside visibility toggle and server-side value-clear callbacks.
+    """Register the clientside visibility toggle and value-clear callbacks.
 
     Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
     dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
     MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
     """
-    from dash import Output, Input, no_update
+    from dash import Output, Input
 
     _empty = empty_value
     _target = target_value
@@ -76,15 +77,14 @@ def _build_conditional_callbacks(
     def _show_when_matching(v):
         return {} if v == _target else {"display": "none"}
 
-    @app.callback(
+    # Inline JS: clear the widget value when its controlling field hides it.
+    # Runs clientside so it never reads a stale server-side annotations-store State.
+    app.clientside_callback(
+        f"(v) => v !== {json.dumps(_target)} ? {json.dumps(_empty)} : window.dash_clientside.no_update",
         Output(self_id, value_prop, allow_duplicate=True),
         Input(controlling_id, controlling_prop),
         prevent_initial_call=True,
     )
-    def _clear_when_hidden(v):
-        if v != _target:
-            return _empty
-        return no_update
 
 
 # ---------------------------------------------------------------------------
@@ -141,10 +141,6 @@ class TaterWidget:
 
     def register_callbacks(self, app: Any) -> None:
         return None
-
-    @property
-    def component_id(self) -> str:
-        return f"annotation-{self.field_path.replace('.', '-')}"
 
     @property
     def conditional_wrapper_id(self) -> dict:

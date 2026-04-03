@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from dash import Input, Output, State, ALL, MATCH, ctx, no_update
+from dash import Input, Output, State, ALL, MATCH, ctx, no_update, ClientsideFunction
 
 from tater.ui import value_helpers
 from tater.ui.callbacks.helpers import _get_ann
@@ -183,11 +183,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
             ann_relay = no_update
             if ann is not None:
-                if is_deselect:
-                    value_helpers.set_model_value(ann, field_path, None)
-                else:
-                    value_helpers.set_model_value(ann, field_path, node_name)
-                ann_relay = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {"field": field_path, "value": None if is_deselect else node_name}
 
             return new_path, ("" if is_search_result else no_update), ann_relay
         else:
@@ -196,27 +192,24 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
                 new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
                 ann_relay = no_update
                 if ann is not None:
-                    value_helpers.set_model_value(ann, field_path, new_value)
-                    ann_relay = {**(annotations_data or {}), doc_id: ann}
+                    ann_relay = {"field": field_path, "value": new_value}
                 return path[:depth], no_update, ann_relay
             # Forward: navigate into non-leaf; only select if allow_non_leaf=True
             new_path = path[:depth] + [node_name]
             ann_relay = no_update
             if widget.allow_non_leaf and ann is not None:
-                value_helpers.set_model_value(ann, field_path, node_name)
-                ann_relay = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {"field": field_path, "value": node_name}
             return new_path, no_update, ann_relay
 
-    # ---- Relay hier-ann-relay → annotations-store (static outputs only) ----
-    @app.callback(
+    # ---- Clientside: apply hier-ann-relay descriptor → annotations-store ----
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hier-ann-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def relay_hier_ann(all_updates):
-        if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
-        return ctx.triggered[0]["value"]
 
     # ---- 4. Rebuild sections from nav state / search / doc change ----
     @app.callback(
@@ -353,8 +346,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
-            value_helpers.set_model_value(ann, field_path, node_name)
-            ann_relay = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {"field": field_path, "value": node_name}
 
         return new_path, "", ann_relay
 
@@ -388,21 +380,19 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None:
-            value_helpers.set_model_value(ann, field_path, parent_name)
-            ann_relay = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {"field": field_path, "value": parent_name}
 
         return path[:idx], ann_relay
 
-    # ---- Relay hl-tags-ann-relay → annotations-store (static outputs only) ----
-    @app.callback(
+    # ---- Clientside: apply hl-tags-ann-relay descriptor → annotations-store ----
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hl-tags-ann-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def relay_hl_tags_ann(all_updates):
-        if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
-        return ctx.triggered[0]["value"]
 
     # 4. Rebuild pills + option tags on nav/search/doc change
     @app.callback(

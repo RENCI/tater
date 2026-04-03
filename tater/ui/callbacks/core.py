@@ -252,15 +252,12 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         return metadata_data
 
     if has_instructions:
-        @app.callback(
+        app.clientside_callback(
+            "(n) => true",
             Output("instructions-drawer", "opened"),
             Input("btn-open-instructions", "n_clicks"),
             prevent_initial_call=True,
         )
-        def open_instructions(n_clicks):
-            if not n_clicks:
-                return no_update
-            return True
 
     is_hosted = tater_app.annotations_path is None
 
@@ -531,41 +528,50 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
                 return result
         return tater_app
 
-    # --- Capture: value prop (all non-boolean ControlWidgets) ---
-    @app.callback(
-        Output("status-store", "data", allow_duplicate=True),
-        Output("auto-advance-store", "data", allow_duplicate=True),
+    # --- Clientside capture: value prop (all non-boolean ControlWidgets) ---
+    # Runs in the browser so annotations-store is always current — no stale-State
+    # race with concurrent clientside span/repeater mutations.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="captureValue"),
         Output("annotations-store", "data", allow_duplicate=True),
-        Output("metadata-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
         Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         State("current-doc-id", "data"),
-        State("auto-advance-store", "data"),
         State("annotations-store", "data"),
-        State("metadata-store", "data"),
+        State("aa-fields-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_values(all_values, doc_id, advance_count, annotations_data, metadata_data):
-        ta = _ta()
-        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
-                           annotations_data, metadata_data, convert_empty_str=True)
 
-    # --- Capture: checked prop (BooleanWidgets) ---
-    @app.callback(
-        Output("status-store", "data", allow_duplicate=True),
-        Output("auto-advance-store", "data", allow_duplicate=True),
+    # --- Clientside capture: checked prop (BooleanWidgets) ---
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="captureChecked"),
         Output("annotations-store", "data", allow_duplicate=True),
-        Output("metadata-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
         Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         State("current-doc-id", "data"),
-        State("auto-advance-store", "data"),
         State("annotations-store", "data"),
+        State("aa-fields-store", "data"),
+        prevent_initial_call=True,
+    )
+
+    # --- Downstream: recompute status whenever annotations change ---
+    # Triggered by annotations-store as Input (always current after a clientside write).
+    @app.callback(
+        Output("status-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
+        Input("annotations-store", "data"),
+        State("current-doc-id", "data"),
         State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_checked(all_values, doc_id, advance_count, annotations_data, metadata_data):
+    def update_status_from_annotations(annotations_data, doc_id, metadata_data):
+        if not doc_id:
+            return no_update, no_update
         ta = _ta()
-        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
-                           annotations_data, metadata_data, advance_requires_value=False)
+        metadata_data = dict(metadata_data or {})
+        update_status_for_doc(ta, doc_id, annotations_data, metadata_data)
+        status = metadata_data.get(doc_id, {}).get("status", "not_started")
+        return status, metadata_data
 
     # --- Load: value prop --- push annotation values to widgets on doc change
     # empty_value_lookup is computed at call time so that hosted-mode sessions
@@ -593,43 +599,6 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         ta = _ta()
         return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup, as_bool=True)
 
-
-def _do_capture(
-    doc_id: str,
-    advance_count,
-    tater_app,
-    auto_advance_fields: set,
-    annotations_data: dict | None,
-    metadata_data: dict | None,
-    convert_empty_str: bool = False,
-    advance_requires_value: bool = True,
-):
-    """Shared body for capture_values and capture_checked.
-
-    Returns (status, advance_count_or_no_update, new_annotations_data, new_metadata_data).
-    """
-    no_store = no_update, no_update, no_update, no_update
-    if not doc_id or not ctx.triggered_id:
-        return no_store
-    tid = ctx.triggered_id
-    field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
-    value = ctx.triggered[0]["value"]
-    if convert_empty_str and value == "":
-        value = None
-    ann = _get_ann(annotations_data, doc_id)
-    if ann is None:
-        return no_store
-    old_value = value_helpers.get_model_value(ann, field_path)
-    value_helpers.set_model_value(ann, field_path, value)
-    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-    metadata_data = dict(metadata_data or {})
-    update_status_for_doc(tater_app, doc_id, new_annotations_data, metadata_data)
-    status = metadata_data.get(doc_id, {}).get("status", "not_started")
-    if field_path in auto_advance_fields:
-        changed = value != old_value
-        if changed and (not advance_requires_value or value is not None):
-            return status, (advance_count or 0) + 1, new_annotations_data, metadata_data
-    return status, no_update, new_annotations_data, metadata_data
 
 
 def _do_load(doc_id: str, all_ids: list, annotations_data: dict | None, empty_value_lookup: dict, as_bool: bool = False) -> list:
