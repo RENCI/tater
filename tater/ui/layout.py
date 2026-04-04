@@ -34,6 +34,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
         dcc.Store(id="span-delete-store", data=None),
         dcc.Store(id="document-text-store", data=""),
         dcc.Store(id="span-color-map", data=tater_app._span_color_map),
+        dcc.Store(id="repeater-load-trigger", data=0),
         html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
     ]
 

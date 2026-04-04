@@ -344,39 +344,45 @@ Object.assign(window.dash_clientside.tater, {
     // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----
     // Runs clientside so it reads the CURRENT browser-side annotations (including any
     // clientside span adds that haven't been reflected in server-side State yet).
-    applyRepeaterOp: function(_allRelays, docId, annotationsData, spanCount) {
+    // On delete, also increments repeater-load-trigger so load_values fires to push
+    // the now-correct store values into the re-rendered (empty) widget components.
+    applyRepeaterOp: function(_allRelays, docId, annotationsData, spanCount, loadTrigger) {
         var nu = window.dash_clientside.no_update;
         var ctx = window.dash_clientside.callback_context;
-        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu]; }
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu, nu]; }
         var val = ctx.triggered[0].value;
-        if (!val || !val.op) { return [nu, nu]; }
-        if (!docId || !annotationsData) { return [nu, nu]; }
+        if (!val || !val.op) { return [nu, nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu, nu]; }
 
         var ann = annotationsData[docId];
-        if (!ann) { return [nu, nu]; }
+        if (!ann) { return [nu, nu, nu]; }
 
         // field is stored as dot-path (e.g. "findings" or "findings.0.annotations")
         var dotField = val.field;
         var currentList = _taterGet(ann, dotField);
-        if (!Array.isArray(currentList)) { return [nu, nu]; }
+        if (!Array.isArray(currentList)) { return [nu, nu, nu]; }
 
         var newList = currentList.slice();
         var isDelete = false;
 
         if (val.op === 'delete') {
-            if (val.pos < 0 || val.pos >= newList.length) { return [nu, nu]; }
+            if (val.pos < 0 || val.pos >= newList.length) { return [nu, nu, nu]; }
             newList.splice(val.pos, 1);
             isDelete = true;
         } else if (val.op === 'add') {
             newList.push(val.item !== undefined ? val.item : null);
         } else {
-            return [nu, nu];
+            return [nu, nu, nu];
         }
 
         var newAnn = JSON.parse(JSON.stringify(ann));
         _taterSet(newAnn, dotField, newList);
         var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
-        return [newAnnotationsData, isDelete ? (spanCount || 0) + 1 : nu];
+        return [
+            newAnnotationsData,
+            isDelete ? (spanCount || 0) + 1 : nu,
+            isDelete ? (loadTrigger || 0) + 1 : nu,
+        ];
     },
 
     // ---- updateSpanCounts: update badge children + style for all span-count elements ----

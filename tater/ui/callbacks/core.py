@@ -573,17 +573,18 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         status = metadata_data.get(doc_id, {}).get("status", "not_started")
         return status, metadata_data
 
-    # --- Load: value prop --- push annotation values to widgets on doc change
+    # --- Load: value prop --- push annotation values to widgets on doc change or repeater delete.
     # empty_value_lookup is computed at call time so that hosted-mode sessions
     # with different schemas all get the correct fallback values for their widgets.
     @app.callback(
         Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_values(doc_id, all_ids, annotations_data):
+    def load_values(doc_id, _load_trigger, all_ids, annotations_data):
         ta = _ta()
         return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup)
 
@@ -591,11 +592,12 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     @app.callback(
         Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_checked(doc_id, all_ids, annotations_data):
+    def load_checked(doc_id, _load_trigger, all_ids, annotations_data):
         ta = _ta()
         return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup, as_bool=True)
 

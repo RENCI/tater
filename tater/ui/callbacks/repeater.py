@@ -81,20 +81,6 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
                 return result
         return tater_app
 
-    def _sync_annotation_delete(field_path, annotations_data, doc_id, del_position):
-        """Return a copy of annotations_data with item at del_position removed.
-
-        Used only for rendering (so remaining items show correct widget defaults
-        after delete). The actual store update is done clientside by applyRepeaterOp.
-        """
-        ann = _get_ann(annotations_data, doc_id)
-        if ann is None:
-            return annotations_data
-        current_list = value_helpers.get_model_value(ann, field_path)
-        if isinstance(current_list, list) and del_position < len(current_list):
-            current_list.pop(del_position)
-        return {**(annotations_data or {}), doc_id: ann}
-
     # --- Unified MATCH callback ---
     # Uses repeater-ann-relay (MATCH) instead of annotations-store (static) to avoid
     # Dash's prohibition on mixing MATCH and static string outputs in one callback.
@@ -151,7 +137,6 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
         active_value = None
         is_delete = False
         ann_relay = no_update
-        render_annotations = annotations_data  # default: use current state for rendering
 
         if isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-add":
             new_index = len(indices)
@@ -160,38 +145,39 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
             if doc_id:
                 empty_item = _compute_empty_item(widget)
                 ann_relay = {"op": "add", "field": field_path, "item": empty_item}
-            # render_annotations = annotations_data (new item will use widget defaults)
 
         elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == "repeater-delete":
             delete_index = ctx.triggered_id.get("index")
             if delete_index in indices:
                 del_position = indices.index(delete_index)
                 ann_relay = {"op": "delete", "field": field_path, "pos": del_position}
-                # Compute render_annotations for correct widget defaults on remaining items.
-                # This uses server-State data (may lag on span fields) but is correct for
-                # ControlWidget values, which is what matters for rendering.
-                if doc_id and _get_ann(annotations_data, doc_id) is not None:
-                    render_annotations = _sync_annotation_delete(field_path, annotations_data, doc_id, del_position)
                 indices = list(range(len(indices) - 1))
                 active_value = str(indices[0]) if indices else None
                 is_delete = True
 
         new_data = {"indices": indices, "next_index": len(indices)}
         new_change = (change_count or 0) + 1 if is_delete else no_update
+        # On delete, render without baked annotation defaults — load_values fires after
+        # applyRepeaterOp to push correct values from the (now updated) clientside store.
+        render_annotations = None if is_delete else annotations_data
         return new_data, widget._render_items(indices, ta, doc_id, active_value=active_value, annotations_data=render_annotations), new_change, ann_relay
 
     # --- Clientside: apply repeater op to annotations-store + increment span-any-change on delete ---
     # Runs in the browser so it reads the CURRENT annotations-store (including any clientside
     # span adds that haven't been reflected in the server-side State yet).  This avoids the race
     # where a server-side relay would overwrite clientside span data with a stale snapshot.
+    # Also increments repeater-load-trigger on delete so load_values fires to push the now-correct
+    # store values back into the re-rendered (empty) widget components.
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="applyRepeaterOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Output("span-any-change", "data", allow_duplicate=True),
+        Output("repeater-load-trigger", "data", allow_duplicate=True),
         Input({"type": "repeater-ann-relay", "field": ALL}, "data"),
         State("current-doc-id", "data"),
         State("annotations-store", "data"),
         State("span-any-change", "data"),
+        State("repeater-load-trigger", "data"),
         prevent_initial_call=True,
     )
 
@@ -259,7 +245,7 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
         ta = _ta()
         indices = list(store_data.get("indices", []))
         ann_relay = no_update
-        render_ann = annotations_data
+        is_delete = False
 
         full_path = f"{outer_list_field}.{outer_li}.{item_field}"
 
@@ -269,23 +255,19 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
             if doc_id:
                 empty_item = _compute_empty_item(template)
                 ann_relay = {"op": "add", "field": full_path, "item": empty_item}
-            # render_ann = annotations_data (new item uses widget defaults)
 
         elif isinstance(ctx.triggered_id, dict) and ctx.triggered_id.get("type") == _NESTED_DELETE_TYPE:
             inner_li_del = ctx.triggered_id.get("inner_li")
             if inner_li_del in indices:
                 del_position = indices.index(inner_li_del)
                 ann_relay = {"op": "delete", "field": full_path, "pos": del_position}
-                # Compute render_ann for correct widget defaults on remaining items.
-                ann = _get_ann(annotations_data, doc_id)
-                if doc_id and ann is not None:
-                    render_ann = copy.deepcopy(annotations_data)
-                    inner_list = value_helpers.get_model_value(render_ann.get(doc_id, {}), full_path)
-                    if isinstance(inner_list, list) and del_position < len(inner_list):
-                        inner_list.pop(del_position)
                 indices = list(range(len(indices) - 1))
+                is_delete = True
 
         new_data = {"indices": indices, "next_index": len(indices)}
+        # On delete, render without baked annotation defaults — load_values fires after
+        # applyRepeaterOp to push correct values from the (now updated) clientside store.
+        render_ann = None if is_delete else annotations_data
         return new_data, template._render_nested_items(
             indices, ld, outer_li, outer_list_field, item_field, ta, doc_id, render_ann
         ), ann_relay
@@ -295,9 +277,11 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
         ClientsideFunction(namespace="tater", function_name="applyRepeaterOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Output("span-any-change", "data", allow_duplicate=True),
+        Output("repeater-load-trigger", "data", allow_duplicate=True),
         Input({"type": "nested-repeater-ann-relay", "ld": ALL, "li": ALL}, "data"),
         State("current-doc-id", "data"),
         State("annotations-store", "data"),
         State("span-any-change", "data"),
+        State("repeater-load-trigger", "data"),
         prevent_initial_call=True,
     )
