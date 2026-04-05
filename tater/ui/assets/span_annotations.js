@@ -54,6 +54,21 @@ function _taterDecodePath(ld, path, tf) {
     return parts.join('.');
 }
 
+// Return the dot-path up to and including the deepest numeric index segment,
+// or null if the path contains no numeric segment (i.e. not a repeater item field).
+// e.g. "findings.0.kind" → "findings.0"
+//      "findings.0.evidence.2.tag" → "findings.0.evidence.2"
+//      "label" → null
+function _taterListItemPath(dotPath) {
+    var parts = dotPath.split('.');
+    for (var i = parts.length - 1; i >= 0; i--) {
+        if (!isNaN(parts[i]) && parts[i] !== '') {
+            return parts.slice(0, i + 1).join('.');
+        }
+    }
+    return null;
+}
+
 function _taterGet(obj, dotPath) {
     var keys = dotPath.split('.');
     var cur = obj;
@@ -316,6 +331,13 @@ Object.assign(window.dash_clientside.tater, {
         var ann = annotationsData[docId];
         if (!ann) { return [nu, nu]; }
 
+        // Guard: if this widget is a repeater item (dotField has a numeric index),
+        // verify the list item actually exists in the annotation before writing.
+        // Prevents stale DOM components from a previous document creating phantom
+        // list entries when loadValues fires before update_repeater re-renders.
+        var itemPath = _taterListItemPath(dotField);
+        if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
+
         var oldValue = _taterGet(ann, dotField);
         var newAnn = JSON.parse(JSON.stringify(ann));
         _taterSet(newAnn, dotField, value);
@@ -349,6 +371,10 @@ Object.assign(window.dash_clientside.tater, {
 
         var ann = annotationsData[docId];
         if (!ann) { return [nu, nu]; }
+
+        // Same stale-DOM guard as captureValue.
+        var itemPath = _taterListItemPath(dotField);
+        if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
 
         var oldValue = _taterGet(ann, dotField);
         var newAnn = JSON.parse(JSON.stringify(ann));
