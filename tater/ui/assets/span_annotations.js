@@ -279,10 +279,16 @@ Object.assign(window.dash_clientside.tater, {
         if (!ctx || !ctx.outputs_list) { return []; }
         var outputs = ctx.outputs_list;
         if (!outputs.length) { return []; }
+        var nu = window.dash_clientside.no_update;
         var ann = (annotationsData && docId) ? annotationsData[docId] : null;
         return outputs.map(function(out) {
             var id = out.id;
             var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            // If this widget is a repeater item and its list item doesn't exist yet
+            // in the annotation (e.g. a phantom fire during an add before
+            // applyRepeaterOp has run), preserve the server-rendered value.
+            var itemPath = _taterListItemPath(dotField);
+            if (itemPath !== null && (!ann || _taterGet(ann, itemPath) == null)) { return nu; }
             var v = ann ? _taterGet(ann, dotField) : null;
             if (v === null || v === undefined) {
                 v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
@@ -298,10 +304,14 @@ Object.assign(window.dash_clientside.tater, {
         if (!ctx || !ctx.outputs_list) { return []; }
         var outputs = ctx.outputs_list;
         if (!outputs.length) { return []; }
+        var nu = window.dash_clientside.no_update;
         var ann = (annotationsData && docId) ? annotationsData[docId] : null;
         return outputs.map(function(out) {
             var id = out.id;
             var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            // Same phantom-fire guard as loadValues.
+            var itemPath = _taterListItemPath(dotField);
+            if (itemPath !== null && (!ann || _taterGet(ann, itemPath) == null)) { return nu; }
             var v = ann ? _taterGet(ann, dotField) : null;
             if (v === null || v === undefined) {
                 v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
