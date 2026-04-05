@@ -6,7 +6,6 @@ to import from ``tater.ui.callbacks`` without changes.
 from tater.ui.callbacks.core import (
     setup_callbacks,
     setup_value_capture_callbacks,
-    _do_load,
     _decode_field_path,
 )
 from tater.ui.callbacks.span import setup_span_callbacks
@@ -47,6 +46,5 @@ __all__ = [
     "update_status_for_doc",
     "_build_menu_items",
     "_perform_navigation",
-    "_do_load",
     "_decode_field_path",
 ]

@@ -114,6 +114,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
             dcc.Store(id="status-store", data="not_started"),
             dcc.Store(id="auto-advance-store", data=0),
             dcc.Store(id="aa-fields-store", data=list(tater_app._aa_fields)),
+            dcc.Store(id="ev-lookup-store", data=tater_app._ev_lookup),
             dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
             dcc.Store(id="annotations-store", data={
                 doc_id: ann.model_dump()

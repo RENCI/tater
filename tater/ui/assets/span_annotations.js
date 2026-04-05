@@ -255,6 +255,46 @@ Object.assign(window.dash_clientside.tater, {
         return components.length ? components : rawText;
     },
 
+    // ---- loadValues: push annotation values into non-boolean widget value props ----
+    // Replaces the server-side load_values callback.  Reads annotations-store and
+    // ev-lookup-store directly in the browser — no server round-trip on doc nav.
+    // Output IDs come from ctx.outputs_list; ev-lookup keys are tf-encoded field paths.
+    loadValues: function(docId, _trigger, annotationsData, evLookup) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list) { return []; }
+        var outputs = ctx.outputs_list;
+        if (!outputs.length) { return []; }
+        var ann = (annotationsData && docId) ? annotationsData[docId] : null;
+        return outputs.map(function(out) {
+            var id = out.id;
+            var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            var v = ann ? _taterGet(ann, dotField) : null;
+            if (v === null || v === undefined) {
+                v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
+            }
+            return v !== undefined ? v : null;
+        });
+    },
+
+    // ---- loadChecked: push annotation values into boolean widget checked props ----
+    // Same as loadValues but coerces to boolean and defaults to false.
+    loadChecked: function(docId, _trigger, annotationsData, evLookup) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list) { return []; }
+        var outputs = ctx.outputs_list;
+        if (!outputs.length) { return []; }
+        var ann = (annotationsData && docId) ? annotationsData[docId] : null;
+        return outputs.map(function(out) {
+            var id = out.id;
+            var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            var v = ann ? _taterGet(ann, dotField) : null;
+            if (v === null || v === undefined) {
+                v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
+            }
+            return (v !== null && v !== undefined) ? Boolean(v) : false;
+        });
+    },
+
     // ---- captureValue: write non-boolean widget value to annotations-store ----
     // Replaces the server-side capture_values callback.  Runs in the browser so
     // annotations-store is always current (no stale-State race with span adds).

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from dash import Input, Output, State, ALL, ctx, no_update, html, ClientsideFunction
 import dash_mantine_components as dmc
 
-from tater.ui import value_helpers
 from tater.ui.callbacks.helpers import (
     _get_ann,
     _get_meta,
@@ -573,47 +572,30 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
         status = metadata_data.get(doc_id, {}).get("status", "not_started")
         return status, metadata_data
 
-    # --- Load: value prop --- push annotation values to widgets on doc change or repeater delete.
-    # empty_value_lookup is computed at call time so that hosted-mode sessions
-    # with different schemas all get the correct fallback values for their widgets.
-    @app.callback(
+    # --- Clientside load: value prop --- push annotation values to widgets on doc change
+    # or repeater delete.  ev-lookup-store supplies per-field empty values so the server
+    # is not needed; hosted-mode sessions each write their own ev-lookup-store at layout time.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="loadValues"),
         Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
         Input("repeater-load-trigger", "data"),
-        State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         State("annotations-store", "data"),
+        State("ev-lookup-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_values(doc_id, _load_trigger, all_ids, annotations_data):
-        ta = _ta()
-        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup)
 
-    # --- Load: checked prop ---
-    @app.callback(
+    # --- Clientside load: checked prop ---
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="loadChecked"),
         Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
         Input("repeater-load-trigger", "data"),
-        State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
         State("annotations-store", "data"),
+        State("ev-lookup-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_checked(doc_id, _load_trigger, all_ids, annotations_data):
-        ta = _ta()
-        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup, as_bool=True)
 
-
-
-def _do_load(doc_id: str, all_ids: list, annotations_data: dict | None, empty_value_lookup: dict, as_bool: bool = False) -> list:
-    """Shared body for load_values and load_checked."""
-    ann = _get_ann(annotations_data, doc_id) if doc_id else None
-    result = []
-    for wid in (all_ids or []):
-        field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
-        v = value_helpers.get_model_value(ann, field) if ann is not None else None
-        if v is None:
-            v = empty_value_lookup.get(wid["tf"])
-        result.append(bool(v) if (as_bool and v is not None) else (False if as_bool else v))
-    return result
 
 
 def _decode_field_path(ld: str, path: str, tf: str) -> str:

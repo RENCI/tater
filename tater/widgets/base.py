@@ -66,21 +66,18 @@ def _build_conditional_callbacks(
     """
     from dash import Output, Input
 
-    _empty = empty_value
-    _target = target_value
-
-    @app.callback(
+    # Inline JS: show wrapper when controlling value matches target, hide otherwise.
+    app.clientside_callback(
+        f'(v) => v === {json.dumps(target_value)} ? {{}} : {{"display": "none"}}',
         Output(wrapper_id, "style"),
         Input(controlling_id, controlling_prop),
         prevent_initial_call=False,
     )
-    def _show_when_matching(v):
-        return {} if v == _target else {"display": "none"}
 
     # Inline JS: clear the widget value when its controlling field hides it.
     # Runs clientside so it never reads a stale server-side annotations-store State.
     app.clientside_callback(
-        f"(v) => v !== {json.dumps(_target)} ? {json.dumps(_empty)} : window.dash_clientside.no_update",
+        f"(v) => v !== {json.dumps(target_value)} ? {json.dumps(empty_value)} : window.dash_clientside.no_update",
         Output(self_id, value_prop, allow_duplicate=True),
         Input(controlling_id, controlling_prop),
         prevent_initial_call=True,

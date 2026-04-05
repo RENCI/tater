@@ -86,22 +86,20 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         return _find_hl_template(_ta().widgets, field_path)
 
     # ---- 1a. Show/hide clear button ----
-    @app.callback(
+    app.clientside_callback(
+        '(v) => v ? {} : {"display": "none"}',
         Output({"type": "hier-search-clear", "field": MATCH}, "style"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
         prevent_initial_call=False,
     )
-    def toggle_clear(value):
-        return {} if value else {"display": "none"}
 
     # ---- 1b. Clear search on button click ----
-    @app.callback(
+    app.clientside_callback(
+        '() => ""',
         Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
         Input({"type": "hier-search-clear", "field": MATCH}, "n_clicks"),
         prevent_initial_call=True,
     )
-    def clear_search(_):
-        return ""
 
     # ---- 2. Reset navigation when document changes ----
     @app.callback(
@@ -211,13 +209,16 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # ---- 4. Rebuild sections from nav state / search / doc change ----
+    # ---- 4. Rebuild sections from nav state / search ----
+    # current-doc-id is State (not Input) — reset_nav already fires on doc change
+    # and updates hier-nav, which triggers this callback.  Having current-doc-id
+    # as an Input too would cause a double-fire on every navigation.
     @app.callback(
         Output({"type": "hier-sections", "field": MATCH}, "children"),
         Output({"type": "hier-breadcrumb", "field": MATCH}, "children"),
         Input({"type": "hier-nav", "field": MATCH}, "data"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
-        Input("current-doc-id", "data"),
+        State("current-doc-id", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=False,
     )
@@ -394,14 +395,17 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # 4. Rebuild pills + option tags on nav/search/doc change
+    # 4. Rebuild pills + option tags on nav/search change
+    # current-doc-id is State (not Input) — reset_nav already fires on doc change
+    # and updates hl-tags-nav, which triggers this callback.  Having current-doc-id
+    # as an Input too would cause a double-fire on every navigation.
     @app.callback(
         Output({"type": "hl-tags-pills", "field": MATCH}, "children"),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Output({"type": "hl-tags-options", "field": MATCH}, "children"),
         Input({"type": "hl-tags-nav", "field": MATCH}, "data"),
         Input({"type": "hl-tags-search", "field": MATCH}, "value"),
-        Input("current-doc-id", "data"),
+        State("current-doc-id", "data"),
         State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
@@ -411,9 +415,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         path = list(current_path or [])
 
         triggered = ctx.triggered_id
-        if triggered == "current-doc-id" or (
-            isinstance(triggered, dict) and triggered.get("type") == "hl-tags-nav"
-        ):
+        if isinstance(triggered, dict) and triggered.get("type") == "hl-tags-nav":
             clear_search = ""
         else:
             clear_search = no_update
