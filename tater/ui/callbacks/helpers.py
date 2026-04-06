@@ -94,6 +94,36 @@ def _collect_all_control_templates(widgets: list[TaterWidget]) -> list[TaterWidg
     return captured
 
 
+def _build_ev_lookup(widgets: list[TaterWidget], _group_prefix: str = "") -> dict:
+    """Build the ev_lookup dict mapping tf keys to empty values.
+
+    Keys use the same encoding as ``_item_relative_tf`` at render time:
+    - Standalone or direct repeater child: ``schema_field`` (or full pipe-encoded path for standalones)
+    - GroupWidget child inside a repeater: ``"group_schema_field|child_schema_field"``
+
+    This ensures ``loadValues`` can find the fallback empty value for every widget,
+    including those inside GroupWidgets within repeaters.
+    """
+    result = {}
+    for widget in widgets:
+        if isinstance(widget, RepeaterWidget):
+            # Entering a new repeater resets the group prefix.
+            result.update(_build_ev_lookup(widget.item_widgets, ""))
+        elif isinstance(widget, GroupWidget):
+            new_prefix = f"{_group_prefix}|{widget.schema_field}" if _group_prefix else widget.schema_field
+            if hasattr(widget, "children") and widget.children:
+                result.update(_build_ev_lookup(widget.children, new_prefix))
+        elif isinstance(widget, ControlWidget):
+            if _group_prefix:
+                # Inside a repeater group: key is group-relative (e.g. "booleans|indoor_location")
+                key = f"{_group_prefix}|{widget.schema_field}"
+            else:
+                # Standalone or direct repeater child: key is full pipe-encoded field_path
+                key = widget.field_path.replace(".", "|")
+            result[key] = widget.empty_value
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------

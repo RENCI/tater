@@ -98,6 +98,7 @@ class TaterWidget:
 
     _full_path: Optional[str] = field(init=False, default=None, repr=False)
     _condition: Optional[tuple] = field(init=False, default=None, repr=False)
+    _initial_hidden: bool = field(init=False, default=False, repr=False)
 
     def conditional_on(self, controlling_field: "str | list[str] | tuple[str, ...]", value: Any) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
@@ -167,7 +168,8 @@ class TaterWidget:
         content = self._build_field_content(mt)
         if self._condition is not None:
             from dash import html
-            return html.Div(content, id=self.conditional_wrapper_id)
+            style = {"display": "none"} if self._initial_hidden else {}
+            return html.Div(content, id=self.conditional_wrapper_id, style=style)
         return content
 
     def _build_field_content(self, mt: str = "md") -> Any:
@@ -346,13 +348,18 @@ class ControlWidget(TaterWidget):
         return {"type": "tater-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
 
     def _register_repeater_conditional_callbacks(
-        self, app: Any, ld: str, sibling_widgets: list
+        self, app: Any, ld: str, sibling_widgets: list, group_prefix: str = ""
     ) -> None:
         """Register MATCH-based conditional callbacks for this widget inside a repeater.
 
         ``ld`` is the pipe-joined outer list-field path (e.g. ``"pets"``).
         ``sibling_widgets`` is the repeater's ``item_widgets`` list (templates),
         used to look up the controlling widget's type and schema_field.
+        ``group_prefix`` is the pipe-joined schema_field path of any containing
+        GroupWidget(s) within the repeater item (e.g. ``"booleans"``).  It is
+        prepended to both self and controlling widget tf keys so that the
+        registered MATCH IDs match the group-relative tf the rendered components
+        emit at render time (e.g. ``"booleans|indoor_location"``).
         """
         if self._condition is None:
             return
@@ -375,10 +382,17 @@ class ControlWidget(TaterWidget):
         controlling_type = "tater-bool-control" if is_bool else "tater-control"
         controlling_prop = "checked" if is_bool else "value"
 
-        # Use _item_relative_tf so group children encode their group prefix
-        # (e.g. "booleans|is_indoor") matching what the rendered components emit.
-        self_tf = self._item_relative_tf
-        controlling_tf = controlling_widget._item_relative_tf
+        # Build tf keys that match what rendered components emit.
+        # At registration time item_widgets are not yet finalized (no _set_repeater_context),
+        # so _item_relative_tf returns just schema_field.  For widgets inside a GroupWidget
+        # the rendered tf is group-prefixed (e.g. "booleans|indoor_location"), so we use
+        # group_prefix supplied by the GroupWidget's registration helper.
+        if group_prefix:
+            self_tf = f"{group_prefix}|{self.schema_field}"
+            controlling_tf = f"{group_prefix}|{controlling_widget.schema_field}"
+        else:
+            self_tf = self.schema_field
+            controlling_tf = controlling_widget.schema_field
         self_type = self.schema_id["type"]
 
         wrapper_match_id = {"type": "tater-cond-wrapper", "ld": ld, "path": MATCH, "tf": self_tf}

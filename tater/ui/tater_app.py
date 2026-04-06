@@ -17,6 +17,7 @@ from tater.ui.hooks import OnSaveHook
 from tater.ui.callbacks.helpers import (
     _collect_all_control_templates,
     _collect_value_capture_widgets,
+    _build_ev_lookup,
 )
 
 
@@ -172,10 +173,7 @@ class TaterApp:
         # Cache derived widget-tree lookups used in hot-path callbacks.
         # These are computed once here because the widget tree is immutable
         # after set_annotation_widgets() completes.
-        self._ev_lookup: dict[str, object] = {
-            w.field_path.replace(".", "|"): w.empty_value
-            for w in _collect_all_control_templates(self.widgets)
-        }
+        self._ev_lookup: dict[str, object] = _build_ev_lookup(self.widgets)
         self._aa_fields: set[str] = {
             w.field_path
             for w in _collect_value_capture_widgets(self.widgets)
