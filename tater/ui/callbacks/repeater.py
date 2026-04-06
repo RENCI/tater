@@ -62,6 +62,8 @@ def _compute_empty_item(widget_template) -> dict | None:
             item[iw.schema_field] = iw.empty_value
         elif isinstance(iw, SpanAnnotationWidget):
             item[iw.schema_field] = []
+        elif isinstance(iw, RepeaterWidget):
+            item[iw.schema_field] = []
     return item if item else None
 
 
