@@ -173,12 +173,13 @@ class TaterWidget:
     def _build_field_content(self, mt: str = "md") -> Any:
         return dmc.Stack([self.component()], gap="xs", mt=mt)
 
-    def _input_wrapper(self, children: Any, label: Any, withAsterisk: bool = False) -> dmc.InputWrapper:
+    def _input_wrapper(self, children: Any, label: Any, withAsterisk: bool = False, labelProps: dict = {}) -> dmc.InputWrapper:
         """Wrap a component in a dmc.InputWrapper with consistent label/description/asterisk."""
         return dmc.InputWrapper(
             label=label,
             description=self.description,
             withAsterisk=withAsterisk,
+            labelProps=labelProps or None,
             styles={"description": {"marginBottom": "4px"}} if self.description else None,
             children=[children],
         )
@@ -305,11 +306,11 @@ class ControlWidget(TaterWidget):
         return self.schema_field.replace(".", "|")
 
     def _label_with_tooltip(self) -> Any:
-        """Return label string, decorated with auto_advance tooltip if needed."""
+        """Return label string, or a Group with the auto_advance icon if needed."""
         if not self.auto_advance:
             return self.label
         return dmc.Group([
-            dmc.Text(self.label, size="sm"),
+            self.label,
             dmc.Tooltip(
                 DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
                 label="Auto-advances to next document",
@@ -319,7 +320,8 @@ class ControlWidget(TaterWidget):
         ], gap=4)
 
     def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
-        return super()._input_wrapper(children, self._label_with_tooltip(), self.required)
+        label_props = {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}} if self.auto_advance else {}
+        return super()._input_wrapper(children, self._label_with_tooltip(), self.required, labelProps=label_props)
 
     @property
     def renders_own_label(self) -> bool:
