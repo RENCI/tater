@@ -51,17 +51,27 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # Setup timing callbacks
-    _setup_timing_callbacks(tater_app, _ta)
-
-    # Update document display and info on navigation.
-    @app.callback(
-        Output("document-content", "children", allow_duplicate=True),
+    # Update document title, metadata, progress bar and nav-button states clientside.
+    # Fires immediately on navigation — no server round-trip — using info preloaded
+    # into doc-list-store at layout time.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="updateNavInfo"),
         Output("document-title", "children"),
         Output("document-metadata", "children"),
         Output("document-progress", "value"),
         Output("btn-prev", "disabled"),
         Output("btn-next", "disabled"),
+        Input("current-doc-id", "data"),
+        State("doc-list-store", "data"),
+        prevent_initial_call=False,
+    )
+
+    # Setup timing callbacks
+    _setup_timing_callbacks(tater_app, _ta)
+
+    # Render document content on navigation (server-side: loads file + renders spans).
+    @app.callback(
+        Output("document-content", "children", allow_duplicate=True),
         Output("document-text-store", "data"),
         Input("current-doc-id", "data"),
         State("annotations-store", "data"),
@@ -69,12 +79,12 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     )
     def update_document(doc_id, annotations_data):
         if not doc_id:
-            return "No document loaded", "No document", "", 0, True, True, ""
+            return "No document loaded", ""
 
         ta = _ta()
         doc = next((d for d in ta.documents if d.id == doc_id), None)
         if not doc:
-            return "Document not found", "Error", "", 0, True, True, ""
+            return "Document not found", ""
 
         try:
             raw_text = doc.load_content()
@@ -82,21 +92,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             raw_text = f"Error loading file: {e}"
 
         content = _render_document_content(raw_text, doc_id, ta, annotations_data)
-
-        doc_index = next((i for i, d in enumerate(ta.documents) if d.id == doc_id), 0)
-        title = f"{doc_index + 1} / {len(ta.documents)}"
-
-        metadata_parts = []
-        if doc.info:
-            for key, value in doc.info.items():
-                metadata_parts.append(f"{key}: {value}")
-        metadata = " | ".join(metadata_parts) if metadata_parts else ""
-
-        progress = ((doc_index + 1) / len(ta.documents)) * 100 if ta.documents else 0
-
-        is_first = doc_index == 0
-        is_last = doc_index == len(ta.documents) - 1
-        return content, title, metadata, progress, is_first, is_last, raw_text
+        return content, raw_text
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".

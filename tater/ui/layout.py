@@ -19,6 +19,19 @@ _HEADER_HEIGHT = 52
 _FOOTER_HEIGHT = 84
 
 
+def _build_doc_list_store_data(tater_app: TaterApp) -> dict:
+    """Precompute per-doc display info for the clientside nav-info callback."""
+    docs = tater_app.documents
+    return {
+        "total": len(docs),
+        "index": {d.id: i for i, d in enumerate(docs)},
+        "metadata": {
+            d.id: " | ".join(f"{k}: {v}" for k, v in d.info.items()) if d.info else ""
+            for d in docs
+        },
+    }
+
+
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
     annotation_components = _build_annotation_components(tater_app.widgets)
@@ -27,6 +40,9 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     document_controls = _build_document_controls()
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
     is_hosted = tater_app.is_hosted
+
+    # Static per-doc info preloaded for the clientside nav-info callback.
+    doc_list_store = dcc.Store(id="doc-list-store", data=_build_doc_list_store_data(tater_app))
 
     # Global span stores — always included so span callbacks are always registered
     span_stores = [
@@ -125,6 +141,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 for doc_id, meta in tater_app.metadata.items()
             }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
+            doc_list_store,
             *span_stores,
             app_shell,
             dmc.Drawer(

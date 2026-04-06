@@ -461,6 +461,24 @@ Object.assign(window.dash_clientside.tater, {
         ];
     },
 
+    // ---- updateNavInfo: update document title, metadata, progress bar and nav buttons ----
+    // Fires clientside immediately on current-doc-id change — no server round-trip needed
+    // since all required information is preloaded in doc-list-store at layout time.
+    updateNavInfo: function(docId, docListStore) {
+        var nu = window.dash_clientside.no_update;
+        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu]; }
+        var idx = docListStore.index[docId];
+        if (idx === undefined) { return [nu, nu, nu, nu, nu]; }
+        var total = docListStore.total;
+        return [
+            (idx + 1) + " / " + total,
+            docListStore.metadata[docId] || "",
+            ((idx + 1) / total) * 100,
+            idx === 0,
+            idx === total - 1
+        ];
+    },
+
     // ---- updateSpanCounts: update badge children + style for all span-count elements ----
     updateSpanCounts: function(_anyChange, docId, annotationsData) {
         var nu = window.dash_clientside.no_update;
