@@ -130,10 +130,17 @@ class RepeaterWidget(ContainerWidget):
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
-            # For nested RepeaterWidgets use _component_with_context so initial
-            # items are pre-populated from the annotation rather than empty.
+            # For nested RepeaterWidgets use component_in_list so the component
+            # uses _NESTED_* IDs (keyed by ld/li) and widget IDs use pipe-separated
+            # list fields without embedded numeric indices.  _component_with_context
+            # embeds the outer index into pipe_field ("findings|0|evidence") which
+            # corrupts _taterDecodePath in the browser.
             if isinstance(template, RepeaterWidget):
-                comp = widget._component_with_context(tater_app, doc_id, annotations_data)
+                nested_ld = f"{self.field_path}-{template.schema_field}"
+                comp = widget.component_in_list(
+                    nested_ld, index, self.field_path, template.schema_field,
+                    tater_app, doc_id, annotations_data,
+                )
             elif isinstance(template, HierarchicalLabelWidget):
                 # Bake the initial nav path from annotation so the hier-nav store
                 # starts with the correct value — avoids a race where update_repeater
