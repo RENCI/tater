@@ -417,7 +417,7 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
                         },
                     ),
                     dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
-                    dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=self._initial_nav_path),
                     dcc.Store(id={"type": "hl-tags-ann-relay", "field": pipe_field}, data=None),
                 ],
                 gap="xs",

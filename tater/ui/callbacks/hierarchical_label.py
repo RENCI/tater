@@ -261,6 +261,14 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             ann = _get_ann(annotations_data, doc_id)
             if ann is not None:
                 selected_value = value_helpers.get_model_value(ann, field_path)
+                # If hier-nav is empty (e.g. reset_nav fired before update_repeater
+                # baked in the correct path), derive render_path from the tree so
+                # compact/full widgets show the selection in context rather than
+                # rendering from root with nothing highlighted.
+                if selected_value and not render_path:
+                    full_path = _find_path(root, selected_value)
+                    if full_path:
+                        render_path = full_path[:-1]
 
         breadcrumb = " → ".join(path) if path else "None selected"
 
@@ -456,6 +464,14 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+
+        # If hl-tags-nav is empty but there's a saved annotation value (e.g. a
+        # phantom fire from a freshly-mounted store before reset_nav corrects it),
+        # recover the path from the tree so pills render correctly.
+        if not path and selected_value:
+            recovered = _find_path(root, selected_value)
+            if recovered:
+                path = recovered
 
         # Pills = nav path; last pill gets selected style only if it's the saved value
         # (leaf always; non-leaf only when allow_non_leaf=True)
