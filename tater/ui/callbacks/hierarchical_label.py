@@ -101,19 +101,22 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # ---- 2. Reset navigation when document changes ----
+    # ---- 2. Reset navigation when document changes or repeater ops run ----
+    # Also listens on repeater-load-trigger so hier-nav is refreshed after
+    # add/delete ops, mirroring how loadValues works for standard widgets.
     @app.callback(
         Output({"type": "hier-nav", "field": MATCH}, "data"),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id, annotations_data):
+    def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
-            return []
+            return no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
@@ -286,20 +289,21 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         w = _find_hl_template(_ta().widgets, field_path)
         return w if isinstance(w, HierarchicalLabelTagsWidget) else None
 
-    # 1. Reset nav + search on doc change — initialise path from existing selection
+    # 1. Reset nav + search on doc change or repeater ops
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id, annotations_data):
+    def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
-            return [], ""
+            return no_update, no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
