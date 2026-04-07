@@ -134,6 +134,21 @@ class RepeaterWidget(ContainerWidget):
             # items are pre-populated from the annotation rather than empty.
             if isinstance(template, RepeaterWidget):
                 comp = widget._component_with_context(tater_app, doc_id, annotations_data)
+            elif isinstance(template, HierarchicalLabelWidget):
+                # Bake the initial nav path from annotation so the hier-nav store
+                # starts with the correct value — avoids a race where update_repeater
+                # re-renders with data=[] and wins over reset_nav's output.
+                ann = (annotations_data or {}).get(doc_id) if doc_id else None
+                if ann is None and tater_app and doc_id:
+                    ann = tater_app.annotations.get(doc_id)
+                if ann is not None:
+                    v = value_helpers.get_model_value(ann, widget.field_path)
+                    if v:
+                        from tater.widgets.hierarchical_label import _find_path
+                        computed = _find_path(widget.root, v)
+                        if computed:
+                            widget._initial_nav_path = computed
+                comp = widget.component()
             else:
                 # Set repeater context BEFORE component() so the rendered
                 # component gets MATCH-compatible schema_id (ld/path/tf) rather
@@ -357,8 +372,11 @@ class RepeaterWidget(ContainerWidget):
                         ann = tater_app.annotations[doc_id]
                     if ann is not None:
                         value = value_helpers.get_model_value(ann, widget.field_path)
-                        if value is not None:
-                            widget.default = value
+                        if value:
+                            from tater.widgets.hierarchical_label import _find_path
+                            computed = _find_path(widget.root, value)
+                            if computed:
+                                widget._initial_nav_path = computed
                 nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue

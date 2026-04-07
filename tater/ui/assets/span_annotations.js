@@ -420,14 +420,21 @@ Object.assign(window.dash_clientside.tater, {
     // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----
     // Runs clientside so it reads the CURRENT browser-side annotations (including any
     // clientside span adds that haven't been reflected in server-side State yet).
-    // On delete, also increments repeater-load-trigger so load_values fires to push
-    // the now-correct store values into the re-rendered (empty) widget components.
+    // Always increments repeater-load-trigger so loadValues re-fires after the
+    // re-render, pushing correct values from the current annotations-store into all
+    // items (existing items may have been re-rendered with stale server-side State).
     applyRepeaterOp: function(_allRelays, docId, annotationsData, spanCount, loadTrigger) {
         var nu = window.dash_clientside.no_update;
         var ctx = window.dash_clientside.callback_context;
         if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu, nu]; }
-        var val = ctx.triggered[0].value;
-        if (!val || !val.op) { return [nu, nu, nu]; }
+        // Iterate through all triggered entries — a re-rendered nested repeater may
+        // emit a null relay store first, which must not block the real op.
+        var val = null;
+        for (var i = 0; i < ctx.triggered.length; i++) {
+            var v = ctx.triggered[i].value;
+            if (v && v.op) { val = v; break; }
+        }
+        if (!val) { return [nu, nu, nu]; }
         if (!docId || !annotationsData) { return [nu, nu, nu]; }
 
         var ann = annotationsData[docId];
@@ -457,7 +464,7 @@ Object.assign(window.dash_clientside.tater, {
         return [
             newAnnotationsData,
             isDelete ? (spanCount || 0) + 1 : nu,
-            isDelete ? (loadTrigger || 0) + 1 : nu,
+            (loadTrigger || 0) + 1,
         ];
     },
 

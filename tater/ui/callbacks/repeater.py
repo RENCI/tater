@@ -159,8 +159,12 @@ def setup_repeater_callbacks(tater_app: TaterApp) -> None:
 
         new_data = {"indices": indices, "next_index": len(indices)}
         new_change = (change_count or 0) + 1 if is_delete else no_update
-        # On delete, render without baked annotation defaults — load_values fires after
-        # applyRepeaterOp to push correct values from the (now updated) clientside store.
+        # On delete, render without baked annotation defaults — item positions shift and
+        # stale server State would bake wrong values; loadValues corrects them after
+        # applyRepeaterOp updates the store.
+        # On add, use annotations_data (current browser State): the new item has no
+        # annotation entry yet so it renders empty naturally, and existing items render
+        # with their current values so captureValue does not fire spurious null writes.
         render_annotations = None if is_delete else annotations_data
         return new_data, widget._render_items(indices, ta, doc_id, active_value=active_value, annotations_data=render_annotations), new_change, ann_relay
 
@@ -267,8 +271,12 @@ def setup_nested_repeater_callbacks(tater_app: TaterApp) -> None:
                 is_delete = True
 
         new_data = {"indices": indices, "next_index": len(indices)}
-        # On delete, render without baked annotation defaults — load_values fires after
-        # applyRepeaterOp to push correct values from the (now updated) clientside store.
+        # On delete, render without baked annotation defaults — item positions shift and
+        # stale server State would bake wrong values; loadValues corrects them after
+        # applyRepeaterOp updates the store.
+        # On add, use annotations_data: the new item has no annotation entry yet so it
+        # renders empty naturally, and existing items render with current values so
+        # captureValue does not fire spurious null writes.
         render_ann = None if is_delete else annotations_data
         return new_data, template._render_nested_items(
             indices, ld, outer_li, outer_list_field, item_field, ta, doc_id, render_ann
