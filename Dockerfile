@@ -13,16 +13,17 @@ WORKDIR /app
 # copy dep files
 COPY pyproject.toml uv.lock ./
 
-# install deps
-# public-health-app used --locked flag, but we are getting an error, so removing for now
-RUN uv venv && . .venv/bin/activate && uv sync --no-dev
+# copy package source used to install the project entrypoint
+COPY tater ./tater
+COPY README.md ./
 
-# copy in the application code
-COPY . .
+# install deps
+RUN uv venv && . .venv/bin/activate && uv sync --locked --no-dev
 
 
 # stage 2: the final image
-FROM python:3.12-slim
+# Use the same base family as the builder so the copied venv remains valid.
+FROM containers.renci.org/helxplatform/uv-base:v0.0.1
 
 # environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -44,5 +45,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 # expose the port
 EXPOSE $PORT
 
-# run the application with Gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:8050", "app:app", "--timeout", "120"]
+# run tater in hosted mode
+CMD ["tater", "--hosted", "--host", "0.0.0.0", "--port", "8050"]
