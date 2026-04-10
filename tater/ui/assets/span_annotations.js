@@ -350,6 +350,7 @@ Object.assign(window.dash_clientside.tater, {
         if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
 
         var oldValue = _taterGet(ann, dotField);
+        if (JSON.stringify(value) === JSON.stringify(oldValue)) { return [nu, nu]; }
         var newAnn = JSON.parse(JSON.stringify(ann));
         _taterSet(newAnn, dotField, value);
         var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
@@ -388,6 +389,7 @@ Object.assign(window.dash_clientside.tater, {
         if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
 
         var oldValue = _taterGet(ann, dotField);
+        if (value === oldValue) { return [nu, nu]; }
         var newAnn = JSON.parse(JSON.stringify(ann));
         _taterSet(newAnn, dotField, value);
         var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
