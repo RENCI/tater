@@ -65,5 +65,8 @@ def parse_args() -> Namespace:
     # Validate: non-hosted mode also requires --documents
     if not args.hosted and not args.documents:
         parser.error("--documents is required in non-hosted mode (or use --hosted)")
+    # Validate: --no-restore only applies in non-hosted mode
+    if args.hosted and args.no_restore:
+        parser.error("--no-restore is not applicable in hosted mode")
 
     return args
