@@ -1,5 +1,4 @@
 """Base widget classes for Tater."""
-import json
 import typing
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -49,37 +48,41 @@ def _resolve_field_info(model: type, field_path: str) -> Any:
 
 def _build_conditional_callbacks(
     app: Any,
-    target_value: Any,
     *,
     wrapper_id: Any,
     controlling_id: Any,
     controlling_prop: str,
     self_id: Any,
     value_prop: str,
-    empty_value: Any,
+    config_id: Any,
 ) -> None:
     """Register the clientside visibility toggle and value-clear callbacks.
 
     Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
     dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
     MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
-    """
-    from dash import Output, Input
 
-    # Inline JS: show wrapper when controlling value matches target, hide otherwise.
+    ``config_id`` is the ID of the ``dcc.Store`` holding ``{target, empty}``
+    that is embedded in the conditional wrapper div by ``render_field``.
+    """
+    from dash import ClientsideFunction, Output, Input, State
+
+    # Named JS: show wrapper when controlling value matches target, hide otherwise.
     app.clientside_callback(
-        f'(v) => v === {json.dumps(target_value)} ? {{}} : {{"display": "none"}}',
+        ClientsideFunction(namespace="tater", function_name="conditionalVisibility"),
         Output(wrapper_id, "style"),
         Input(controlling_id, controlling_prop),
+        State(config_id, "data"),
         prevent_initial_call=False,
     )
 
-    # Inline JS: clear the widget value when its controlling field hides it.
+    # Named JS: clear the widget value when its controlling field hides it.
     # Runs clientside so it never reads a stale server-side annotations-store State.
     app.clientside_callback(
-        f"(v) => v !== {json.dumps(target_value)} ? {json.dumps(empty_value)} : window.dash_clientside.no_update",
+        ClientsideFunction(namespace="tater", function_name="conditionalClear"),
         Output(self_id, value_prop, allow_duplicate=True),
         Input(controlling_id, controlling_prop),
+        State(config_id, "data"),
         prevent_initial_call=True,
     )
 
@@ -152,6 +155,18 @@ class TaterWidget:
             tf = self.schema_field if ld else self.field_path.replace(".", "|")
         return {"type": "tater-cond-wrapper", "ld": ld, "path": path, "tf": tf}
 
+    @property
+    def conditional_config_id(self) -> dict:
+        """ID for the dcc.Store holding {target, empty} config for conditional callbacks."""
+        ld = getattr(self, "_repeater_ld", "")
+        path = getattr(self, "_repeater_path", "")
+        _irtf = getattr(self, "_item_relative_tf", None)
+        if _irtf is not None:
+            tf = _irtf
+        else:
+            tf = self.schema_field if ld else self.field_path.replace(".", "|")
+        return {"type": "tater-cond-config", "ld": ld, "path": path, "tf": tf}
+
     def _set_repeater_context(self, ld: str, path: str) -> None:
         """Propagate repeater list-field path and row index to this widget.
 
@@ -167,9 +182,13 @@ class TaterWidget:
     def render_field(self, mt: str = "md") -> Any:
         content = self._build_field_content(mt)
         if self._condition is not None:
-            from dash import html
+            from dash import html, dcc
             style = {"display": "none"} if self._initial_hidden else {}
-            return html.Div(content, id=self.conditional_wrapper_id, style=style)
+            config_store = dcc.Store(
+                id=self.conditional_config_id,
+                data={"target": self._condition[1], "empty": getattr(self, "empty_value", None)},
+            )
+            return html.Div([config_store, content], id=self.conditional_wrapper_id, style=style)
         return content
 
     def _build_field_content(self, mt: str = "md") -> Any:
@@ -217,13 +236,13 @@ class TaterWidget:
             }
 
         _build_conditional_callbacks(
-            app, target_value,
+            app,
             wrapper_id=self.conditional_wrapper_id,
             controlling_id=controlling_schema_id,
             controlling_prop=controlling_prop,
             self_id=self.schema_id,
             value_prop=self.value_prop,
-            empty_value=self.empty_value,
+            config_id=self.conditional_config_id,
         )
 
     def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
@@ -398,15 +417,16 @@ class ControlWidget(TaterWidget):
         wrapper_match_id = {"type": "tater-cond-wrapper", "ld": ld, "path": MATCH, "tf": self_tf}
         controlling_match_id = {"type": controlling_type, "ld": ld, "path": MATCH, "tf": controlling_tf}
         self_match_id = {"type": self_type, "ld": ld, "path": MATCH, "tf": self_tf}
+        config_match_id = {"type": "tater-cond-config", "ld": ld, "path": MATCH, "tf": self_tf}
 
         _build_conditional_callbacks(
-            app, target_value,
+            app,
             wrapper_id=wrapper_match_id,
             controlling_id=controlling_match_id,
             controlling_prop=controlling_prop,
             self_id=self_match_id,
             value_prop=self.value_prop,
-            empty_value=self.empty_value,
+            config_id=config_match_id,
         )
 
 
