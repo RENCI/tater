@@ -128,6 +128,13 @@ def _build_ev_lookup(widgets: list[TaterWidget], _group_prefix: str = "") -> dic
 # Status
 # ---------------------------------------------------------------------------
 
+def _status_display(status: str) -> tuple[str, str]:
+    """Return (label, color) for a document status string."""
+    labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
+    colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
+    return labels.get(status, status), colors.get(status, "gray")
+
+
 def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
     """Compute and store the annotation status for a document.
 
@@ -167,8 +174,6 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: di
 
 def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_only: bool = False) -> list:
     """Build document menu items with status badges and flag indicators."""
-    status_labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-    status_colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
     items = []
     for i, doc in enumerate(tater_app.documents):
         meta = _get_meta(metadata_data, doc.id)
@@ -176,13 +181,14 @@ def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_o
         if flagged_only and not flagged:
             continue
         status = meta.get("status", "not_started")
+        status_label, status_color = _status_display(status)
         right_children = []
         if flagged:
             right_children.append(DashIconify(icon="tabler:flag-filled", color="red", width=14))
         right_children.append(
             dmc.Badge(
-                status_labels.get(status, status),
-                color=status_colors.get(status, "gray"),
+                status_label,
+                color=status_color,
                 variant="light",
                 size="xs",
             )

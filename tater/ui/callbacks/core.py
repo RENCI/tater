@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from dash import Input, Output, State, ALL, ctx, no_update, html, ClientsideFunction
-import dash_mantine_components as dmc
 
 from tater.ui.callbacks.helpers import (
     _get_ann,
@@ -16,14 +15,12 @@ from tater.ui.callbacks.helpers import (
     _build_menu_items,
     _perform_navigation,
     update_status_for_doc,
+    _status_display,
 )
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
 
-
-_STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-_STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
 
 
 def setup_callbacks(tater_app: TaterApp) -> None:
@@ -400,7 +397,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
     )
     def update_save_status(timing_data):
         if _ta()._save_error:
-            save_text = f"Save failed: {tater_app._save_error}"
+            save_text = f"Save failed: {_ta()._save_error}"
             save_color = "red"
         elif timing_data and timing_data.get("last_save_time"):
             dt = datetime.fromtimestamp(timing_data["last_save_time"])
@@ -463,9 +460,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         Input("status-store", "data"),
     )
     def update_status_badge(status):
-        label = _STATUS_LABELS.get(status, status)
-        color = _STATUS_COLORS.get(status, "gray")
-        return label, color
+        return _status_display(status)
 
     @app.callback(
         Output("notification-container", "sendNotifications"),
