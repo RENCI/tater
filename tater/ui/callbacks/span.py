@@ -84,7 +84,7 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
     # document-text-store triggers on nav; span-any-change triggers on span edits.
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="renderDocumentSpans"),
-        Output("document-content", "children", allow_duplicate=True),
+        Output("document-content", "children"),
         Input("document-text-store", "data"),
         Input("span-any-change", "data"),
         State("current-doc-id", "data"),

@@ -289,24 +289,24 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             flask.session.pop("tater_session", None)
             return "/"
 
-    # Auto-save: write to file whenever annotations or metadata store changes.
-    @app.callback(
-        Output("timing-store", "data", allow_duplicate=True),
-        Input("annotations-store", "data"),
-        Input("metadata-store", "data"),
-        State("current-doc-id", "data"),
-        State("timing-store", "data"),
-        prevent_initial_call=True,
-    )
-    def auto_save(annotations_data, metadata_data, doc_id, timing_data):
-        ta = _ta()
-        if not ta.annotations_path:
-            return no_update
-        ta._save_stores_to_file(annotations_data or {}, metadata_data or {}, doc_id=doc_id)
-        now = time.time()
-        timing_data = dict(timing_data or {})
-        timing_data["last_save_time"] = now
-        return timing_data
+    if not is_hosted:
+        # Auto-save: write to file whenever annotations or metadata store changes.
+        # Not registered in hosted mode — no annotations_path, no file to write.
+        @app.callback(
+            Output("timing-store", "data", allow_duplicate=True),
+            Input("annotations-store", "data"),
+            Input("metadata-store", "data"),
+            State("current-doc-id", "data"),
+            State("timing-store", "data"),
+            prevent_initial_call=True,
+        )
+        def auto_save(annotations_data, metadata_data, doc_id, timing_data):
+            ta = _ta()
+            ta._save_stores_to_file(annotations_data or {}, metadata_data or {}, doc_id=doc_id)
+            now = time.time()
+            timing_data = dict(timing_data or {})
+            timing_data["last_save_time"] = now
+            return timing_data
 
 
 def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
