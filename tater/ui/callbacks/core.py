@@ -17,7 +17,6 @@ from tater.ui.callbacks.helpers import (
     _perform_navigation,
     update_status_for_doc,
 )
-from tater.ui.callbacks.span import _render_document_content
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -69,30 +68,24 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app, _ta)
 
-    # Render document content on navigation (server-side: loads file + renders spans).
+    # Load raw document text on navigation; rendering is handled clientside.
     @app.callback(
-        Output("document-content", "children", allow_duplicate=True),
         Output("document-text-store", "data"),
         Input("current-doc-id", "data"),
-        State("annotations-store", "data"),
-        prevent_initial_call="initial_duplicate",
     )
-    def update_document(doc_id, annotations_data):
+    def update_document(doc_id):
         if not doc_id:
-            return "No document loaded", ""
+            return no_update
 
         ta = _ta()
         doc = next((d for d in ta.documents if d.id == doc_id), None)
         if not doc:
-            return "Document not found", ""
+            return no_update
 
         try:
-            raw_text = doc.load_content()
+            return doc.load_content()
         except Exception as e:
-            raw_text = f"Error loading file: {e}"
-
-        content = _render_document_content(raw_text, doc_id, ta, annotations_data)
-        return content, raw_text
+            return f"Error loading file: {e}"
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".

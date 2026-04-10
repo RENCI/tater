@@ -217,9 +217,10 @@ Object.assign(window.dash_clientside.tater, {
     },
 
     // ---- renderDocumentSpans: rebuild document-content marks in the browser ----
-    renderDocumentSpans: function(_anyChange, docId, annotationsData, rawText, colorMap) {
+    // Fires on both nav (rawText Input) and span edits (_anyChange Input).
+    renderDocumentSpans: function(rawText, _anyChange, docId, annotationsData, colorMap) {
         var nu = window.dash_clientside.no_update;
-        if (!docId || !rawText || !annotationsData || !colorMap) { return nu; }
+        if (!docId || rawText === null || rawText === undefined || !annotationsData || !colorMap) { return nu; }
 
         var ann = annotationsData[docId];
         if (!ann) { return rawText; }
