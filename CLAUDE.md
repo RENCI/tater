@@ -58,7 +58,7 @@ tater --hosted [--port 8050] [--host 0.0.0.0]
 ```
 
 CLI flags: `--documents` (required in single mode), `--config` or `--schema` (one required in single mode),
-`--annotations`, `--port`, `--host`, `--debug`, `--hosted`
+`--annotations`, `--no-restore`, `--port`, `--host`, `--debug`, `--hosted`
 (also via `TATER_DEBUG` / `TATER_PORT` / `TATER_HOST` env vars).
 
 ## Architecture
@@ -74,10 +74,17 @@ CLI flags: `--documents` (required in single mode), `--config` or `--schema` (on
   calls `widgets_from_model(model, overrides=widgets)` to fill the gaps — the same flow used
   by the Python config path.
 - **Callbacks**: each widget registers its own Dash callbacks in `register_callbacks(app)`.
-  The central `callbacks.py` handles navigation, doc loading, and metadata (flag/notes/status).
-- **Persistence**: `TaterApp._save_annotations_to_file()` is called eagerly on every change
-  in single mode. In hosted mode `annotations_path` is `None` — no auto-save; annotations live
-  in `dcc.Store` client-side and the user downloads them explicitly.
+  `tater/ui/callbacks/` handles navigation, document loading, metadata (flag/notes/status),
+  and value capture. All are split across `core.py`, `helpers.py`, `span.py`, `repeater.py`,
+  and `hierarchical_label.py`.
+- **Document rendering**: `update_document` (server) loads raw text and writes it to
+  `document-text-store`. The JS `renderDocumentSpans` fires on that store change (and on
+  `span-any-change`) to render annotated text clientside — no server round-trip for rendering.
+- **Persistence**: annotation and metadata state lives in `dcc.Store` components
+  (`annotations-store`, `metadata-store`) in the browser. All mutations are clientside. The
+  `auto_save` server callback fires on store changes and calls `TaterApp._save_stores_to_file()`
+  to persist to disk. `auto_save` is not registered in hosted mode (`annotations_path` is
+  `None`); annotations live in the browser and the user downloads them explicitly.
   Format: `{doc_id: {annotations: {...}, metadata: {...}}}`.
 - **value_helpers**: `get_model_value` / `set_model_value` in `tater/ui/value_helpers.py`
   handle dot-path reads/writes into nested Pydantic model instances.
@@ -189,26 +196,38 @@ output must also use `allow_duplicate=True`. Missing it on one will cause Dash t
 
 - **`current-doc-id` / `data`** — written by the prev/next buttons and the document-menu
   selector. All three already use `allow_duplicate=True`; any new navigation callback must too.
-  See the comment block on the first such callback in `callbacks.py`.
+  See the comment block on the first such callback in `core.py`.
 
-- **`annotations-store` / `data`** — written by the main save callback and by multiple relay
-  callbacks (repeater, nested repeater, HL, HL tags, span). All use `allow_duplicate=True`.
-  New callbacks writing to `annotations-store` must also use it.
+- **`annotations-store` / `data`** — written by `captureValue`/`captureChecked` (clientside,
+  ALL pattern) and by multiple relay callbacks (repeater, nested repeater, HL, HL tags, span).
+  All use `allow_duplicate=True`. New callbacks writing to `annotations-store` must also use it.
 
 - **`upload-location` / `href`** — written by both `handle_submit` (upload tab) and
   `load_example` (examples tab) in `upload_layout.py`. Both use `allow_duplicate=True`.
 
-- **Widget value props** (e.g. `annotation-<field>` / `value` or `checked`) — when a widget
-  has `_condition` set, two callbacks both write to its value prop: `update_widget_value`
-  (in `_register_widget_value_capture`, triggered by doc load) and `_clear_when_hidden` (in
-  `TaterWidget._register_conditional_callbacks`, triggered by the controlling field). Both
-  use `allow_duplicate=True`; `prevent_initial_call='initial_duplicate'` is also required on
-  the doc-load callback because `allow_duplicate=True` normally forbids initial calls.
-  This is enforced automatically in `_register_widget_value_capture` when `widget._condition
-  is not None` — don't remove that branch.
+- **Widget value props** (`tater-control` / `value` and `tater-bool-control` / `checked`) —
+  `loadValues`/`loadChecked` (ALL pattern, `prevent_initial_call="initial_duplicate"`) and
+  `conditionalClear` (MATCH pattern, `allow_duplicate=True`) both write to these props for
+  conditional widgets. The ALL callbacks use `prevent_initial_call="initial_duplicate"` rather
+  than `allow_duplicate=True`; Dash treats ALL and MATCH pattern callbacks as distinct writers
+  for the same component type, so this combination is valid.
 
 **`prevent_initial_call=True` does not suppress pattern-matching fires** caused by component
 re-renders — only the very first page load. Use the value guard above instead.
+
+**All clientside callbacks must use named `ClientsideFunction`** — inline JS strings are
+prohibited for Dash 4 compatibility. Dash 4 stores inline strings under a SHA-256 hash in
+`window.dash_clientside._dashprivate_clientside_funcs`, and they fail at runtime with
+`TypeError: Cannot read properties of undefined (reading 'apply')` when combined with
+`allow_duplicate=True`. Instead, define all JS functions in `tater/ui/assets/*.js` under
+`window.dash_clientside.tater` and reference them via
+`ClientsideFunction(namespace="tater", function_name="...")`.
+
+**Conditional callbacks use a `tater-cond-config` store** — `render_field` (in `base.py`)
+embeds a `dcc.Store(id=conditional_config_id, data={"target": ..., "empty": ...})` inside each
+conditional wrapper div. The `conditionalVisibility` and `conditionalClear` JS functions read
+this store as `State` rather than having the target/empty values baked into inline JS. This
+avoids parameterizing named JS functions with per-widget string arguments.
 
 ## Widget conventions
 
