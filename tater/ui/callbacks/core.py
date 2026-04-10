@@ -361,32 +361,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         prevent_initial_call='initial_duplicate',
     )
     def on_doc_change(doc_id, timing_data, annotations_data, metadata_data):
-        # Navigation callbacks (_perform_navigation) already initialized timing,
-        # metadata (visited=True), and status for this doc.  Just return the
-        # status computed there and leave the stores untouched.
-        if timing_data and timing_data.get("_nav_init"):
-            status = (metadata_data or {}).get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
-            return no_update, status, no_update
-
-        # Initial page load path: no navigation callback has run yet.
-        metadata_data = dict(metadata_data or {})
-        if doc_id:
-            meta = dict(_get_meta(metadata_data, doc_id))
-            meta["visited"] = True
-            metadata_data[doc_id] = meta
-            update_status_for_doc(_ta(), doc_id, annotations_data, metadata_data)
-
-        if timing_data is None:
-            timing_data = {}
-        timing_data["doc_start_time"] = time.time()
-        timing_data["paused"] = False
-        if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
-            timing_data["session_start_time"] = time.time()
-        meta = _get_meta(metadata_data, doc_id) if doc_id else {}
-        timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
-
-        status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
-        return timing_data, status, metadata_data
+        return _on_doc_change_impl(_ta(), doc_id, timing_data, annotations_data, metadata_data)
 
     # Update save status and pause icon whenever timing-store changes (i.e. on every save,
     # navigation, or pause toggle) — no interval needed, no "Updating..." flicker.
@@ -396,17 +371,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         Input("timing-store", "data"),
     )
     def update_save_status(timing_data):
-        if _ta()._save_error:
-            save_text = f"Save failed: {_ta()._save_error}"
-            save_color = "red"
-        elif timing_data and timing_data.get("last_save_time"):
-            dt = datetime.fromtimestamp(timing_data["last_save_time"])
-            save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
-            save_color = "dimmed"
-        else:
-            save_text = "Never saved"
-            save_color = "dimmed"
-        return save_text, save_color
+        return _update_save_status_impl(_ta(), timing_data)
 
     # Update the doc timer display every second — runs entirely in the browser so
     # there is no server round-trip and no "Updating..." tab-title flicker.
@@ -430,29 +395,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         prevent_initial_call=True,
     )
     def toggle_pause(n_clicks, timing_data, doc_id, metadata_data):
-        if not n_clicks:
-            return no_update, no_update
-        if timing_data is None:
-            timing_data = {}
-        metadata_data = dict(metadata_data or {})
-        now = time.time()
-        currently_paused = timing_data.get("paused", False)
-        if not currently_paused:
-            # Flush elapsed into metadata so time isn't lost
-            start = timing_data.get("doc_start_time")
-            if start and doc_id:
-                meta = dict(_get_meta(metadata_data, doc_id))
-                meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
-                metadata_data[doc_id] = meta
-            timing_data["doc_start_time"] = None
-            timing_data["paused"] = True
-            # Update baseline so the clientside timer shows the correct accumulated total
-            meta = _get_meta(metadata_data, doc_id) if doc_id else {}
-            timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
-        else:
-            timing_data["doc_start_time"] = now
-            timing_data["paused"] = False
-        return timing_data, metadata_data
+        return _toggle_pause_impl(n_clicks, timing_data, doc_id, metadata_data)
 
     @app.callback(
         Output("status-badge", "children"),
@@ -496,6 +439,88 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
             "action": "show",
             "autoClose": False,
         }]
+
+
+# ---------------------------------------------------------------------------
+# Extracted callback implementations — module-level for unit testability.
+# The registered callbacks are thin shells that call these with _ta().
+# See tests/test_callbacks_core.py for the rationale.
+# ---------------------------------------------------------------------------
+
+def _update_save_status_impl(ta, timing_data):
+    """Business logic for update_save_status callback.
+
+    Returns (text, color) to display in the save-status footer element.
+    Branches: save error → red; saved at time → dimmed; never saved → dimmed.
+    """
+    if ta._save_error:
+        return f"Save failed: {ta._save_error}", "red"
+    if timing_data and timing_data.get("last_save_time"):
+        dt = datetime.fromtimestamp(timing_data["last_save_time"])
+        return f"Last saved: {dt.strftime('%H:%M:%S')}", "dimmed"
+    return "Never saved", "dimmed"
+
+
+def _on_doc_change_impl(ta, doc_id, timing_data, annotations_data, metadata_data):
+    """Business logic for on_doc_change callback.
+
+    Returns (timing_data, status, metadata_data) — or (no_update, status, no_update)
+    when _nav_init is set (navigation callbacks already handled initialization).
+    The _nav_init guard prevents double-writes and cascading auto-saves on navigation.
+    """
+    if timing_data and timing_data.get("_nav_init"):
+        status = (metadata_data or {}).get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+        return no_update, status, no_update
+
+    metadata_data = dict(metadata_data or {})
+    if doc_id:
+        meta = dict(_get_meta(metadata_data, doc_id))
+        meta["visited"] = True
+        metadata_data[doc_id] = meta
+        update_status_for_doc(ta, doc_id, annotations_data, metadata_data)
+
+    if timing_data is None:
+        timing_data = {}
+    timing_data["doc_start_time"] = time.time()
+    timing_data["paused"] = False
+    if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
+        timing_data["session_start_time"] = time.time()
+    meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+    timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
+
+    status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+    return timing_data, status, metadata_data
+
+
+def _toggle_pause_impl(n_clicks, timing_data, doc_id, metadata_data):
+    """Business logic for toggle_pause callback.
+
+    On pause: flushes elapsed seconds into metadata, clears doc_start_time,
+    and updates annotation_seconds_at_load so the clientside timer stays correct.
+    On resume: restores doc_start_time to now.
+    Returns (timing_data, metadata_data).
+    """
+    if not n_clicks:
+        return no_update, no_update
+    if timing_data is None:
+        timing_data = {}
+    metadata_data = dict(metadata_data or {})
+    now = time.time()
+    currently_paused = timing_data.get("paused", False)
+    if not currently_paused:
+        start = timing_data.get("doc_start_time")
+        if start and doc_id:
+            meta = dict(_get_meta(metadata_data, doc_id))
+            meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+            metadata_data[doc_id] = meta
+        timing_data["doc_start_time"] = None
+        timing_data["paused"] = True
+        meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+        timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
+    else:
+        timing_data["doc_start_time"] = now
+        timing_data["paused"] = False
+    return timing_data, metadata_data
 
 
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
