@@ -87,7 +87,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
     # ---- 1a. Show/hide clear button ----
     app.clientside_callback(
-        '(v) => v ? {} : {"display": "none"}',
+        ClientsideFunction(namespace="tater", function_name="showWhenTruthy"),
         Output({"type": "hier-search-clear", "field": MATCH}, "style"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
         prevent_initial_call=False,
@@ -95,7 +95,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
     # ---- 1b. Clear search on button click ----
     app.clientside_callback(
-        '() => ""',
+        ClientsideFunction(namespace="tater", function_name="clearInput"),
         Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
         Input({"type": "hier-search-clear", "field": MATCH}, "n_clicks"),
         prevent_initial_call=True,

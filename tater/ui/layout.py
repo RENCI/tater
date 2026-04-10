@@ -216,7 +216,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     with a full-width progress bar flush to the bottom edge."""
     help_button = (
         dmc.ActionIcon(
-            DashIconify(icon="tabler:help-circle", width=20),
+            DashIconify(icon="tabler:info-circle", width=20),
             id="btn-open-instructions",
             variant="subtle",
             size="sm",

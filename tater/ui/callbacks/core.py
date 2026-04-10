@@ -248,7 +248,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
 
     if has_instructions:
         app.clientside_callback(
-            "(n) => true",
+            ClientsideFunction(namespace="tater", function_name="openOnClick"),
             Output("instructions-drawer", "opened"),
             Input("btn-open-instructions", "n_clicks"),
             prevent_initial_call=True,
