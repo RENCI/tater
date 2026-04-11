@@ -17,6 +17,7 @@ from tater.ui.hooks import OnSaveHook
 from tater.ui.callbacks.helpers import (
     _collect_all_control_templates,
     _collect_value_capture_widgets,
+    _build_ev_lookup,
 )
 
 
@@ -54,6 +55,7 @@ class TaterApp:
         on_save: Optional[OnSaveHook] = None,
         is_hosted: bool = False,
         dash_app: Optional[Any] = None,
+        restore_annotations: bool = True,
     ):
         """
         Initialize the Tater app.
@@ -66,6 +68,7 @@ class TaterApp:
             schema_model: Optional Pydantic model class for annotations
             is_hosted: If True, running in hosted mode (no auto-save, download button shown)
             dash_app: External Dash app to register callbacks on (hosted mode)
+            restore_annotations: If False, skip loading existing annotations on startup
         """
         self.title = title or "tater - document annotation"
         self.description = description
@@ -74,6 +77,7 @@ class TaterApp:
         self.schema_model = schema_model
         self.on_save = on_save
         self.is_hosted = is_hosted
+        self.restore_annotations = restore_annotations
         self.app = dash_app if dash_app is not None else Dash(__name__, title="tater", suppress_callback_exceptions=True)
         # In hosted mode the shared Dash app carries a callable that resolves
         # the current user's TaterApp from the Flask session at callback runtime.
@@ -124,8 +128,9 @@ class TaterApp:
                 doc_path = Path(source)
                 self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
-            # Load existing annotations if file exists
-            self._load_annotations_from_file()
+            # Load existing annotations if file exists (skipped when restore_annotations=False)
+            if self.restore_annotations:
+                self._load_annotations_from_file()
 
             # Ensure every document has annotation and metadata objects
             for doc in self.documents:
@@ -172,10 +177,7 @@ class TaterApp:
         # Cache derived widget-tree lookups used in hot-path callbacks.
         # These are computed once here because the widget tree is immutable
         # after set_annotation_widgets() completes.
-        self._ev_lookup: dict[str, object] = {
-            w.field_path.replace(".", "|"): w.empty_value
-            for w in _collect_all_control_templates(self.widgets)
-        }
+        self._ev_lookup: dict[str, object] = _build_ev_lookup(self.widgets)
         self._aa_fields: set[str] = {
             w.field_path
             for w in _collect_value_capture_widgets(self.widgets)

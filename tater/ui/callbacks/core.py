@@ -8,24 +8,19 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from dash import Input, Output, State, ALL, ctx, no_update, html, ClientsideFunction
-import dash_mantine_components as dmc
 
-from tater.ui import value_helpers
 from tater.ui.callbacks.helpers import (
     _get_ann,
     _get_meta,
     _build_menu_items,
     _perform_navigation,
     update_status_for_doc,
+    _status_display,
 )
-from tater.ui.callbacks.span import _render_document_content
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
 
-
-_STATUS_LABELS = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-_STATUS_COLORS = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
 
 
 def setup_callbacks(tater_app: TaterApp) -> None:
@@ -52,52 +47,42 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
-    # Setup timing callbacks
-    _setup_timing_callbacks(tater_app, _ta)
-
-    # Update document display and info on navigation.
-    @app.callback(
-        Output("document-content", "children", allow_duplicate=True),
+    # Update document title, metadata, progress bar and nav-button states clientside.
+    # Fires immediately on navigation — no server round-trip — using info preloaded
+    # into doc-list-store at layout time.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="updateNavInfo"),
         Output("document-title", "children"),
         Output("document-metadata", "children"),
         Output("document-progress", "value"),
         Output("btn-prev", "disabled"),
         Output("btn-next", "disabled"),
+        Input("current-doc-id", "data"),
+        State("doc-list-store", "data"),
+        prevent_initial_call=False,
+    )
+
+    # Setup timing callbacks
+    _setup_timing_callbacks(tater_app, _ta)
+
+    # Load raw document text on navigation; rendering is handled clientside.
+    @app.callback(
         Output("document-text-store", "data"),
         Input("current-doc-id", "data"),
-        State("annotations-store", "data"),
-        prevent_initial_call="initial_duplicate",
     )
-    def update_document(doc_id, annotations_data):
+    def update_document(doc_id):
         if not doc_id:
-            return "No document loaded", "No document", "", 0, True, True, ""
+            return no_update
 
         ta = _ta()
         doc = next((d for d in ta.documents if d.id == doc_id), None)
         if not doc:
-            return "Document not found", "Error", "", 0, True, True, ""
+            return no_update
 
         try:
-            raw_text = doc.load_content()
+            return doc.load_content()
         except Exception as e:
-            raw_text = f"Error loading file: {e}"
-
-        content = _render_document_content(raw_text, doc_id, ta, annotations_data)
-
-        doc_index = next((i for i, d in enumerate(ta.documents) if d.id == doc_id), 0)
-        title = f"{doc_index + 1} / {len(ta.documents)}"
-
-        metadata_parts = []
-        if doc.info:
-            for key, value in doc.info.items():
-                metadata_parts.append(f"{key}: {value}")
-        metadata = " | ".join(metadata_parts) if metadata_parts else ""
-
-        progress = ((doc_index + 1) / len(ta.documents)) * 100 if ta.documents else 0
-
-        is_first = doc_index == 0
-        is_last = doc_index == len(ta.documents) - 1
-        return content, title, metadata, progress, is_first, is_last, raw_text
+            return f"Error loading file: {e}"
 
     # Button navigation
     # NOTE: Multiple callbacks write to "current-doc-id" and "timing-store".
@@ -252,15 +237,12 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         return metadata_data
 
     if has_instructions:
-        @app.callback(
+        app.clientside_callback(
+            ClientsideFunction(namespace="tater", function_name="openOnClick"),
             Output("instructions-drawer", "opened"),
             Input("btn-open-instructions", "n_clicks"),
             prevent_initial_call=True,
         )
-        def open_instructions(n_clicks):
-            if not n_clicks:
-                return no_update
-            return True
 
     is_hosted = tater_app.annotations_path is None
 
@@ -307,24 +289,24 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             flask.session.pop("tater_session", None)
             return "/"
 
-    # Auto-save: write to file whenever annotations or metadata store changes.
-    @app.callback(
-        Output("timing-store", "data", allow_duplicate=True),
-        Input("annotations-store", "data"),
-        Input("metadata-store", "data"),
-        State("current-doc-id", "data"),
-        State("timing-store", "data"),
-        prevent_initial_call=True,
-    )
-    def auto_save(annotations_data, metadata_data, doc_id, timing_data):
-        ta = _ta()
-        if not ta.annotations_path:
-            return no_update
-        ta._save_stores_to_file(annotations_data or {}, metadata_data or {}, doc_id=doc_id)
-        now = time.time()
-        timing_data = dict(timing_data or {})
-        timing_data["last_save_time"] = now
-        return timing_data
+    if not is_hosted:
+        # Auto-save: write to file whenever annotations or metadata store changes.
+        # Not registered in hosted mode — no annotations_path, no file to write.
+        @app.callback(
+            Output("timing-store", "data", allow_duplicate=True),
+            Input("annotations-store", "data"),
+            Input("metadata-store", "data"),
+            State("current-doc-id", "data"),
+            State("timing-store", "data"),
+            prevent_initial_call=True,
+        )
+        def auto_save(annotations_data, metadata_data, doc_id, timing_data):
+            ta = _ta()
+            ta._save_stores_to_file(annotations_data or {}, metadata_data or {}, doc_id=doc_id)
+            now = time.time()
+            timing_data = dict(timing_data or {})
+            timing_data["last_save_time"] = now
+            return timing_data
 
 
 def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
@@ -379,32 +361,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         prevent_initial_call='initial_duplicate',
     )
     def on_doc_change(doc_id, timing_data, annotations_data, metadata_data):
-        # Navigation callbacks (_perform_navigation) already initialized timing,
-        # metadata (visited=True), and status for this doc.  Just return the
-        # status computed there and leave the stores untouched.
-        if timing_data and timing_data.get("_nav_init"):
-            status = (metadata_data or {}).get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
-            return no_update, status, no_update
-
-        # Initial page load path: no navigation callback has run yet.
-        metadata_data = dict(metadata_data or {})
-        if doc_id:
-            meta = dict(_get_meta(metadata_data, doc_id))
-            meta["visited"] = True
-            metadata_data[doc_id] = meta
-            update_status_for_doc(_ta(), doc_id, annotations_data, metadata_data)
-
-        if timing_data is None:
-            timing_data = {}
-        timing_data["doc_start_time"] = time.time()
-        timing_data["paused"] = False
-        if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
-            timing_data["session_start_time"] = time.time()
-        meta = _get_meta(metadata_data, doc_id) if doc_id else {}
-        timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
-
-        status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
-        return timing_data, status, metadata_data
+        return _on_doc_change_impl(_ta(), doc_id, timing_data, annotations_data, metadata_data)
 
     # Update save status and pause icon whenever timing-store changes (i.e. on every save,
     # navigation, or pause toggle) — no interval needed, no "Updating..." flicker.
@@ -414,17 +371,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         Input("timing-store", "data"),
     )
     def update_save_status(timing_data):
-        if _ta()._save_error:
-            save_text = f"Save failed: {tater_app._save_error}"
-            save_color = "red"
-        elif timing_data and timing_data.get("last_save_time"):
-            dt = datetime.fromtimestamp(timing_data["last_save_time"])
-            save_text = f"Last saved: {dt.strftime('%H:%M:%S')}"
-            save_color = "dimmed"
-        else:
-            save_text = "Never saved"
-            save_color = "dimmed"
-        return save_text, save_color
+        return _update_save_status_impl(_ta(), timing_data)
 
     # Update the doc timer display every second — runs entirely in the browser so
     # there is no server round-trip and no "Updating..." tab-title flicker.
@@ -448,29 +395,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         prevent_initial_call=True,
     )
     def toggle_pause(n_clicks, timing_data, doc_id, metadata_data):
-        if not n_clicks:
-            return no_update, no_update
-        if timing_data is None:
-            timing_data = {}
-        metadata_data = dict(metadata_data or {})
-        now = time.time()
-        currently_paused = timing_data.get("paused", False)
-        if not currently_paused:
-            # Flush elapsed into metadata so time isn't lost
-            start = timing_data.get("doc_start_time")
-            if start and doc_id:
-                meta = dict(_get_meta(metadata_data, doc_id))
-                meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
-                metadata_data[doc_id] = meta
-            timing_data["doc_start_time"] = None
-            timing_data["paused"] = True
-            # Update baseline so the clientside timer shows the correct accumulated total
-            meta = _get_meta(metadata_data, doc_id) if doc_id else {}
-            timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
-        else:
-            timing_data["doc_start_time"] = now
-            timing_data["paused"] = False
-        return timing_data, metadata_data
+        return _toggle_pause_impl(n_clicks, timing_data, doc_id, metadata_data)
 
     @app.callback(
         Output("status-badge", "children"),
@@ -478,9 +403,7 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         Input("status-store", "data"),
     )
     def update_status_badge(status):
-        label = _STATUS_LABELS.get(status, status)
-        color = _STATUS_COLORS.get(status, "gray")
-        return label, color
+        return _status_display(status)
 
     @app.callback(
         Output("notification-container", "sendNotifications"),
@@ -518,6 +441,88 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
         }]
 
 
+# ---------------------------------------------------------------------------
+# Extracted callback implementations — module-level for unit testability.
+# The registered callbacks are thin shells that call these with _ta().
+# See tests/test_callbacks_core.py for the rationale.
+# ---------------------------------------------------------------------------
+
+def _update_save_status_impl(ta, timing_data):
+    """Business logic for update_save_status callback.
+
+    Returns (text, color) to display in the save-status footer element.
+    Branches: save error → red; saved at time → dimmed; never saved → dimmed.
+    """
+    if ta._save_error:
+        return f"Save failed: {ta._save_error}", "red"
+    if timing_data and timing_data.get("last_save_time"):
+        dt = datetime.fromtimestamp(timing_data["last_save_time"])
+        return f"Last saved: {dt.strftime('%H:%M:%S')}", "dimmed"
+    return "Never saved", "dimmed"
+
+
+def _on_doc_change_impl(ta, doc_id, timing_data, annotations_data, metadata_data):
+    """Business logic for on_doc_change callback.
+
+    Returns (timing_data, status, metadata_data) — or (no_update, status, no_update)
+    when _nav_init is set (navigation callbacks already handled initialization).
+    The _nav_init guard prevents double-writes and cascading auto-saves on navigation.
+    """
+    if timing_data and timing_data.get("_nav_init"):
+        status = (metadata_data or {}).get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+        return no_update, status, no_update
+
+    metadata_data = dict(metadata_data or {})
+    if doc_id:
+        meta = dict(_get_meta(metadata_data, doc_id))
+        meta["visited"] = True
+        metadata_data[doc_id] = meta
+        update_status_for_doc(ta, doc_id, annotations_data, metadata_data)
+
+    if timing_data is None:
+        timing_data = {}
+    timing_data["doc_start_time"] = time.time()
+    timing_data["paused"] = False
+    if "session_start_time" not in timing_data or timing_data["session_start_time"] is None:
+        timing_data["session_start_time"] = time.time()
+    meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+    timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
+
+    status = metadata_data.get(doc_id, {}).get("status", "not_started") if doc_id else "not_started"
+    return timing_data, status, metadata_data
+
+
+def _toggle_pause_impl(n_clicks, timing_data, doc_id, metadata_data):
+    """Business logic for toggle_pause callback.
+
+    On pause: flushes elapsed seconds into metadata, clears doc_start_time,
+    and updates annotation_seconds_at_load so the clientside timer stays correct.
+    On resume: restores doc_start_time to now.
+    Returns (timing_data, metadata_data).
+    """
+    if not n_clicks:
+        return no_update, no_update
+    if timing_data is None:
+        timing_data = {}
+    metadata_data = dict(metadata_data or {})
+    now = time.time()
+    currently_paused = timing_data.get("paused", False)
+    if not currently_paused:
+        start = timing_data.get("doc_start_time")
+        if start and doc_id:
+            meta = dict(_get_meta(metadata_data, doc_id))
+            meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+            metadata_data[doc_id] = meta
+        timing_data["doc_start_time"] = None
+        timing_data["paused"] = True
+        meta = _get_meta(metadata_data, doc_id) if doc_id else {}
+        timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
+    else:
+        timing_data["doc_start_time"] = now
+        timing_data["paused"] = False
+    return timing_data, metadata_data
+
+
 def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
     """Setup unified callbacks to capture all ControlWidget value changes."""
     app = tater_app.app
@@ -531,118 +536,75 @@ def setup_value_capture_callbacks(tater_app: TaterApp) -> None:
                 return result
         return tater_app
 
-    # --- Capture: value prop (all non-boolean ControlWidgets) ---
-    @app.callback(
-        Output("status-store", "data", allow_duplicate=True),
-        Output("auto-advance-store", "data", allow_duplicate=True),
+    # --- Clientside capture: value prop (all non-boolean ControlWidgets) ---
+    # Runs in the browser so annotations-store is always current — no stale-State
+    # race with concurrent clientside span/repeater mutations.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="captureValue"),
         Output("annotations-store", "data", allow_duplicate=True),
-        Output("metadata-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
         Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         State("current-doc-id", "data"),
-        State("auto-advance-store", "data"),
         State("annotations-store", "data"),
-        State("metadata-store", "data"),
+        State("aa-fields-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_values(all_values, doc_id, advance_count, annotations_data, metadata_data):
-        ta = _ta()
-        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
-                           annotations_data, metadata_data, convert_empty_str=True)
 
-    # --- Capture: checked prop (BooleanWidgets) ---
-    @app.callback(
-        Output("status-store", "data", allow_duplicate=True),
-        Output("auto-advance-store", "data", allow_duplicate=True),
+    # --- Clientside capture: checked prop (BooleanWidgets) ---
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="captureChecked"),
         Output("annotations-store", "data", allow_duplicate=True),
-        Output("metadata-store", "data", allow_duplicate=True),
+        Output("auto-advance-store", "data", allow_duplicate=True),
         Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         State("current-doc-id", "data"),
-        State("auto-advance-store", "data"),
         State("annotations-store", "data"),
+        State("aa-fields-store", "data"),
+        prevent_initial_call=True,
+    )
+
+    # --- Downstream: recompute status whenever annotations change ---
+    # Triggered by annotations-store as Input (always current after a clientside write).
+    @app.callback(
+        Output("status-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
+        Input("annotations-store", "data"),
+        State("current-doc-id", "data"),
         State("metadata-store", "data"),
         prevent_initial_call=True,
     )
-    def capture_checked(all_values, doc_id, advance_count, annotations_data, metadata_data):
+    def update_status_from_annotations(annotations_data, doc_id, metadata_data):
+        if not doc_id:
+            return no_update, no_update
         ta = _ta()
-        return _do_capture(doc_id, advance_count, ta, ta._aa_fields,
-                           annotations_data, metadata_data, advance_requires_value=False)
+        metadata_data = dict(metadata_data or {})
+        update_status_for_doc(ta, doc_id, annotations_data, metadata_data)
+        status = metadata_data.get(doc_id, {}).get("status", "not_started")
+        return status, metadata_data
 
-    # --- Load: value prop --- push annotation values to widgets on doc change
-    # empty_value_lookup is computed at call time so that hosted-mode sessions
-    # with different schemas all get the correct fallback values for their widgets.
-    @app.callback(
+    # --- Clientside load: value prop --- push annotation values to widgets on doc change
+    # or repeater delete.  ev-lookup-store supplies per-field empty values so the server
+    # is not needed; hosted-mode sessions each write their own ev-lookup-store at layout time.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="loadValues"),
         Output({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
+        State("ev-lookup-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_values(doc_id, all_ids, annotations_data):
-        ta = _ta()
-        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup)
 
-    # --- Load: checked prop ---
-    @app.callback(
+    # --- Clientside load: checked prop ---
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="loadChecked"),
         Output({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
         Input("current-doc-id", "data"),
-        State({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "id"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
+        State("ev-lookup-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def load_checked(doc_id, all_ids, annotations_data):
-        ta = _ta()
-        return _do_load(doc_id, all_ids, annotations_data, ta._ev_lookup, as_bool=True)
 
-
-def _do_capture(
-    doc_id: str,
-    advance_count,
-    tater_app,
-    auto_advance_fields: set,
-    annotations_data: dict | None,
-    metadata_data: dict | None,
-    convert_empty_str: bool = False,
-    advance_requires_value: bool = True,
-):
-    """Shared body for capture_values and capture_checked.
-
-    Returns (status, advance_count_or_no_update, new_annotations_data, new_metadata_data).
-    """
-    no_store = no_update, no_update, no_update, no_update
-    if not doc_id or not ctx.triggered_id:
-        return no_store
-    tid = ctx.triggered_id
-    field_path = _decode_field_path(tid["ld"], tid["path"], tid["tf"])
-    value = ctx.triggered[0]["value"]
-    if convert_empty_str and value == "":
-        value = None
-    ann = _get_ann(annotations_data, doc_id)
-    if ann is None:
-        return no_store
-    old_value = value_helpers.get_model_value(ann, field_path)
-    value_helpers.set_model_value(ann, field_path, value)
-    new_annotations_data = {**(annotations_data or {}), doc_id: ann}
-    metadata_data = dict(metadata_data or {})
-    update_status_for_doc(tater_app, doc_id, new_annotations_data, metadata_data)
-    status = metadata_data.get(doc_id, {}).get("status", "not_started")
-    if field_path in auto_advance_fields:
-        changed = value != old_value
-        if changed and (not advance_requires_value or value is not None):
-            return status, (advance_count or 0) + 1, new_annotations_data, metadata_data
-    return status, no_update, new_annotations_data, metadata_data
-
-
-def _do_load(doc_id: str, all_ids: list, annotations_data: dict | None, empty_value_lookup: dict, as_bool: bool = False) -> list:
-    """Shared body for load_values and load_checked."""
-    ann = _get_ann(annotations_data, doc_id) if doc_id else None
-    result = []
-    for wid in (all_ids or []):
-        field = _decode_field_path(wid["ld"], wid["path"], wid["tf"])
-        v = value_helpers.get_model_value(ann, field) if ann is not None else None
-        if v is None:
-            v = empty_value_lookup.get(wid["tf"])
-        result.append(bool(v) if (as_bool and v is not None) else (False if as_bool else v))
-    return result
 
 
 def _decode_field_path(ld: str, path: str, tf: str) -> str:

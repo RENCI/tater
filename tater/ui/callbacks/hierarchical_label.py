@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-from dash import Input, Output, State, ALL, MATCH, ctx, no_update
+from dash import Input, Output, State, ALL, MATCH, ctx, no_update, ClientsideFunction
 
 from tater.ui import value_helpers
 from tater.ui.callbacks.helpers import _get_ann
@@ -86,36 +86,37 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         return _find_hl_template(_ta().widgets, field_path)
 
     # ---- 1a. Show/hide clear button ----
-    @app.callback(
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="showWhenTruthy"),
         Output({"type": "hier-search-clear", "field": MATCH}, "style"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
         prevent_initial_call=False,
     )
-    def toggle_clear(value):
-        return {} if value else {"display": "none"}
 
     # ---- 1b. Clear search on button click ----
-    @app.callback(
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="clearInput"),
         Output({"type": "hier-search", "field": MATCH}, "value", allow_duplicate=True),
         Input({"type": "hier-search-clear", "field": MATCH}, "n_clicks"),
         prevent_initial_call=True,
     )
-    def clear_search(_):
-        return ""
 
-    # ---- 2. Reset navigation when document changes ----
+    # ---- 2. Reset navigation when document changes or repeater ops run ----
+    # Also listens on repeater-load-trigger so hier-nav is refreshed after
+    # add/delete ops, mirroring how loadValues works for standard widgets.
     @app.callback(
         Output({"type": "hier-nav", "field": MATCH}, "data"),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id, annotations_data):
+    def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
-            return []
+            return no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
@@ -183,11 +184,7 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
             ann_relay = no_update
             if ann is not None:
-                if is_deselect:
-                    value_helpers.set_model_value(ann, field_path, None)
-                else:
-                    value_helpers.set_model_value(ann, field_path, node_name)
-                ann_relay = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {"field": field_path, "value": None if is_deselect else node_name}
 
             return new_path, ("" if is_search_result else no_update), ann_relay
         else:
@@ -196,47 +193,57 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
                 new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
                 ann_relay = no_update
                 if ann is not None:
-                    value_helpers.set_model_value(ann, field_path, new_value)
-                    ann_relay = {**(annotations_data or {}), doc_id: ann}
+                    ann_relay = {"field": field_path, "value": new_value}
                 return path[:depth], no_update, ann_relay
             # Forward: navigate into non-leaf; only select if allow_non_leaf=True
             new_path = path[:depth] + [node_name]
             ann_relay = no_update
             if widget.allow_non_leaf and ann is not None:
-                value_helpers.set_model_value(ann, field_path, node_name)
-                ann_relay = {**(annotations_data or {}), doc_id: ann}
+                ann_relay = {"field": field_path, "value": node_name}
             return new_path, no_update, ann_relay
 
-    # ---- Relay hier-ann-relay → annotations-store (static outputs only) ----
-    @app.callback(
+    # ---- Clientside: apply hier-ann-relay descriptor → annotations-store ----
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hier-ann-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def relay_hier_ann(all_updates):
-        if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
-        return ctx.triggered[0]["value"]
 
-    # ---- 4. Rebuild sections from nav state / search / doc change ----
+    # ---- 4. Rebuild sections from nav state / search ----
+    # current-doc-id is now an Input so this fires immediately on navigation,
+    # one round-trip earlier than waiting for reset_nav → hier-nav.
+    # reset_nav is kept so hier-nav stays in sync for handle_click's State.
+    # The double-fire on navigation (once from current-doc-id, once from hier-nav
+    # after reset_nav) is harmless — both produce the same output.
     @app.callback(
         Output({"type": "hier-sections", "field": MATCH}, "children"),
         Output({"type": "hier-breadcrumb", "field": MATCH}, "children"),
+        Input("current-doc-id", "data"),
         Input({"type": "hier-nav", "field": MATCH}, "data"),
         Input({"type": "hier-search", "field": MATCH}, "value"),
-        Input("current-doc-id", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=False,
     )
-    def update_display(current_path, search_query, doc_id, annotations_data):
+    def update_display(doc_id, current_path, search_query, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
-        path = list(current_path or [])
 
         widget = _get_widget(field_path)
         if widget is None:
             return no_update, no_update
         root = widget.root
+
+        # When triggered directly by doc navigation, derive the path from the
+        # annotation without waiting for reset_nav to update hier-nav first.
+        if ctx.triggered_id == "current-doc-id":
+            ann = _get_ann(annotations_data, doc_id) if doc_id else None
+            selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            path = (_find_path(root, selected_value) or []) if selected_value else []
+        else:
+            path = list(current_path or [])
 
         # If the path tip is a leaf it encodes the current selection — derive
         # selected_value directly so we don't race against annotations-store.
@@ -254,6 +261,14 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             ann = _get_ann(annotations_data, doc_id)
             if ann is not None:
                 selected_value = value_helpers.get_model_value(ann, field_path)
+                # If hier-nav is empty (e.g. reset_nav fired before update_repeater
+                # baked in the correct path), derive render_path from the tree so
+                # compact/full widgets show the selection in context rather than
+                # rendering from root with nothing highlighted.
+                if selected_value and not render_path:
+                    full_path = _find_path(root, selected_value)
+                    if full_path:
+                        render_path = full_path[:-1]
 
         breadcrumb = " → ".join(path) if path else "None selected"
 
@@ -282,20 +297,21 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         w = _find_hl_template(_ta().widgets, field_path)
         return w if isinstance(w, HierarchicalLabelTagsWidget) else None
 
-    # 1. Reset nav + search on doc change — initialise path from existing selection
+    # 1. Reset nav + search on doc change or repeater ops
     @app.callback(
         Output({"type": "hl-tags-nav", "field": MATCH}, "data", allow_duplicate=True),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
         State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def reset_nav(doc_id, annotations_data):
+    def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         widget = _get_widget(field_path)
         if widget is None:
-            return [], ""
+            return no_update, no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if selected_value:
@@ -353,8 +369,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
-            value_helpers.set_model_value(ann, field_path, node_name)
-            ann_relay = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {"field": field_path, "value": node_name}
 
         return new_path, "", ann_relay
 
@@ -388,45 +403,59 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None:
-            value_helpers.set_model_value(ann, field_path, parent_name)
-            ann_relay = {**(annotations_data or {}), doc_id: ann}
+            ann_relay = {"field": field_path, "value": parent_name}
 
         return path[:idx], ann_relay
 
-    # ---- Relay hl-tags-ann-relay → annotations-store (static outputs only) ----
-    @app.callback(
+    # ---- Clientside: apply hl-tags-ann-relay descriptor → annotations-store ----
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
         Output("annotations-store", "data", allow_duplicate=True),
         Input({"type": "hl-tags-ann-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
         prevent_initial_call=True,
     )
-    def relay_hl_tags_ann(all_updates):
-        if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
-        return ctx.triggered[0]["value"]
 
-    # 4. Rebuild pills + option tags on nav/search/doc change
+    # 4. Rebuild pills + option tags on nav/search change
+    # current-doc-id is now an Input so this fires immediately on navigation,
+    # one round-trip earlier than waiting for reset_nav → hl-tags-nav.
+    # reset_nav is kept so hl-tags-nav stays in sync for handle_option_click's State.
     @app.callback(
         Output({"type": "hl-tags-pills", "field": MATCH}, "children"),
         Output({"type": "hl-tags-search", "field": MATCH}, "value", allow_duplicate=True),
         Output({"type": "hl-tags-options", "field": MATCH}, "children"),
+        Input("current-doc-id", "data"),
         Input({"type": "hl-tags-nav", "field": MATCH}, "data"),
         Input({"type": "hl-tags-search", "field": MATCH}, "value"),
-        Input("current-doc-id", "data"),
         State("annotations-store", "data"),
         prevent_initial_call="initial_duplicate",
     )
-    def update_display(current_path, search_query, doc_id, annotations_data):
+    def update_display(doc_id, current_path, search_query, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
-        path = list(current_path or [])
 
         triggered = ctx.triggered_id
-        if triggered == "current-doc-id" or (
-            isinstance(triggered, dict) and triggered.get("type") == "hl-tags-nav"
-        ):
+
+        # When triggered directly by doc navigation, derive the path from the
+        # annotation without waiting for reset_nav to update hl-tags-nav first.
+        if triggered == "current-doc-id":
+            widget = _get_widget(field_path)
+            if widget is None:
+                return no_update, no_update, no_update
+            ann = _get_ann(annotations_data, doc_id) if doc_id else None
+            selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            if selected_value:
+                path = _find_path(widget.root, selected_value) or []
+            else:
+                path = []
             clear_search = ""
         else:
-            clear_search = no_update
+            path = list(current_path or [])
+            if isinstance(triggered, dict) and triggered.get("type") == "hl-tags-nav":
+                clear_search = ""
+            else:
+                clear_search = no_update
 
         widget = _get_widget(field_path)
         if widget is None:
@@ -435,6 +464,14 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+
+        # If hl-tags-nav is empty but there's a saved annotation value (e.g. a
+        # phantom fire from a freshly-mounted store before reset_nav corrects it),
+        # recover the path from the tree so pills render correctly.
+        if not path and selected_value:
+            recovered = _find_path(root, selected_value)
+            if recovered:
+                path = recovered
 
         # Pills = nav path; last pill gets selected style only if it's the saved value
         # (leaf always; non-leaf only when allow_non_leaf=True)
