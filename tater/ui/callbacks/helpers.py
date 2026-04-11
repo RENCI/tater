@@ -94,9 +94,46 @@ def _collect_all_control_templates(widgets: list[TaterWidget]) -> list[TaterWidg
     return captured
 
 
+def _build_ev_lookup(widgets: list[TaterWidget], _group_prefix: str = "") -> dict:
+    """Build the ev_lookup dict mapping tf keys to empty values.
+
+    Keys use the same encoding as ``_item_relative_tf`` at render time:
+    - Standalone or direct repeater child: ``schema_field`` (or full pipe-encoded path for standalones)
+    - GroupWidget child inside a repeater: ``"group_schema_field|child_schema_field"``
+
+    This ensures ``loadValues`` can find the fallback empty value for every widget,
+    including those inside GroupWidgets within repeaters.
+    """
+    result = {}
+    for widget in widgets:
+        if isinstance(widget, RepeaterWidget):
+            # Entering a new repeater resets the group prefix.
+            result.update(_build_ev_lookup(widget.item_widgets, ""))
+        elif isinstance(widget, GroupWidget):
+            new_prefix = f"{_group_prefix}|{widget.schema_field}" if _group_prefix else widget.schema_field
+            if hasattr(widget, "children") and widget.children:
+                result.update(_build_ev_lookup(widget.children, new_prefix))
+        elif isinstance(widget, ControlWidget):
+            if _group_prefix:
+                # Inside a repeater group: key is group-relative (e.g. "booleans|indoor_location")
+                key = f"{_group_prefix}|{widget.schema_field}"
+            else:
+                # Standalone or direct repeater child: key is full pipe-encoded field_path
+                key = widget.field_path.replace(".", "|")
+            result[key] = widget.empty_value
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Status
 # ---------------------------------------------------------------------------
+
+def _status_display(status: str) -> tuple[str, str]:
+    """Return (label, color) for a document status string."""
+    labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
+    colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
+    return labels.get(status, status), colors.get(status, "gray")
+
 
 def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
     """Compute and store the annotation status for a document.
@@ -137,8 +174,6 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: di
 
 def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_only: bool = False) -> list:
     """Build document menu items with status badges and flag indicators."""
-    status_labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-    status_colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
     items = []
     for i, doc in enumerate(tater_app.documents):
         meta = _get_meta(metadata_data, doc.id)
@@ -146,13 +181,14 @@ def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_o
         if flagged_only and not flagged:
             continue
         status = meta.get("status", "not_started")
+        status_label, status_color = _status_display(status)
         right_children = []
         if flagged:
             right_children.append(DashIconify(icon="tabler:flag-filled", color="red", width=14))
         right_children.append(
             dmc.Badge(
-                status_labels.get(status, status),
-                color=status_colors.get(status, "gray"),
+                status_label,
+                color=status_color,
                 variant="light",
                 size="xs",
             )

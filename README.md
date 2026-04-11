@@ -419,6 +419,7 @@ tater --hosted [options]
 | `--schema PATH` | JSON schema file (one of `--config` / `--schema` required in single mode) |
 | `--documents PATH` | Documents JSON file (required in single mode) |
 | `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
+| `--no-restore` | Skip loading existing annotations on startup |
 | `--hosted` | Run in hosted mode (upload page at `/`, annotation UI at `/annotate`) |
 | `--port INT` | Server port (default: `8050`) |
 | `--host STR` | Bind address (default: `127.0.0.1`) |

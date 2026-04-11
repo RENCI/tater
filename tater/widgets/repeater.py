@@ -40,6 +40,26 @@ _NESTED_STORE_TYPE  = "nested-repeater-store"
 _NESTED_ITEMS_TYPE  = "nested-repeater-items"
 
 
+def _apply_conditional_initial_styles(group_or_children: Any) -> None:
+    """Set ``_initial_hidden`` on conditional ControlWidget children based on sibling defaults.
+
+    Called after ``_load_defaults_from_annotation`` so each controlling widget already
+    has its ``default`` set from the annotation (or schema default if no annotation).
+    Works recursively into nested GroupWidgets.
+    """
+    from tater.widgets.group import GroupWidget
+    children = group_or_children.children if hasattr(group_or_children, "children") else group_or_children
+    defaults = {w.schema_field: getattr(w, "default", None) for w in children}
+    for w in children:
+        if w._condition is not None:
+            controlling_schema_field = w._condition[0].split(".")[-1]
+            target_value = w._condition[1]
+            current_value = defaults.get(controlling_schema_field)
+            w._initial_hidden = (current_value != target_value)
+        if isinstance(w, GroupWidget):
+            _apply_conditional_initial_styles(w)
+
+
 def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str, annotations_data: dict | None = None) -> None:
     """Recursively set annotation values as widget defaults for ControlWidget descendants.
 
@@ -95,6 +115,8 @@ class RepeaterWidget(ContainerWidget):
         from tater.ui import value_helpers
         rendered = []
         pipe_ld = self.field_path.replace(".", "|")
+        # Track defaults of direct ControlWidget children for conditional visibility.
+        direct_defaults: dict[str, Any] = {}
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
@@ -104,13 +126,36 @@ class RepeaterWidget(ContainerWidget):
             if isinstance(template, GroupWidget):
                 widget._set_repeater_context(pipe_ld, str(index))
                 _load_defaults_from_annotation(widget, tater_app, doc_id, annotations_data)
+                _apply_conditional_initial_styles(widget)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
-            # For nested RepeaterWidgets use _component_with_context so initial
-            # items are pre-populated from the annotation rather than empty.
+            # For nested RepeaterWidgets use component_in_list so the component
+            # uses _NESTED_* IDs (keyed by ld/li) and widget IDs use pipe-separated
+            # list fields without embedded numeric indices.  _component_with_context
+            # embeds the outer index into pipe_field ("findings|0|evidence") which
+            # corrupts _taterDecodePath in the browser.
             if isinstance(template, RepeaterWidget):
-                comp = widget._component_with_context(tater_app, doc_id, annotations_data)
+                nested_ld = f"{self.field_path}-{template.schema_field}"
+                comp = widget.component_in_list(
+                    nested_ld, index, self.field_path, template.schema_field,
+                    tater_app, doc_id, annotations_data,
+                )
+            elif isinstance(template, HierarchicalLabelWidget):
+                # Bake the initial nav path from annotation so the hier-nav store
+                # starts with the correct value — avoids a race where update_repeater
+                # re-renders with data=[] and wins over reset_nav's output.
+                ann = (annotations_data or {}).get(doc_id) if doc_id else None
+                if ann is None and tater_app and doc_id:
+                    ann = tater_app.annotations.get(doc_id)
+                if ann is not None:
+                    v = value_helpers.get_model_value(ann, widget.field_path)
+                    if v:
+                        from tater.widgets.hierarchical_label import _find_path
+                        computed = _find_path(widget.root, v)
+                        if computed:
+                            widget._initial_nav_path = computed
+                comp = widget.component()
             else:
                 # Set repeater context BEFORE component() so the rendered
                 # component gets MATCH-compatible schema_id (ld/path/tf) rather
@@ -128,11 +173,16 @@ class RepeaterWidget(ContainerWidget):
                         v = value_helpers.get_model_value(ann, widget.field_path)
                         if v is not None:
                             widget.default = v
+                    direct_defaults[widget.schema_field] = getattr(widget, "default", None)
+                    if widget._condition is not None:
+                        cf = widget._condition[0].split(".")[-1]
+                        widget._initial_hidden = (direct_defaults.get(cf) != widget._condition[1])
                 comp = widget.component()
 
             stack = dmc.Stack([comp], gap="xs", mt="sm")
             if widget._condition is not None:
-                rendered.append(html.Div(stack, id=widget.conditional_wrapper_id))
+                initial_style = {"display": "none"} if widget._initial_hidden else {}
+                rendered.append(html.Div(stack, id=widget.conditional_wrapper_id, style=initial_style))
             else:
                 rendered.append(stack)
         return rendered
@@ -329,8 +379,11 @@ class RepeaterWidget(ContainerWidget):
                         ann = tater_app.annotations[doc_id]
                     if ann is not None:
                         value = value_helpers.get_model_value(ann, widget.field_path)
-                        if value is not None:
-                            widget.default = value
+                        if value:
+                            from tater.widgets.hierarchical_label import _find_path
+                            computed = _find_path(widget.root, value)
+                            if computed:
+                                widget._initial_nav_path = computed
                 nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue

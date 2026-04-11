@@ -166,6 +166,9 @@ class HierarchicalLabelWidget(TaterWidget):
     searchable: bool = True
     allow_non_leaf: bool = False
     root: Node = dc_field(init=False, repr=False)
+    # Set by repeater rendering to pre-populate hier-nav from annotation so the
+    # race between update_repeater (resets store to []) and reset_nav is avoided.
+    _initial_nav_path: list = dc_field(init=False, default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         if isinstance(self.hierarchy, (str, Path)):
@@ -218,7 +221,17 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
-        initial_sections = self._render_sections([], pipe_field, None)
+        # If _initial_nav_path was set by repeater rendering, use it so the
+        # sections render with the correct selection immediately (no flash).
+        init_path = list(self._initial_nav_path)
+        selected_value = None
+        render_path = init_path
+        if init_path:
+            tip = _node_at(self.root, init_path)
+            if tip and tip.is_leaf:
+                selected_value = init_path[-1]
+                render_path = init_path[:-1]
+        initial_sections = self._render_sections(render_path, pipe_field, selected_value)
 
         return self._input_wrapper(dmc.Stack(
                 [
@@ -245,7 +258,7 @@ class HierarchicalLabelWidget(TaterWidget):
                         style={} if self._show_breadcrumb else {"display": "none"},
                     ),
                     dmc.Stack(initial_sections, id={"type": "hier-sections", "field": pipe_field}, gap="sm"),
-                    dcc.Store(id={"type": "hier-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hier-nav", "field": pipe_field}, data=self._initial_nav_path),
                     dcc.Store(id={"type": "hier-ann-relay", "field": pipe_field}, data=None),
                 ],
                 gap="xs",
@@ -404,7 +417,7 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
                         },
                     ),
                     dmc.Group([], id={"type": "hl-tags-options", "field": pipe_field}, gap="xs", wrap="wrap"),
-                    dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=[]),
+                    dcc.Store(id={"type": "hl-tags-nav", "field": pipe_field}, data=self._initial_nav_path),
                     dcc.Store(id={"type": "hl-tags-ann-relay", "field": pipe_field}, data=None),
                 ],
                 gap="xs",

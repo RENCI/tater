@@ -500,23 +500,10 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
         result, error = _decode_json_upload(contents, filename)
         if error:
             return None, _error_text(error)
-        if not isinstance(result, list) or not result:
-            return None, _error_text("Documents must be a non-empty JSON array.")
-        bad = [i for i, d in enumerate(result) if not isinstance(d, dict)]
-        if bad:
-            return None, _error_text(f"Document(s) at index {bad[:3]} are not objects.")
-        file_path_docs = [i for i, d in enumerate(result) if isinstance(d, dict) and "file_path" in d]
-        if file_path_docs:
-            return None, _error_text(
-                "Documents with 'file_path' are not supported in hosted mode. "
-                "Include document text inline using the 'text' field."
-            )
-        missing_text = [i for i, d in enumerate(result) if isinstance(d, dict) and "text" not in d]
-        if missing_text:
-            return None, _error_text(
-                f"Document(s) at index {missing_text[:3]} are missing required 'text' field."
-            )
-        return result, _success_text(f"✓ {filename} — {len(result)} document(s)")
+        data, err = _validate_documents_data(result, filename)
+        if err:
+            return None, _error_text(err)
+        return data, _success_text(f"✓ {filename} — {len(data)} document(s)")
 
     # Validate annotations upload (optional)
     @app.callback(
@@ -705,6 +692,29 @@ def _validate_schema_json(data: dict) -> tuple[bool, str]:
         if not is_divider and ("id" not in f or "type" not in f):
             return False, f"Field at index {i} is missing 'id' or 'type'."
     return True, ""
+
+
+def _validate_documents_data(result: list, filename: str) -> tuple[list | None, str | None]:
+    """Validate parsed documents list. Returns (data, error_message) — error_message is None on success.
+
+    Extracted from the validate_documents closure for unit testability.
+    The closure wraps the error string in _error_text / _success_text before returning to Dash.
+    """
+    if not isinstance(result, list) or not result:
+        return None, "Documents must be a non-empty JSON array."
+    bad = [i for i, d in enumerate(result) if not isinstance(d, dict)]
+    if bad:
+        return None, f"Document(s) at index {bad[:3]} are not objects."
+    file_path_docs = [i for i, d in enumerate(result) if isinstance(d, dict) and "file_path" in d]
+    if file_path_docs:
+        return None, (
+            "Documents with 'file_path' are not supported in hosted mode. "
+            "Include document text inline using the 'text' field."
+        )
+    missing_text = [i for i, d in enumerate(result) if isinstance(d, dict) and "text" not in d]
+    if missing_text:
+        return None, f"Document(s) at index {missing_text[:3]} are missing required 'text' field."
+    return result, None
 
 
 def _error_text(msg: str):

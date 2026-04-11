@@ -48,43 +48,43 @@ def _resolve_field_info(model: type, field_path: str) -> Any:
 
 def _build_conditional_callbacks(
     app: Any,
-    target_value: Any,
     *,
     wrapper_id: Any,
     controlling_id: Any,
     controlling_prop: str,
     self_id: Any,
     value_prop: str,
-    empty_value: Any,
+    config_id: Any,
 ) -> None:
-    """Register the clientside visibility toggle and server-side value-clear callbacks.
+    """Register the clientside visibility toggle and value-clear callbacks.
 
     Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
     dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
     MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
+
+    ``config_id`` is the ID of the ``dcc.Store`` holding ``{target, empty}``
+    that is embedded in the conditional wrapper div by ``render_field``.
     """
-    from dash import Output, Input, no_update
+    from dash import ClientsideFunction, Output, Input, State
 
-    _empty = empty_value
-    _target = target_value
-
-    @app.callback(
+    # Named JS: show wrapper when controlling value matches target, hide otherwise.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="conditionalVisibility"),
         Output(wrapper_id, "style"),
         Input(controlling_id, controlling_prop),
+        State(config_id, "data"),
         prevent_initial_call=False,
     )
-    def _show_when_matching(v):
-        return {} if v == _target else {"display": "none"}
 
-    @app.callback(
+    # Named JS: clear the widget value when its controlling field hides it.
+    # Runs clientside so it never reads a stale server-side annotations-store State.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="conditionalClear"),
         Output(self_id, value_prop, allow_duplicate=True),
         Input(controlling_id, controlling_prop),
+        State(config_id, "data"),
         prevent_initial_call=True,
     )
-    def _clear_when_hidden(v):
-        if v != _target:
-            return _empty
-        return no_update
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +101,7 @@ class TaterWidget:
 
     _full_path: Optional[str] = field(init=False, default=None, repr=False)
     _condition: Optional[tuple] = field(init=False, default=None, repr=False)
+    _initial_hidden: bool = field(init=False, default=False, repr=False)
 
     def conditional_on(self, controlling_field: "str | list[str] | tuple[str, ...]", value: Any) -> "TaterWidget":
         """Set conditional visibility. Returns self for chaining.
@@ -143,10 +144,6 @@ class TaterWidget:
         return None
 
     @property
-    def component_id(self) -> str:
-        return f"annotation-{self.field_path.replace('.', '-')}"
-
-    @property
     def conditional_wrapper_id(self) -> dict:
         ld = getattr(self, "_repeater_ld", "")
         path = getattr(self, "_repeater_path", "")
@@ -157,6 +154,18 @@ class TaterWidget:
         else:
             tf = self.schema_field if ld else self.field_path.replace(".", "|")
         return {"type": "tater-cond-wrapper", "ld": ld, "path": path, "tf": tf}
+
+    @property
+    def conditional_config_id(self) -> dict:
+        """ID for the dcc.Store holding {target, empty} config for conditional callbacks."""
+        ld = getattr(self, "_repeater_ld", "")
+        path = getattr(self, "_repeater_path", "")
+        _irtf = getattr(self, "_item_relative_tf", None)
+        if _irtf is not None:
+            tf = _irtf
+        else:
+            tf = self.schema_field if ld else self.field_path.replace(".", "|")
+        return {"type": "tater-cond-config", "ld": ld, "path": path, "tf": tf}
 
     def _set_repeater_context(self, ld: str, path: str) -> None:
         """Propagate repeater list-field path and row index to this widget.
@@ -173,19 +182,25 @@ class TaterWidget:
     def render_field(self, mt: str = "md") -> Any:
         content = self._build_field_content(mt)
         if self._condition is not None:
-            from dash import html
-            return html.Div(content, id=self.conditional_wrapper_id)
+            from dash import html, dcc
+            style = {"display": "none"} if self._initial_hidden else {}
+            config_store = dcc.Store(
+                id=self.conditional_config_id,
+                data={"target": self._condition[1], "empty": getattr(self, "empty_value", None)},
+            )
+            return html.Div([config_store, content], id=self.conditional_wrapper_id, style=style)
         return content
 
     def _build_field_content(self, mt: str = "md") -> Any:
         return dmc.Stack([self.component()], gap="xs", mt=mt)
 
-    def _input_wrapper(self, children: Any, label: Any, withAsterisk: bool = False) -> dmc.InputWrapper:
+    def _input_wrapper(self, children: Any, label: Any, withAsterisk: bool = False, labelProps: dict = {}) -> dmc.InputWrapper:
         """Wrap a component in a dmc.InputWrapper with consistent label/description/asterisk."""
         return dmc.InputWrapper(
             label=label,
             description=self.description,
             withAsterisk=withAsterisk,
+            labelProps=labelProps or None,
             styles={"description": {"marginBottom": "4px"}} if self.description else None,
             children=[children],
         )
@@ -221,13 +236,13 @@ class TaterWidget:
             }
 
         _build_conditional_callbacks(
-            app, target_value,
+            app,
             wrapper_id=self.conditional_wrapper_id,
             controlling_id=controlling_schema_id,
             controlling_prop=controlling_prop,
             self_id=self.schema_id,
             value_prop=self.value_prop,
-            empty_value=self.empty_value,
+            config_id=self.conditional_config_id,
         )
 
     def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
@@ -312,11 +327,11 @@ class ControlWidget(TaterWidget):
         return self.schema_field.replace(".", "|")
 
     def _label_with_tooltip(self) -> Any:
-        """Return label string, decorated with auto_advance tooltip if needed."""
+        """Return label string, or a Group with the auto_advance icon if needed."""
         if not self.auto_advance:
             return self.label
         return dmc.Group([
-            dmc.Text(self.label, size="sm"),
+            self.label,
             dmc.Tooltip(
                 DashIconify(icon="tabler:circle-open-arrow-right", width=13, color="var(--mantine-color-dimmed)"),
                 label="Auto-advances to next document",
@@ -326,7 +341,8 @@ class ControlWidget(TaterWidget):
         ], gap=4)
 
     def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
-        return super()._input_wrapper(children, self._label_with_tooltip(), self.required)
+        label_props = {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}} if self.auto_advance else {}
+        return super()._input_wrapper(children, self._label_with_tooltip(), self.required, labelProps=label_props)
 
     @property
     def renders_own_label(self) -> bool:
@@ -351,13 +367,18 @@ class ControlWidget(TaterWidget):
         return {"type": "tater-control", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
 
     def _register_repeater_conditional_callbacks(
-        self, app: Any, ld: str, sibling_widgets: list
+        self, app: Any, ld: str, sibling_widgets: list, group_prefix: str = ""
     ) -> None:
         """Register MATCH-based conditional callbacks for this widget inside a repeater.
 
         ``ld`` is the pipe-joined outer list-field path (e.g. ``"pets"``).
         ``sibling_widgets`` is the repeater's ``item_widgets`` list (templates),
         used to look up the controlling widget's type and schema_field.
+        ``group_prefix`` is the pipe-joined schema_field path of any containing
+        GroupWidget(s) within the repeater item (e.g. ``"booleans"``).  It is
+        prepended to both self and controlling widget tf keys so that the
+        registered MATCH IDs match the group-relative tf the rendered components
+        emit at render time (e.g. ``"booleans|indoor_location"``).
         """
         if self._condition is None:
             return
@@ -380,24 +401,32 @@ class ControlWidget(TaterWidget):
         controlling_type = "tater-bool-control" if is_bool else "tater-control"
         controlling_prop = "checked" if is_bool else "value"
 
-        # Use _item_relative_tf so group children encode their group prefix
-        # (e.g. "booleans|is_indoor") matching what the rendered components emit.
-        self_tf = self._item_relative_tf
-        controlling_tf = controlling_widget._item_relative_tf
+        # Build tf keys that match what rendered components emit.
+        # At registration time item_widgets are not yet finalized (no _set_repeater_context),
+        # so _item_relative_tf returns just schema_field.  For widgets inside a GroupWidget
+        # the rendered tf is group-prefixed (e.g. "booleans|indoor_location"), so we use
+        # group_prefix supplied by the GroupWidget's registration helper.
+        if group_prefix:
+            self_tf = f"{group_prefix}|{self.schema_field}"
+            controlling_tf = f"{group_prefix}|{controlling_widget.schema_field}"
+        else:
+            self_tf = self.schema_field
+            controlling_tf = controlling_widget.schema_field
         self_type = self.schema_id["type"]
 
         wrapper_match_id = {"type": "tater-cond-wrapper", "ld": ld, "path": MATCH, "tf": self_tf}
         controlling_match_id = {"type": controlling_type, "ld": ld, "path": MATCH, "tf": controlling_tf}
         self_match_id = {"type": self_type, "ld": ld, "path": MATCH, "tf": self_tf}
+        config_match_id = {"type": "tater-cond-config", "ld": ld, "path": MATCH, "tf": self_tf}
 
         _build_conditional_callbacks(
-            app, target_value,
+            app,
             wrapper_id=wrapper_match_id,
             controlling_id=controlling_match_id,
             controlling_prop=controlling_prop,
             self_id=self_match_id,
             value_prop=self.value_prop,
-            empty_value=self.empty_value,
+            config_id=config_match_id,
         )
 
 

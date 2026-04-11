@@ -33,7 +33,7 @@ mark {
   color: white;
   font-size: 10px;
   font-weight: 700;
-  z-index: 199;
+  z-index: 99;
   display: none;
   align-items: center;
   justify-content: center;

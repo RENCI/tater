@@ -16,10 +16,9 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--documents",
         type=str,
-        required=False,
         help="Path to documents JSON file (required in non-hosted mode)"
     )
-    group = parser.add_mutually_exclusive_group(required=False)
+    group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--config",
         type=str,
@@ -33,8 +32,12 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--annotations",
         type=str,
-        required=False,
         help="Path to save/load annotations (default: <documents>_annotations.json)"
+    )
+    parser.add_argument(
+        "--no-restore",
+        action="store_true",
+        help="Skip loading existing annotations on startup",
     )
     parser.add_argument(
         "--debug",
@@ -62,5 +65,8 @@ def parse_args() -> Namespace:
     # Validate: non-hosted mode also requires --documents
     if not args.hosted and not args.documents:
         parser.error("--documents is required in non-hosted mode (or use --hosted)")
+    # Validate: --no-restore only applies in non-hosted mode
+    if args.hosted and args.no_restore:
+        parser.error("--no-restore is not applicable in hosted mode")
 
     return args
