@@ -17,7 +17,7 @@ class Pet(BaseModel):
     kind: Optional[Literal["cat", "dog", "fish"]] = None
     neutered: Optional[bool] = None
     indoor: Optional[bool] = None
-    breed: Optional[str] = None
+    breed: Optional[List[str]] = None
 
 
 class Schema(BaseModel):

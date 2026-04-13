@@ -151,10 +151,7 @@ class RepeaterWidget(ContainerWidget):
                 if ann is not None:
                     v = value_helpers.get_model_value(ann, widget.field_path)
                     if v:
-                        from tater.widgets.hierarchical_label import _find_path
-                        computed = _find_path(widget.root, v)
-                        if computed:
-                            widget._initial_nav_path = computed
+                        widget._initial_nav_path = list(v)
                 comp = widget.component()
             else:
                 # Set repeater context BEFORE component() so the rendered
@@ -380,10 +377,7 @@ class RepeaterWidget(ContainerWidget):
                     if ann is not None:
                         value = value_helpers.get_model_value(ann, widget.field_path)
                         if value:
-                            from tater.widgets.hierarchical_label import _find_path
-                            computed = _find_path(widget.root, value)
-                            if computed:
-                                widget._initial_nav_path = computed
+                            widget._initial_nav_path = list(value)
                 nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue

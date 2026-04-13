@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 from dash import dcc, html
 import dash_mantine_components as dmc
@@ -187,19 +187,22 @@ class HierarchicalLabelWidget(TaterWidget):
         return True
 
     def to_python_type(self) -> type:
-        return str
+        return list
 
     def bind_schema(self, model: type) -> None:
+        import typing
         field_info = _resolve_field_info(model, self.field_path)
         if field_info is None:
             raise ValueError(
                 f"{self.__class__.__name__}: field '{self.field_path}' not found in {model.__name__}"
             )
         inner = _unwrap_optional(field_info.annotation)
-        if inner is not str:
+        origin = typing.get_origin(inner)
+        args = typing.get_args(inner)
+        if not (origin is list and args and args[0] is str):
             raise TypeError(
-                f"{self.__class__.__name__}: field '{self.field_path}' must be str or "
-                f"Optional[str], got {field_info.annotation!r}"
+                f"{self.__class__.__name__}: field '{self.field_path}' must be List[str] or "
+                f"Optional[List[str]], got {field_info.annotation!r}"
             )
 
     # ------------------------------------------------------------------
@@ -221,16 +224,11 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
-        # If _initial_nav_path was set by repeater rendering, use it so the
-        # sections render with the correct selection immediately (no flash).
+        # _initial_nav_path is the full path (including selected node) set by
+        # repeater rendering from the stored List[str] annotation value.
         init_path = list(self._initial_nav_path)
-        selected_value = None
-        render_path = init_path
-        if init_path:
-            tip = _node_at(self.root, init_path)
-            if tip and tip.is_leaf:
-                selected_value = init_path[-1]
-                render_path = init_path[:-1]
+        selected_value = init_path[-1] if init_path else None
+        render_path = init_path[:-1] if init_path else []
         initial_sections = self._render_sections(render_path, pipe_field, selected_value)
 
         return self._input_wrapper(dmc.Stack(

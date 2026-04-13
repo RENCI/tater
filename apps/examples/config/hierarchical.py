@@ -1,5 +1,5 @@
 """Hierarchical label annotation using a pet/animal ontology."""
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel
 
 from tater.widgets import HierarchicalLabelFullWidget, HierarchicalLabelCompactWidget, HierarchicalLabelTagsWidget
@@ -7,9 +7,9 @@ from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 
 class Schema(BaseModel):
-    tags_breed: Optional[str] = None
-    primary_breed: Optional[str] = None
-    secondary_breed: Optional[str] = None
+    tags_breed: Optional[List[str]] = None
+    primary_breed: Optional[List[str]] = None
+    secondary_breed: Optional[List[str]] = None
 
 
 title = "tater - hierarchical"

@@ -145,7 +145,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Optional, Literal
+from typing import Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, create_model
 
@@ -245,7 +245,7 @@ def _build_pydantic_field(
         return fid, (list[SpanAnnotation], Field(default_factory=list))
 
     if ftype == "hierarchical_label":
-        return fid, (Optional[str], None)
+        return fid, (Optional[List[str]], None)
 
     raise ValueError(f"Unknown field type {ftype!r} for field {fid!r}")
 
