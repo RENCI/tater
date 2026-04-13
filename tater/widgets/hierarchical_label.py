@@ -432,54 +432,53 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
 _PATH_SEP = "|"
 
 
-def _build_multiselect_data(root: Node, depth_char: str = "—", allow_non_leaf: bool = False) -> list:
+def _build_multiselect_data(root: Node, allow_non_leaf: bool = False) -> list:
     """Build dmc.MultiSelect data from a Node tree.
 
-    Each item: ``{value: "A|B|C", label: "——C"}``.
+    Each item: ``{value: "A|B|C", label: "C"}``.
     ``value`` is the full path joined by ``_PATH_SEP`` (unique even for duplicate leaf names).
-    ``label`` uses ``depth_char`` repeated for depth, so hierarchy is visible in the dropdown.
+    ``label`` is the plain node name; depth-based indentation is handled by the
+    ``hlMultiRenderOption`` JS function via the ``renderOption`` prop.
     Depth is relative to root's children (root itself is not included).
     """
     items = []
 
-    def _walk(node: Node, path: list[str], depth: int) -> None:
+    def _walk(node: Node, path: list[str]) -> None:
         if node.name == "__root__":
             for child in node.children:
-                _walk(child, [], 0)
+                _walk(child, [])
             return
         current_path = path + [node.name]
-        label = depth_char * depth + node.name
         value = _PATH_SEP.join(current_path)
         if node.is_leaf:
-            items.append({"value": value, "label": label})
+            items.append({"value": value, "label": node.name})
         else:
             # Non-leaf nodes always appear to provide hierarchy context.
             # Disabled when allow_non_leaf=False so they act as visual headers only.
-            item = {"value": value, "label": label}
+            item = {"value": value, "label": node.name}
             if not allow_non_leaf:
                 item["disabled"] = True
             items.append(item)
             for child in node.children:
-                _walk(child, current_path, depth + 1)
+                _walk(child, current_path)
 
     for child in root.children:
-        _walk(child, [], 0)
+        _walk(child, [])
     return items
 
 
 @dataclass(eq=False)
 class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
-    """Multi-select hierarchical widget using dmc.MultiSelect with depth-prefixed labels.
+    """Multi-select hierarchical widget using dmc.MultiSelect with depth-indented options.
 
     Stores ``Optional[List[List[str]]]`` — a list of full paths, one per selection.
-    The dropdown shows all nodes with em-dash depth indicators; search is handled
-    natively by Mantine. Selected items show as chips with the node name only.
+    The dropdown uses ``renderOption`` (``hlMultiRenderOption`` JS function) to indent
+    each option based on its depth in the hierarchy. Selected pills show the node name only.
+    Search is handled natively by Mantine (matches against the label, i.e. node name).
 
     Component IDs use ``hl-multi-*`` types; a single MATCH callback in
     ``setup_hl_multi_callbacks`` handles all instances.
     """
-
-    depth_char: str = "—"
 
     def to_python_type(self) -> type:
         return list
@@ -514,7 +513,7 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
 
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
-        data = _build_multiselect_data(self.root, self.depth_char, self.allow_non_leaf)
+        data = _build_multiselect_data(self.root, self.allow_non_leaf)
         return self._input_wrapper(
             dmc.Stack(
                 [
@@ -526,6 +525,8 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                         clearable=True,
                         placeholder="Search…",
                         size="sm",
+                        renderOption={"function": "hlMultiRenderOption"},
+                        filter={"function": "hlMultiFilter"},
                     ),
                     dcc.Store(id={"type": "hl-multi-relay", "field": pipe_field}, data=None),
                 ],

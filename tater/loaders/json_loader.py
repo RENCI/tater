@@ -408,8 +408,7 @@ def _build_widget_from_spec(
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
         allow_non_leaf = widget_spec.get("allow_non_leaf", False)
-        depth_char = widget_spec.get("depth_char", "—")
-        w = WIDGET_CLASS[wtype](fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable, allow_non_leaf=allow_non_leaf, depth_char=depth_char)
+        w = WIDGET_CLASS[wtype](fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable, allow_non_leaf=allow_non_leaf)
 
     elif wtype == "divider":
         w = DividerWidget(label=label, description=description)
