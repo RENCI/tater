@@ -11,12 +11,14 @@ from tater.widgets.base import ContainerWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
     HierarchicalLabelTagsWidget,
+    HierarchicalLabelMultiWidget,
     _find_path,
     _make_buttons,
     _make_tags_option_buttons,
     _make_tags_pill,
     _node_at,
     _section,
+    _PATH_SEP,
 )
 from tater.widgets.repeater import RepeaterWidget
 
@@ -486,3 +488,66 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             option_tags = _make_tags_option_buttons(current_node.children, pipe_field, len(path), selected_value)
 
         return pills, clear_search, option_tags
+
+
+def setup_hl_multi_callbacks(tater_app: TaterApp) -> None:
+    """Register MATCH callbacks for all HierarchicalLabelMultiWidget instances."""
+    app = tater_app.app
+    _get_current_app_fn = tater_app._get_current_app
+
+    def _ta() -> TaterApp:
+        if _get_current_app_fn is not None:
+            result = _get_current_app_fn()
+            if result is not None:
+                return result
+        return tater_app
+
+    def _get_widget(field_path: str) -> Optional[HierarchicalLabelMultiWidget]:
+        w = _find_hl_template(_ta().widgets, field_path)
+        return w if isinstance(w, HierarchicalLabelMultiWidget) else None
+
+    # 1. Load values on doc change or repeater reload
+    @app.callback(
+        Output({"type": "hl-multi", "field": MATCH}, "value"),
+        Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )
+    def load_multi(doc_id, _trigger, annotations_data):
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        stored = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+        if stored:
+            return [_PATH_SEP.join(p) for p in stored]
+        return []
+
+    # 2. On selection change, write full paths to relay store
+    @app.callback(
+        Output({"type": "hl-multi-relay", "field": MATCH}, "data"),
+        Input({"type": "hl-multi", "field": MATCH}, "value"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_multi_change(selected_values, doc_id, annotations_data):
+        if not ctx.triggered or not ctx.triggered[0].get("value") is not None:
+            pass  # allow empty list through — that's a deliberate clear
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        if ann is None:
+            return no_update
+        paths = [v.split(_PATH_SEP) for v in (selected_values or [])]
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        return {"field": field_path, "value": paths if paths else None}
+
+    # 3. Clientside: apply relay → annotations-store
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "hl-multi-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )

@@ -47,3 +47,4 @@ Object.assign(window.dash_clientside.tater, {
     },
 
 });
+

@@ -426,6 +426,119 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
 
 
 # ---------------------------------------------------------------------------
+# HierarchicalLabelMultiWidget
+# ---------------------------------------------------------------------------
+
+_PATH_SEP = "|"
+
+
+def _build_multiselect_data(root: Node, depth_char: str = "—", allow_non_leaf: bool = False) -> list:
+    """Build dmc.MultiSelect data from a Node tree.
+
+    Each item: ``{value: "A|B|C", label: "——C"}``.
+    ``value`` is the full path joined by ``_PATH_SEP`` (unique even for duplicate leaf names).
+    ``label`` uses ``depth_char`` repeated for depth, so hierarchy is visible in the dropdown.
+    Depth is relative to root's children (root itself is not included).
+    """
+    items = []
+
+    def _walk(node: Node, path: list[str], depth: int) -> None:
+        if node.name == "__root__":
+            for child in node.children:
+                _walk(child, [], 0)
+            return
+        current_path = path + [node.name]
+        label = depth_char * depth + node.name
+        value = _PATH_SEP.join(current_path)
+        if node.is_leaf:
+            items.append({"value": value, "label": label})
+        else:
+            # Non-leaf nodes always appear to provide hierarchy context.
+            # Disabled when allow_non_leaf=False so they act as visual headers only.
+            item = {"value": value, "label": label}
+            if not allow_non_leaf:
+                item["disabled"] = True
+            items.append(item)
+            for child in node.children:
+                _walk(child, current_path, depth + 1)
+
+    for child in root.children:
+        _walk(child, [], 0)
+    return items
+
+
+@dataclass(eq=False)
+class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
+    """Multi-select hierarchical widget using dmc.MultiSelect with depth-prefixed labels.
+
+    Stores ``Optional[List[List[str]]]`` — a list of full paths, one per selection.
+    The dropdown shows all nodes with em-dash depth indicators; search is handled
+    natively by Mantine. Selected items show as chips with the node name only.
+
+    Component IDs use ``hl-multi-*`` types; a single MATCH callback in
+    ``setup_hl_multi_callbacks`` handles all instances.
+    """
+
+    depth_char: str = "—"
+
+    def to_python_type(self) -> type:
+        return list
+
+    def bind_schema(self, model: type) -> None:
+        import typing as _t
+        field_info = _resolve_field_info(model, self.field_path)
+        if field_info is None:
+            raise ValueError(
+                f"{self.__class__.__name__}: field '{self.field_path}' not found in {model.__name__}"
+            )
+        inner = _unwrap_optional(field_info.annotation)
+        origin = _t.get_origin(inner)
+        args = _t.get_args(inner)
+        # Expect List[List[str]]
+        if origin is list and args:
+            item_origin = _t.get_origin(args[0])
+            item_args = _t.get_args(args[0])
+            if item_origin is list and item_args and item_args[0] is str:
+                return
+        raise TypeError(
+            f"{self.__class__.__name__}: field '{self.field_path}' must be "
+            f"List[List[str]] or Optional[List[List[str]]], got {field_info.annotation!r}"
+        )
+
+    @property
+    def _show_breadcrumb(self) -> bool:
+        return False
+
+    def _render_sections(self, path, pipe_field, selected_value):
+        return []  # Not used — MultiSelect renders its own dropdown
+
+    def component(self) -> Any:
+        pipe_field = self.field_path.replace(".", "|")
+        data = _build_multiselect_data(self.root, self.depth_char, self.allow_non_leaf)
+        return self._input_wrapper(
+            dmc.Stack(
+                [
+                    dmc.MultiSelect(
+                        id={"type": "hl-multi", "field": pipe_field},
+                        data=data,
+                        value=[],
+                        searchable=self.searchable,
+                        clearable=True,
+                        placeholder="Search…",
+                        size="sm",
+                    ),
+                    dcc.Store(id={"type": "hl-multi-relay", "field": pipe_field}, data=None),
+                ],
+                gap="xs",
+            ),
+            self.label,
+        )
+
+    def register_callbacks(self, app: Any) -> None:
+        pass  # Handled by setup_hl_multi_callbacks
+
+
+# ---------------------------------------------------------------------------
 # Rendering helpers
 # ---------------------------------------------------------------------------
 

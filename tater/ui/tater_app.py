@@ -378,6 +378,7 @@ class TaterApp:
         """Setup unified MATCH-based HierarchicalLabel callbacks."""
         callbacks.setup_hl_callbacks(self)
         callbacks.setup_hl_tags_callbacks(self)
+        callbacks.setup_hl_multi_callbacks(self)
 
     def _collect_value_capture_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
         """
