@@ -244,7 +244,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             prevent_initial_call=True,
         )
 
-    is_hosted = tater_app.annotations_path is None
+    is_hosted = tater_app.is_hosted
 
     if is_hosted:
         # Download annotations as JSON
