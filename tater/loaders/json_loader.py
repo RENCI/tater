@@ -135,6 +135,7 @@ Widget config keys (inside the ``widget`` block):
   ``max_value``      — maximum (number_input, slider, range_slider)
   ``step``           — step size (slider, range_slider, number_input)
   ``searchable``     — enable search (hierarchical_label_*)
+  ``allow_non_leaf`` — allow selecting intermediate nodes (hierarchical_label_*)
   ``hierarchy_ref``  — key into the top-level ``hierarchies`` dict
   ``entity_types``   — list of entity type names (span_annotation)
   ``item_label``     — singular label for list items (listable, tabs, accordion)
@@ -394,8 +395,9 @@ def _build_widget_from_spec(
         ref = widget_spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
+        allow_non_leaf = widget_spec.get("allow_non_leaf", False)
         cls = WIDGET_CLASS[wtype]
-        w = cls(fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable)
+        w = cls(fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable, allow_non_leaf=allow_non_leaf)
 
     elif wtype == "divider":
         w = DividerWidget(label=label, description=description)
