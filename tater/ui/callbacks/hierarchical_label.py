@@ -242,10 +242,18 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         else:
             path = list(current_path or [])
 
-        # path includes the selected node as its last element.
-        # selected_value = path[-1]; render_path = path[:-1].
-        selected_value = path[-1] if path else None
-        render_path = path[:-1] if path else []
+        # hier-nav includes the navigated-to node as its tip (leaf or non-leaf).
+        # selected_value is set when the tip is selectable (leaf, or allow_non_leaf).
+        # render_path strips the tip only for leaves (no children to show);
+        # a selected non-leaf still renders its own children so render_path = path.
+        selected_value = None
+        render_path = path
+        if path:
+            tip = _node_at(root, path)
+            if tip and (tip.is_leaf or widget.allow_non_leaf):
+                selected_value = path[-1]
+                if tip.is_leaf:
+                    render_path = path[:-1]
 
         # Fall back to annotations-store when hier-nav is stale (e.g. reset_nav
         # fired before update_repeater baked in the correct path).
@@ -253,10 +261,13 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             ann = _get_ann(annotations_data, doc_id)
             if ann is not None:
                 stored_path = value_helpers.get_model_value(ann, field_path)
-                if stored_path:
+                if stored_path and not render_path:
                     path = list(stored_path)
-                    selected_value = path[-1]
-                    render_path = path[:-1]
+                    tip = _node_at(root, path)
+                    if tip and (tip.is_leaf or widget.allow_non_leaf):
+                        selected_value = path[-1]
+                        if tip.is_leaf:
+                            render_path = path[:-1]
 
         breadcrumb = " → ".join(path) if path else "None selected"
 
@@ -446,16 +457,18 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-        # selected_value is the last element of the stored path (the selected node name)
-        selected_value = stored_path[-1] if stored_path else None
 
         # If hl-tags-nav is empty but there's a saved annotation (phantom fire
         # from a freshly-mounted store before reset_nav corrects it), recover.
         if not path and stored_path:
             path = list(stored_path)
 
-        # Pills = nav path; last pill is highlighted when the nav path matches the annotation.
-        last_is_selected = bool(path and stored_path and path == list(stored_path))
+        # Derive selected_value from the nav path directly (same as compact/full)
+        # so the pill highlight doesn't lag behind annotations-store.
+        tip = _node_at(root, path) if path else None
+        last_is_selected = bool(tip and (tip.is_leaf or widget.allow_non_leaf))
+        selected_value = path[-1] if last_is_selected else (stored_path[-1] if stored_path else None)
+
         pills = [
             _make_tags_pill(name, pipe_field, i, is_selected=(i == len(path) - 1 and last_is_selected))
             for i, name in enumerate(path)
