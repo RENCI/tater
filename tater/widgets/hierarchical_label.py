@@ -536,6 +536,7 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                         data=[sentinel] + data,
                         value=[],
                         searchable=True,
+                        clearSearchOnChange=False,
                         clearable=True,
                         placeholder="Search…",
                         size="sm",
