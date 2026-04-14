@@ -138,12 +138,9 @@ window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
 // SVG icon helpers
 // ---------------------------------------------------------------------------
 
-// Renders a Tabler-style SVG icon. stroke is applied directly to the path child
-// element via style so CSS variables resolve correctly and aren't overridden by
-// cascading parent styles. strokeWidth compensates for the 24×24 viewBox being
-// scaled to `size` px so line weight stays consistent.
+// Renders a Tabler-style SVG icon. strokeWidth compensates for the 24×24 viewBox
+// being scaled to `size` px so line weight stays consistent.
 function _tablerSvg(points, stroke, size, svgStyle) {
-    const sw = Math.round(2 * 24 / size);
     return React.createElement(
         "svg",
         {
@@ -151,14 +148,13 @@ function _tablerSvg(points, stroke, size, svgStyle) {
             width: size, height: size,
             viewBox: "0 0 24 24",
             fill: "none",
+            stroke,
+            strokeWidth: Math.round(2 * 24 / size),
             strokeLinecap: "round",
             strokeLinejoin: "round",
             style: svgStyle,
         },
-        React.createElement("polyline", {
-            points,
-            style: { stroke: stroke, strokeWidth: sw },
-        })
+        React.createElement("polyline", { points })
     );
 }
 
