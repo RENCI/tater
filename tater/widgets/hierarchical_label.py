@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
+import json
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
@@ -451,11 +452,11 @@ def _build_multiselect_data(root: Node, allow_non_leaf: bool = False) -> list:
         current_path = path + [node.name]
         value = _PATH_SEP.join(current_path)
         if node.is_leaf:
-            items.append({"value": value, "label": node.name})
+            items.append({"value": value, "label": node.name, "leaf": True})
         else:
             # Non-leaf nodes always appear to provide hierarchy context.
             # Disabled when allow_non_leaf=False so they act as visual headers only.
-            item = {"value": value, "label": node.name}
+            item = {"value": value, "label": node.name, "leaf": False}
             if not allow_non_leaf:
                 item["disabled"] = True
             items.append(item)
@@ -476,9 +477,16 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
     each option based on its depth in the hierarchy. Selected pills show the node name only.
     Search is handled natively by Mantine (matches against the label, i.e. node name).
 
+    ``search_show_siblings``: also show sibling nodes of each matched term.
+    ``search_show_children``: also show direct children of each matched term.
+    Ancestor nodes are always included to provide hierarchy context.
+
     Component IDs use ``hl-multi-*`` types; a single MATCH callback in
     ``setup_hl_multi_callbacks`` handles all instances.
     """
+
+    search_show_siblings: bool = False
+    search_show_children: bool = False
 
     def to_python_type(self) -> type:
         return list
@@ -514,12 +522,18 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_multiselect_data(self.root, self.allow_non_leaf)
+        # Prepend a hidden sentinel item encoding filter config as JSON for the JS filter
+        # function (hlMultiFilter in utils.js). The sentinel value starts with "__config__"
+        # followed by a JSON object. The filter function detects this prefix, parses the
+        # config, and strips the sentinel from the returned options.
+        sentinel_config = json.dumps({"showSiblings": self.search_show_siblings, "showChildren": self.search_show_children})
+        sentinel = {"value": f"__config__{sentinel_config}", "label": "", "disabled": True}
         return self._input_wrapper(
             dmc.Stack(
                 [
                     dmc.MultiSelect(
                         id={"type": "hl-multi", "field": pipe_field},
-                        data=data,
+                        data=[sentinel] + data,
                         value=[],
                         searchable=self.searchable,
                         clearable=True,

@@ -10,7 +10,6 @@ class Schema(BaseModel):
     tags_breed: Optional[List[str]] = None
     primary_breed: Optional[List[str]] = None
     secondary_breed: Optional[List[str]] = None
-    multi_breed: Optional[List[List[str]]] = None
 
 
 title = "tater - hierarchical"
@@ -52,14 +51,6 @@ widgets = [
         schema_field="secondary_breed",
         label="Secondary Breed (Mixed)",
         description="Select a secondary breed if the pet is a mix.",
-        hierarchy=ontology,
-        searchable=True,
-        allow_non_leaf=allow_non_leaf,
-    ),
-    HierarchicalLabelMultiWidget(
-        schema_field="multi_breed",
-        label="Multi Select Breed",
-        description="Select multiple breeds.",
         hierarchy=ontology,
         searchable=True,
         allow_non_leaf=allow_non_leaf,
