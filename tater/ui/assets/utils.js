@@ -185,7 +185,7 @@ window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked })
                 borderLeft: checked ? "3px solid var(--mantine-primary-color-filled)" : "3px solid transparent",
             },
         },
-        labelContent,
+        React.createElement("span", null, labelContent),
         !isLeaf ? _chevronDown : null,
     );
 };
