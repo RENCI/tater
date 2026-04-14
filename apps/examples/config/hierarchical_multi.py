@@ -39,7 +39,7 @@ widgets = [
         label="Ancestors only",
         description="Matched terms + spine to root. Try searching 'spaniel' or 'sporting'.",
         hierarchy=ontology,
-        searchable=True,
+
         allow_non_leaf=allow_non_leaf,
         search_show_siblings=False,
         search_show_children=False,
@@ -49,7 +49,7 @@ widgets = [
         label="Siblings",
         description="Matched terms + ancestors + peer nodes at the same level.",
         hierarchy=ontology,
-        searchable=True,
+
         allow_non_leaf=allow_non_leaf,
         search_show_siblings=True,
         search_show_children=False,
@@ -59,7 +59,7 @@ widgets = [
         label="Children",
         description="Matched terms + ancestors + direct children of matched terms.",
         hierarchy=ontology,
-        searchable=True,
+
         allow_non_leaf=allow_non_leaf,
         search_show_siblings=False,
         search_show_children=True,
@@ -69,7 +69,7 @@ widgets = [
         label="Context (siblings + children)",
         description="Matched terms + ancestors + siblings + direct children.",
         hierarchy=ontology,
-        searchable=True,
+
         allow_non_leaf=allow_non_leaf,
         search_show_siblings=True,
         search_show_children=True,

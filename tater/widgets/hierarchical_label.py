@@ -535,7 +535,7 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                         id={"type": "hl-multi", "field": pipe_field},
                         data=[sentinel] + data,
                         value=[],
-                        searchable=self.searchable,
+                        searchable=True,
                         clearable=True,
                         placeholder="Search…",
                         size="sm",
