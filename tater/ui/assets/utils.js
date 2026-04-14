@@ -56,20 +56,21 @@ Object.assign(window.dash_clientside.tater, {
 window.dashMantineFunctions = window.dashMantineFunctions || {};
 
 /**
- * renderOption / filter for HierarchicalLabelMultiWidget.
+ * filter / renderOption for HierarchicalLabelMultiWidget.
  *
- * Filter (hlMultiFilter): matches on node name (label); ancestor nodes of any match are
- * always included. Optionally also includes siblings and/or direct children of matched
+ * hlMultiFilter: matches on node name (label); ancestors of any match are always
+ * included. Optionally also includes siblings and/or direct children of matched
  * nodes, controlled by a sentinel config item prepended to the data array by
  * HierarchicalLabelMultiWidget.component() in hierarchical_label.py.
  *
- * Sentinel format: value = "__config__" + JSON string, e.g.:
+ * Sentinel format: value = "__config__" + JSON, e.g.:
  *   __config__{"showSiblings":true,"showChildren":false}
  * The sentinel has an empty label and disabled=true so it is never rendered or selected.
+ * The search term is stashed in _hlMultiSearch for use by hlMultiRenderOption.
  *
- * renderOption (hlMultiRenderOption): indents each option by depth (derived from
- * "|"-separated value), renders non-leaf (disabled) entries bold, and highlights
- * the matched substring using the search term stashed by hlMultiFilter.
+ * hlMultiRenderOption: indents each option by depth (from "|"-separated value),
+ * renders non-leaf nodes bold, highlights the matched substring, shows a
+ * chevron-down for non-leaf nodes, and a check icon (right-aligned) when selected.
  */
 
 // Shared search term written by hlMultiFilter, read by hlMultiRenderOption.
@@ -133,22 +134,66 @@ window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
     return dataOptions.filter((option) => includedPaths.has(option.value));
 };
 
-// Tabler chevron-down SVG used to indicate non-leaf (expandable) nodes.
-const _chevronDown = React.createElement(
-    "svg",
-    {
-        xmlns: "http://www.w3.org/2000/svg",
-        width: 10, height: 10,
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 2,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        style: { marginLeft: "4px", verticalAlign: "middle", opacity: 0.5, flexShrink: 0 },
-    },
-    React.createElement("polyline", { points: "6 9 12 15 18 9" })
-);
+// ---------------------------------------------------------------------------
+// SVG icon helpers
+// ---------------------------------------------------------------------------
+
+// Renders a Tabler-style SVG icon. stroke is applied directly to the path child
+// element via style so CSS variables resolve correctly and aren't overridden by
+// cascading parent styles. strokeWidth compensates for the 24×24 viewBox being
+// scaled to `size` px so line weight stays consistent.
+function _tablerSvg(points, stroke, size, svgStyle) {
+    const sw = Math.round(2 * 24 / size);
+    return React.createElement(
+        "svg",
+        {
+            xmlns: "http://www.w3.org/2000/svg",
+            width: size, height: size,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            style: svgStyle,
+        },
+        React.createElement("polyline", {
+            points,
+            style: { stroke: stroke, strokeWidth: sw },
+        })
+    );
+}
+
+// tabler:chevron-down — indicates a non-leaf (expandable) node.
+function _chevronDown() {
+    return _tablerSvg(
+        "6 9 12 15 18 9",
+        "var(--mantine-color-dimmed)",
+        12,
+        { marginLeft: "4px", flexShrink: 0 }
+    );
+}
+
+// tabler:check — right-aligned selection indicator; hidden when unchecked.
+function _checkIcon(visible) {
+    return React.createElement(
+        "span",
+        {
+            style: {
+                marginLeft: "auto",
+                paddingLeft: "8px",
+                flexShrink: 0,
+                visibility: visible ? "visible" : "hidden",
+                display: "flex",
+                alignItems: "center",
+            },
+        },
+        _tablerSvg(
+            "20 6 9 17 4 12",
+            "var(--mantine-color-dimmed)",
+            14,
+            {}
+        )
+    );
+}
 
 window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked }) {
     const depth = option.value.split("|").length - 1;
@@ -156,7 +201,7 @@ window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked })
     const lower = _hlMultiSearch;
     const isLeaf = option.leaf !== false;  // default true if field absent
 
-    // Build label content — highlight the matching substring if present.
+    // Build label — highlight the matched substring if present.
     let labelContent;
     const matchIdx = lower ? label.toLowerCase().indexOf(lower) : -1;
     if (matchIdx !== -1) {
@@ -179,13 +224,14 @@ window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked })
             style: {
                 display: "flex",
                 alignItems: "center",
+                flex: 1,
                 paddingLeft: `${depth * 14}px`,
                 fontWeight: option.disabled ? 600 : "normal",
                 opacity: option.disabled ? 0.75 : 1,
-                borderLeft: checked ? "3px solid var(--mantine-primary-color-filled)" : "3px solid transparent",
             },
         },
         React.createElement("span", null, labelContent),
-        !isLeaf ? _chevronDown : null,
+        !isLeaf ? _chevronDown() : null,
+        _checkIcon(checked),
     );
 };
