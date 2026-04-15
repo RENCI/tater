@@ -47,6 +47,16 @@ mark {
   display: inline-flex;
 }
 
+/* Inline variant for SpanPopupWidget counter strip.
+   The JS still sets class to tater-count-badge / tater-count-badge tater-count-visible
+   as usual; the container context overrides absolute positioning to keep the
+   badge in normal flow next to the entity label. */
+.tater-count-container .tater-count-badge {
+  position: static;
+  bottom: auto;
+  right: auto;
+}
+
 .tater-tooltip-delete {
   border: none;
   border-left: 1px solid rgba(0, 0, 0, 0.2);

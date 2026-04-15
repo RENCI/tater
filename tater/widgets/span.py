@@ -278,9 +278,21 @@ class SpanPopupWidget(SpanBaseWidget):
     def _make_counter_strip(self, pipe_field: str) -> Any:
         """Build counter-only strip: entity label + count badge per entity type."""
         from dash import html
-        items = []
-        for et in self.entity_types:
-            items.append(
+        _sep = html.Span(
+            style={
+                "display": "inline-block",
+                "width": "1px",
+                "height": "0.85em",
+                "backgroundColor": "var(--mantine-color-gray-4)",
+                "alignSelf": "center",
+                "flexShrink": 0,
+            }
+        )
+        children = []
+        for i, et in enumerate(self.entity_types):
+            if i > 0:
+                children.append(_sep)
+            children.append(
                 html.Div(
                     [
                         html.Span(
@@ -299,6 +311,7 @@ class SpanPopupWidget(SpanBaseWidget):
                             style={"backgroundColor": et.color},
                         ),
                     ],
+                    className="tater-count-container",
                     style={
                         "position": "relative",
                         "display": "inline-flex",
@@ -307,7 +320,7 @@ class SpanPopupWidget(SpanBaseWidget):
                     },
                 )
             )
-        return dmc.Group(items, gap="xs", wrap="wrap")
+        return dmc.Group(children, gap="xs", wrap="wrap")
 
     def register_callbacks(self, app: Any) -> None:
         pass  # Popup callbacks are registered globally in setup_span_callbacks
