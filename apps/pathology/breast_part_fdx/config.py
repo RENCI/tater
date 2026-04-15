@@ -16,7 +16,7 @@ from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 class DiagnosisConcept(BaseModel):
     """A single diagnosis concept with definitive flag."""
-    label: Optional[str] = None
+    label: Optional[List[str]] = None
     not_definitive: bool = False
 
 

@@ -19,7 +19,7 @@ from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 class DiagnosisItem(BaseModel):
     """Single diagnosis code and its definitive status."""
-    diagnosis_code: Optional[str] = None
+    diagnosis_code: Optional[List[str]] = None
     not_definitive: bool = False
     still_pending: bool = False
 
