@@ -7,6 +7,7 @@
     "ontology": "../data/pet_ontology.yaml"
   },
   "data_schema": [
+    {"widget": {"type": "divider", "label": "Leaf nodes only"}},
     {
       "id": "breed",
       "type": "hierarchical_label",
@@ -27,12 +28,13 @@
         "hierarchy_ref": "ontology"
       }
     },
+    {"widget": {"type": "divider", "label": "Any level"}},
     {
       "id": "breed_any",
       "type": "hierarchical_label",
       "widget": {
         "type": "hierarchical_label_select",
-        "label": "Breed (Any Level)",
+        "label": "Breed",
         "description": "Select a breed or any intermediate category.",
         "hierarchy_ref": "ontology",
         "allow_non_leaf": true
@@ -43,7 +45,7 @@
       "type": "hierarchical_label_multi",
       "widget": {
         "type": "hierarchical_label_multi",
-        "label": "Breeds (Multi, Any Level)",
+        "label": "Breeds (Multi)",
         "description": "Select one or more breeds or intermediate categories.",
         "hierarchy_ref": "ontology",
         "allow_non_leaf": true

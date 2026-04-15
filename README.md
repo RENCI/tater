@@ -111,7 +111,7 @@ A config file is a plain Python module. The `tater` CLI looks for these names:
 | Name | Required | Description |
 |------|----------|-------------|
 | `Schema` | **yes** | Pydantic `BaseModel` subclass defining the annotation fields |
-| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget` and hierarchical label widgets cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
+| `widgets` | no | List of `TaterWidget` instances. Omit to auto-generate all; supply a partial list to override specific fields and auto-generate the rest. **`SpanAnnotationWidget`, `HierarchicalLabelSelectWidget`, and `HierarchicalLabelMultiWidget` cannot be usefully auto-generated** (entity types and hierarchy are required) — always include these explicitly. |
 | `title` | no | App window title (default: `"tater - document annotation"`) |
 | `description` | no | Subtitle shown below the title |
 | `instructions` | no | Markdown help text shown in the instructions drawer |
@@ -215,35 +215,33 @@ SpanAnnotationWidget("entities", label="Entities", palette="set1", entity_types=
 
 #### Hierarchical label
 
-Navigate a tree hierarchy to select a node. Schema field must be `str` or `Optional[str]`. `Optional[str]` is indistinguishable from a plain text field during auto-generation.
+Select one or more nodes from a tree hierarchy. Paths are stored as lists of node names from root to the selected node.
 
 ```python
 from tater.widgets import (
-    HierarchicalLabelCompactWidget,
-    HierarchicalLabelFullWidget,
-    HierarchicalLabelTagsWidget,
+    HierarchicalLabelSelectWidget,
+    HierarchicalLabelMultiWidget,
     load_hierarchy_from_yaml,
 )
 
 ontology = load_hierarchy_from_yaml("data/ontology.yaml")
 
-# Chosen leaves appear as removable pills
-HierarchicalLabelTagsWidget("tags", label="Tags", hierarchy=ontology)
+# Single selection — stores Optional[List[str]]
+HierarchicalLabelSelectWidget("breed", label="Breed", hierarchy=ontology)
 
-# Shows only the selected node at each level (compact breadcrumb-style)
-HierarchicalLabelCompactWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
-
-# Shows all siblings at every expanded level with a breadcrumb below the search bar
-HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology)
+# Multi-selection — stores Optional[List[List[str]]]
+HierarchicalLabelMultiWidget("breeds", label="Breeds", hierarchy=ontology)
 ```
 
-All three accept `searchable=True` (default). Build a tree programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
+Both widgets are always searchable. Build a hierarchy programmatically with `build_tree(dict_or_list)` or from a YAML file with `load_hierarchy_from_yaml(path)`.
 
-By default only leaf nodes can be selected. Pass `allow_non_leaf=True` to allow selecting any node — clicking a non-leaf selects it as the annotation value and also navigates into it to show its children. The selected node is indicated by a dark border regardless of depth:
+By default only leaf nodes can be selected. Pass `allow_non_leaf=True` to allow selecting any node in the tree:
 
 ```python
-HierarchicalLabelFullWidget("diagnosis", label="Diagnosis", hierarchy=ontology, allow_non_leaf=True)
+HierarchicalLabelSelectWidget("breed", label="Breed", hierarchy=ontology, allow_non_leaf=True)
 ```
+
+When searching, only matching nodes and their ancestors are shown by default. `search_show_siblings=True` also includes siblings of matching nodes; `search_show_children=True` includes their direct children.
 
 ### Containers
 
@@ -342,8 +340,10 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 | `orientation` | `"vertical"` or `"horizontal"` (`radio_group`, `chip_radio`, `checkbox_group`, `segmented_control`) |
 | `min_value` / `max_value` / `step` | Bounds and step size (`number_input`, `slider`, `range_slider`) |
 | `entity_types` | List of entity type name strings (`span_annotation`) |
-| `hierarchy_ref` | Key into the top-level `hierarchies` dict (`hierarchical_label`) |
-| `searchable` | Enable search (default `true`) (`hierarchical_label`) |
+| `hierarchy_ref` | Key into the top-level `hierarchies` dict (`hierarchical_label_select`, `hierarchical_label_multi`) |
+| `allow_non_leaf` | Allow selecting intermediate (non-leaf) nodes; default `false` (`hierarchical_label_select`, `hierarchical_label_multi`) |
+| `search_show_siblings` | Include sibling nodes in search results; default `false` (`hierarchical_label_select`, `hierarchical_label_multi`) |
+| `search_show_children` | Include direct children of matched nodes in search results; default `false` (`hierarchical_label_select`, `hierarchical_label_multi`) |
 | `item_label` | Singular label for list items (`listable`, `tabs`, `accordion`) |
 | `conditional_on` | `{"field": "field_id", "value": ...}` — show this widget only when the named field equals the given value |
 
@@ -358,7 +358,8 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 | `range_slider` | `list[float]` | `range_slider` | — |
 | `text` | `str` | `text_input` | `text_area` |
 | `span_annotation` | `list[SpanAnnotation]` | `span_annotation` | — |
-| `hierarchical_label` | `Optional[str]` | `hierarchical_label_tags` | `hierarchical_label_compact`, `hierarchical_label_full` |
+| `hierarchical_label` | `Optional[List[str]]` | `hierarchical_label_select` | — |
+| `hierarchical_label_multi` | `Optional[List[List[str]]]` | `hierarchical_label_multi` | — |
 | `group` | nested model | auto (`GroupWidget`) | — |
 | `repeater` | `list[model]` | `listable` | `tabs`, `accordion` |
 
