@@ -1,6 +1,7 @@
-"""Span annotation widget for labeling text spans."""
+"""Span annotation widgets for labeling text spans."""
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Optional, Any, TYPE_CHECKING
 
@@ -80,17 +81,11 @@ class EntityType:
     color: Optional[str] = None  # defaults to widget palette by index
 
 
-class SpanAnnotationWidget(TaterWidget):
-    """
-    Widget for annotating text spans with entity type labels.
+class SpanBaseWidget(TaterWidget):
+    """Shared base for SpanAnnotationWidget and SpanPopupWidget.
 
-    Users highlight text in the document viewer then click an entity button
-    to tag the selection.  Spans are stored as ``List[SpanAnnotation]`` on
-    the Pydantic annotation model.
-
-    Example schema field::
-
-        spans: List[SpanAnnotation] = Field(default_factory=list)
+    Handles entity-type color assignment, label/type plumbing, and the
+    ``get_color_for_tag`` helper.  Subclasses implement ``component()``.
     """
 
     def __init__(
@@ -116,6 +111,54 @@ class SpanAnnotationWidget(TaterWidget):
     @property
     def renders_own_label(self) -> bool:
         return True
+
+    def to_python_type(self) -> type:
+        return list
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def get_color_for_tag(self, tag: str) -> str:
+        """Return the lightened highlight color for the given tag name."""
+        for et in self.entity_types:
+            if et.name == tag:
+                return _lighten_hex(et.color)
+        return _lighten_hex("#ffe066")
+
+
+class SpanAnnotationWidget(SpanBaseWidget):
+    """
+    Widget for annotating text spans with entity type labels.
+
+    Users highlight text in the document viewer then click an entity button
+    to tag the selection.  Spans are stored as ``List[SpanAnnotation]`` on
+    the Pydantic annotation model.
+
+    Example schema field::
+
+        spans: List[SpanAnnotation] = Field(default_factory=list)
+    """
+
+    def __init__(
+        self,
+        schema_field: str,
+        label: str,
+        entity_types: list[EntityType],
+        description: Optional[str] = None,
+        palette: str = "tableau10",
+    ):
+        super().__init__(
+            schema_field=schema_field,
+            label=label,
+            entity_types=entity_types,
+            description=description,
+            palette=palette,
+        )
+
+    # ------------------------------------------------------------------
+    # TaterWidget interface
+    # ------------------------------------------------------------------
 
     def component(self) -> Any:
         """Render the entity-type button row with inline stores."""
@@ -173,16 +216,98 @@ class SpanAnnotationWidget(TaterWidget):
             **{"data-tater-field": pipe_field},
         )
 
-    def to_python_type(self) -> type:
-        return list
+
+class SpanPopupWidget(SpanBaseWidget):
+    """Span annotation widget where entity buttons appear in a floating popup.
+
+    When the user selects text in the document viewer, a popup appears near the
+    selection showing entity type buttons — no need to click in the widget panel.
+    The static widget section shows only span counts (one per entity type) and
+    acts as an active-widget selector (clicking it focuses this widget's spans).
+
+    Spans are stored as ``List[SpanAnnotation]``, identical to
+    ``SpanAnnotationWidget``.  Use this widget when screen real-estate is limited
+    or when a faster annotation workflow is desired.  Keep ``SpanAnnotationWidget``
+    for touchscreen / mobile use-cases where hover/selection is less reliable.
+
+    Example schema field::
+
+        spans: List[SpanAnnotation] = Field(default_factory=list)
+    """
+
+    def __init__(
+        self,
+        schema_field: str,
+        label: str,
+        entity_types: list[EntityType],
+        description: Optional[str] = None,
+        palette: str = "tableau10",
+    ):
+        super().__init__(
+            schema_field=schema_field,
+            label=label,
+            entity_types=entity_types,
+            description=description,
+            palette=palette,
+        )
 
     # ------------------------------------------------------------------
-    # Helpers
+    # TaterWidget interface
     # ------------------------------------------------------------------
 
-    def get_color_for_tag(self, tag: str) -> str:
-        """Return the lightened highlight color for the given tag name."""
+    def component(self) -> Any:
+        """Render the counter strip with data-tater-entities for popup targeting."""
+        from dash import html
+        pipe_field = self.field_path.replace(".", "|")
+        # Encode entity data for the popup JS: name, full color, lightened color
+        entities_json = json.dumps([
+            {"name": et.name, "color": et.color, "lightColor": _lighten_hex(et.color)}
+            for et in self.entity_types
+        ])
+        return self._input_wrapper(
+            html.Div(
+                self._make_counter_strip(pipe_field),
+                **{
+                    "data-tater-field": pipe_field,
+                    "data-tater-entities": entities_json,
+                },
+            ),
+            self.label,
+        )
+
+    def _make_counter_strip(self, pipe_field: str) -> Any:
+        """Build counter-only strip: entity label + count badge per entity type."""
+        from dash import html
+        items = []
         for et in self.entity_types:
-            if et.name == tag:
-                return _lighten_hex(et.color)
-        return _lighten_hex("#ffe066")
+            items.append(
+                html.Div(
+                    [
+                        html.Span(
+                            et.name,
+                            style={
+                                "fontSize": "0.75rem",
+                                "fontWeight": 600,
+                                "color": et.color,
+                                "cursor": "default",
+                            },
+                        ),
+                        html.Span(
+                            "0",
+                            id={"type": "span-count", "field": pipe_field, "tag": et.name},
+                            className="tater-count-badge",
+                            style={"backgroundColor": et.color},
+                        ),
+                    ],
+                    style={
+                        "position": "relative",
+                        "display": "inline-flex",
+                        "alignItems": "center",
+                        "gap": "4px",
+                    },
+                )
+            )
+        return dmc.Group(items, gap="xs", wrap="wrap")
+
+    def register_callbacks(self, app: Any) -> None:
+        pass  # Popup callbacks are registered globally in setup_span_callbacks

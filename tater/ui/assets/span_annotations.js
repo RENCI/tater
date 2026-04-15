@@ -579,6 +579,48 @@ Object.assign(window.dash_clientside.tater, {
         if (!d) { return window.dash_clientside.no_update; }
         window._taterDeletePending = null;
         return d;
+    },
+
+    // ---- addSpanFromPopup: read pending popup data and add span to annotations ----
+    // Mirrors captureDelete: reads window._taterPopupPending set by span_popup.js
+    // and writes directly to span-any-change + annotations-store (no relay needed).
+    addSpanFromPopup: function (_n_clicks, docId, globalCount, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var d = window._taterPopupPending;
+        if (!d || !docId || !annotationsData) { return [nu, nu]; }
+        window._taterPopupPending = null;
+
+        var pipeField = d.field;
+        var text      = d.text || '';
+        var start     = d.start;
+        var end       = d.end;
+        var tag       = d.tag;
+        if (!pipeField || !tag || start == null || end == null) { return [nu, nu]; }
+
+        // Trim leading/trailing whitespace and adjust offsets (mirrors addSpan logic)
+        var trimmed = text.replace(/^\s+/, '');
+        start += text.length - trimmed.length;
+        trimmed = trimmed.replace(/\s+$/, '');
+        end = start + trimmed.length;
+        if (!trimmed) { return [nu, nu]; }
+
+        var dotField = pipeField.replace(/\|/g, '.');
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        for (var i = 0; i < currentSpans.length; i++) {
+            if (start < currentSpans[i].end && end > currentSpans[i].start) { return [nu, nu]; }
+        }
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, currentSpans.concat([
+            { start: start, end: end, text: trimmed, tag: tag }
+        ]));
+        return [
+            (globalCount || 0) + 1,
+            Object.assign({}, annotationsData, { [docId]: newAnn }),
+        ];
     }
 
 });

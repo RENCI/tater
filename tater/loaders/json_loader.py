@@ -35,7 +35,6 @@ Schema format::
             "type": "hierarchical_label_tags",
             "label": "Diagnosis",
             "hierarchy_ref": "ontology",
-            "searchable": true
           }
         },
         {
@@ -390,7 +389,7 @@ def _build_widget_from_spec(
             default=spec.get("default"),
         )
 
-    elif wtype == "span_annotation":
+    elif wtype in ("span_annotation", "span_popup"):
         entity_types = [EntityType(name=et) for et in widget_spec.get("entity_types", [])]
         w = WIDGET_CLASS[wtype](fid, label=label, entity_types=entity_types, description=description)
 
