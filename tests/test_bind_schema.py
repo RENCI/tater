@@ -298,27 +298,35 @@ class TestTabsAndAccordionBindSchema:
 class TestHierarchicalLabelBindSchema:
     _hierarchy = {"Animals": {"Mammals": None, "Birds": None}}
 
-    def test_compact_binds_str_field(self):
+    def test_compact_binds_list_str_field(self):
         w = HierarchicalLabelCompactWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
+            schema_field="hl_path", label="HL", hierarchy=self._hierarchy
         )
         w.bind_schema(Schema)
 
-    def test_full_binds_str_field(self):
+    def test_full_binds_list_str_field(self):
         w = HierarchicalLabelFullWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
+            schema_field="hl_path", label="HL", hierarchy=self._hierarchy
         )
         w.bind_schema(Schema)
 
-    def test_tags_binds_str_field(self):
+    def test_tags_binds_list_str_field(self):
         w = HierarchicalLabelTagsWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
+            schema_field="hl_path", label="HL", hierarchy=self._hierarchy
         )
         w.bind_schema(Schema)
 
-    def test_raises_for_non_str_field(self):
+    def test_raises_for_non_list_str_field(self):
         w = HierarchicalLabelCompactWidget(
             schema_field="score", label="HL", hierarchy=self._hierarchy
+        )
+        with pytest.raises(TypeError):
+            w.bind_schema(Schema)
+
+    def test_raises_for_plain_str_field(self):
+        # str is no longer accepted — must be List[str]
+        w = HierarchicalLabelCompactWidget(
+            schema_field="overall", label="HL", hierarchy=self._hierarchy
         )
         with pytest.raises(TypeError):
             w.bind_schema(Schema)

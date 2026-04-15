@@ -30,6 +30,7 @@ from tater.widgets.hierarchical_label import (
     HierarchicalLabelCompactWidget,
     HierarchicalLabelFullWidget,
     HierarchicalLabelTagsWidget,
+    HierarchicalLabelMultiWidget,
 )
 from tater.models.span import SpanAnnotation
 
@@ -73,6 +74,7 @@ WIDGET_CLASS: dict[str, type[TaterWidget]] = {
     "hierarchical_label_tags":    HierarchicalLabelTagsWidget,
     "hierarchical_label_compact": HierarchicalLabelCompactWidget,
     "hierarchical_label_full":    HierarchicalLabelFullWidget,
+    "hierarchical_label_multi":   HierarchicalLabelMultiWidget,
 
     # group widget doesn't have a type string since it's not directly specifiable in JSON
 

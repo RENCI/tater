@@ -24,7 +24,7 @@ ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 
 
 class Mention(BaseModel):
-    breed: Optional[str] = None
+    breed: Optional[List[str]] = None
     confidence: Optional[Literal["definite", "likely", "uncertain"]] = None
     spans: List[SpanAnnotation] = Field(default_factory=list)
 

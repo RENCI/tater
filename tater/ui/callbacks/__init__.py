@@ -16,6 +16,7 @@ from tater.ui.callbacks.repeater import (
 from tater.ui.callbacks.hierarchical_label import (
     setup_hl_callbacks,
     setup_hl_tags_callbacks,
+    setup_hl_multi_callbacks,
 )
 from tater.ui.callbacks.helpers import (
     _default_meta,
@@ -37,6 +38,7 @@ __all__ = [
     "setup_nested_repeater_callbacks",
     "setup_hl_callbacks",
     "setup_hl_tags_callbacks",
+    "setup_hl_multi_callbacks",
     "_collect_value_capture_widgets",
     "_collect_all_control_templates",
     "_default_meta",

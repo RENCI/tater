@@ -11,12 +11,14 @@ from tater.widgets.base import ContainerWidget
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
     HierarchicalLabelTagsWidget,
+    HierarchicalLabelMultiWidget,
     _find_path,
     _make_buttons,
     _make_tags_option_buttons,
     _make_tags_pill,
     _node_at,
     _section,
+    _PATH_SEP,
 )
 from tater.widgets.repeater import RepeaterWidget
 
@@ -114,16 +116,11 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
     def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
-        widget = _get_widget(field_path)
-        if widget is None:
+        if _get_widget(field_path) is None:
             return no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-        if selected_value:
-            computed_path = _find_path(widget.root, selected_value)
-            if computed_path:
-                return computed_path  # update_display trims leaf tip when rendering
-        return []
+        stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+        return list(stored_path) if stored_path else []
 
     # ---- 3. Handle node button click → update path, write if leaf ----
     # Uses hier-ann-relay (MATCH) instead of annotations-store (static) to avoid
@@ -170,12 +167,13 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
 
         if clicked.is_leaf:
-            current_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-            is_deselect = (current_value == node_name)
+            current_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            is_deselect = (current_path == (path[:depth] + [node_name]) if not is_search_result
+                           else current_path == _find_path(root, node_name))
 
-            # Include the leaf in the path when selecting so update_display can derive
-            # selected_value from the path itself, avoiding a race with annotations-store.
-            # On deselect, navigate back to the parent (exclude leaf).
+            # hier-nav includes the selected leaf so update_display derives
+            # selected_value from the path, avoiding a race with annotations-store.
+            # On deselect, nav backs up to the parent level.
             if is_search_result:
                 full_path = _find_path(root, node_name)
                 new_path = full_path[:-1] if is_deselect else full_path
@@ -184,22 +182,23 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
 
             ann_relay = no_update
             if ann is not None:
-                ann_relay = {"field": field_path, "value": None if is_deselect else node_name}
+                ann_relay = {"field": field_path, "value": None if is_deselect else new_path}
 
             return new_path, ("" if is_search_result else no_update), ann_relay
         else:
             if depth < len(path) and path[depth] == node_name:
-                # Back: parent is non-leaf; only selectable if allow_non_leaf=True, else clear
-                new_value = (path[depth - 1] if depth > 0 else None) if widget.allow_non_leaf else None
+                # Back: clicking an already-navigated non-leaf collapses it.
+                # With allow_non_leaf, the new selection is path[:depth] (the parent).
+                new_path = path[:depth]
                 ann_relay = no_update
                 if ann is not None:
-                    ann_relay = {"field": field_path, "value": new_value}
-                return path[:depth], no_update, ann_relay
-            # Forward: navigate into non-leaf; only select if allow_non_leaf=True
+                    ann_relay = {"field": field_path, "value": new_path if (widget.allow_non_leaf and new_path) else None}
+                return new_path, no_update, ann_relay
+            # Forward: navigate into non-leaf; select it if allow_non_leaf=True
             new_path = path[:depth] + [node_name]
             ann_relay = no_update
             if widget.allow_non_leaf and ann is not None:
-                ann_relay = {"field": field_path, "value": node_name}
+                ann_relay = {"field": field_path, "value": new_path}
             return new_path, no_update, ann_relay
 
     # ---- Clientside: apply hier-ann-relay descriptor → annotations-store ----
@@ -236,39 +235,41 @@ def setup_hl_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update
         root = widget.root
 
-        # When triggered directly by doc navigation, derive the path from the
-        # annotation without waiting for reset_nav to update hier-nav first.
+        # Stored annotation is now List[str] (the full path including selected node).
+        # When triggered by doc navigation, read it directly without waiting for reset_nav.
         if ctx.triggered_id == "current-doc-id":
             ann = _get_ann(annotations_data, doc_id) if doc_id else None
-            selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-            path = (_find_path(root, selected_value) or []) if selected_value else []
+            stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            path = list(stored_path) if stored_path else []
         else:
             path = list(current_path or [])
 
-        # If the path tip is a leaf it encodes the current selection — derive
-        # selected_value directly so we don't race against annotations-store.
-        # Trim it off for rendering (the parent level shows the leaf's siblings).
+        # hier-nav includes the navigated-to node as its tip (leaf or non-leaf).
+        # selected_value is set when the tip is selectable (leaf, or allow_non_leaf).
+        # render_path strips the tip only for leaves (no children to show);
+        # a selected non-leaf still renders its own children so render_path = path.
         selected_value = None
         render_path = path
         if path:
             tip = _node_at(root, path)
-            if tip and tip.is_leaf:
+            if tip and (tip.is_leaf or widget.allow_non_leaf):
                 selected_value = path[-1]
-                render_path = path[:-1]
+                if tip.is_leaf:
+                    render_path = path[:-1]
 
-        # Fall back to annotations-store for initial load and deselected state.
+        # Fall back to annotations-store when hier-nav is stale (e.g. reset_nav
+        # fired before update_repeater baked in the correct path).
         if selected_value is None and doc_id:
             ann = _get_ann(annotations_data, doc_id)
             if ann is not None:
-                selected_value = value_helpers.get_model_value(ann, field_path)
-                # If hier-nav is empty (e.g. reset_nav fired before update_repeater
-                # baked in the correct path), derive render_path from the tree so
-                # compact/full widgets show the selection in context rather than
-                # rendering from root with nothing highlighted.
-                if selected_value and not render_path:
-                    full_path = _find_path(root, selected_value)
-                    if full_path:
-                        render_path = full_path[:-1]
+                stored_path = value_helpers.get_model_value(ann, field_path)
+                if stored_path and not render_path:
+                    path = list(stored_path)
+                    tip = _node_at(root, path)
+                    if tip and (tip.is_leaf or widget.allow_non_leaf):
+                        selected_value = path[-1]
+                        if tip.is_leaf:
+                            render_path = path[:-1]
 
         breadcrumb = " → ".join(path) if path else "None selected"
 
@@ -309,16 +310,11 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
     def reset_nav(doc_id, _load_trigger, annotations_data):
         pipe_field = ctx.outputs_list[0]["id"]["field"]
         field_path = pipe_field.replace("|", ".")
-        widget = _get_widget(field_path)
-        if widget is None:
+        if _get_widget(field_path) is None:
             return no_update, no_update
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-        if selected_value:
-            computed_path = _find_path(widget.root, selected_value)
-            if computed_path:
-                return computed_path, ""  # Tags: full path including selected node
-        return [], ""
+        stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+        return (list(stored_path) if stored_path else []), ""
 
     # 2. Handle option tag click — always a forward selection
     # Uses hl-tags-ann-relay (MATCH) instead of annotations-store (static) to avoid
@@ -369,7 +365,7 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None and (clicked_node.is_leaf or widget.allow_non_leaf):
-            ann_relay = {"field": field_path, "value": node_name}
+            ann_relay = {"field": field_path, "value": new_path}
 
         return new_path, "", ann_relay
 
@@ -398,14 +394,16 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         path = list(current_nav or [])
 
         widget = _get_widget(field_path)
-        # Parent is non-leaf; only selectable if allow_non_leaf=True, else clear
-        parent_name = (path[idx - 1] if idx > 0 else None) if (widget and widget.allow_non_leaf) else None
+        # Clicking pill at idx navigates back to path[:idx].
+        # With allow_non_leaf, select the parent (path[:idx]); otherwise clear.
+        new_nav = path[:idx]
+        parent_path = new_nav if (widget and widget.allow_non_leaf and new_nav) else None
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         ann_relay = no_update
         if ann is not None:
-            ann_relay = {"field": field_path, "value": parent_name}
+            ann_relay = {"field": field_path, "value": parent_path}
 
-        return path[:idx], ann_relay
+        return new_nav, ann_relay
 
     # ---- Clientside: apply hl-tags-ann-relay descriptor → annotations-store ----
     app.clientside_callback(
@@ -437,18 +435,15 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
 
         triggered = ctx.triggered_id
 
-        # When triggered directly by doc navigation, derive the path from the
-        # annotation without waiting for reset_nav to update hl-tags-nav first.
+        # Stored annotation is List[str] (the full path including selected node).
+        # When triggered by doc navigation, read it directly without waiting for reset_nav.
         if triggered == "current-doc-id":
             widget = _get_widget(field_path)
             if widget is None:
                 return no_update, no_update, no_update
             ann = _get_ann(annotations_data, doc_id) if doc_id else None
-            selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
-            if selected_value:
-                path = _find_path(widget.root, selected_value) or []
-            else:
-                path = []
+            stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+            path = list(stored_path) if stored_path else []
             clear_search = ""
         else:
             path = list(current_path or [])
@@ -463,20 +458,19 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
         root = widget.root
 
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
-        selected_value = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+        stored_path = value_helpers.get_model_value(ann, field_path) if ann is not None else None
 
-        # If hl-tags-nav is empty but there's a saved annotation value (e.g. a
-        # phantom fire from a freshly-mounted store before reset_nav corrects it),
-        # recover the path from the tree so pills render correctly.
-        if not path and selected_value:
-            recovered = _find_path(root, selected_value)
-            if recovered:
-                path = recovered
+        # If hl-tags-nav is empty but there's a saved annotation (phantom fire
+        # from a freshly-mounted store before reset_nav corrects it), recover.
+        if not path and stored_path:
+            path = list(stored_path)
 
-        # Pills = nav path; last pill gets selected style only if it's the saved value
-        # (leaf always; non-leaf only when allow_non_leaf=True)
-        last_node = _node_at(root, path) if path else None
-        last_is_selected = bool(last_node and (last_node.is_leaf or widget.allow_non_leaf))
+        # Derive selected_value from the nav path directly (same as compact/full)
+        # so the pill highlight doesn't lag behind annotations-store.
+        tip = _node_at(root, path) if path else None
+        last_is_selected = bool(tip and (tip.is_leaf or widget.allow_non_leaf))
+        selected_value = path[-1] if last_is_selected else (stored_path[-1] if stored_path else None)
+
         pills = [
             _make_tags_pill(name, pipe_field, i, is_selected=(i == len(path) - 1 and last_is_selected))
             for i, name in enumerate(path)
@@ -494,3 +488,66 @@ def setup_hl_tags_callbacks(tater_app: TaterApp) -> None:
             option_tags = _make_tags_option_buttons(current_node.children, pipe_field, len(path), selected_value)
 
         return pills, clear_search, option_tags
+
+
+def setup_hl_multi_callbacks(tater_app: TaterApp) -> None:
+    """Register MATCH callbacks for all HierarchicalLabelMultiWidget instances."""
+    app = tater_app.app
+    _get_current_app_fn = tater_app._get_current_app
+
+    def _ta() -> TaterApp:
+        if _get_current_app_fn is not None:
+            result = _get_current_app_fn()
+            if result is not None:
+                return result
+        return tater_app
+
+    def _get_widget(field_path: str) -> Optional[HierarchicalLabelMultiWidget]:
+        w = _find_hl_template(_ta().widgets, field_path)
+        return w if isinstance(w, HierarchicalLabelMultiWidget) else None
+
+    # 1. Load values on doc change or repeater reload
+    @app.callback(
+        Output({"type": "hl-multi", "field": MATCH}, "value"),
+        Input("current-doc-id", "data"),
+        Input("repeater-load-trigger", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )
+    def load_multi(doc_id, _trigger, annotations_data):
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        stored = value_helpers.get_model_value(ann, field_path) if ann is not None else None
+        if stored:
+            return [_PATH_SEP.join(p) for p in stored]
+        return []
+
+    # 2. On selection change, write full paths to relay store
+    @app.callback(
+        Output({"type": "hl-multi-relay", "field": MATCH}, "data"),
+        Input({"type": "hl-multi", "field": MATCH}, "value"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_multi_change(selected_values, doc_id, annotations_data):
+        if not ctx.triggered or not ctx.triggered[0].get("value") is not None:
+            pass  # allow empty list through — that's a deliberate clear
+        ann = _get_ann(annotations_data, doc_id) if doc_id else None
+        if ann is None:
+            return no_update
+        paths = [v.split(_PATH_SEP) for v in (selected_values or [])]
+        pipe_field = ctx.outputs_list["id"]["field"]
+        field_path = pipe_field.replace("|", ".")
+        return {"field": field_path, "value": paths if paths else None}
+
+    # 3. Clientside: apply relay → annotations-store
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="applyFieldOp"),
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input({"type": "hl-multi-relay", "field": ALL}, "data"),
+        State("current-doc-id", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )

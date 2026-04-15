@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
+import json
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 from dash import dcc, html
 import dash_mantine_components as dmc
@@ -187,19 +188,22 @@ class HierarchicalLabelWidget(TaterWidget):
         return True
 
     def to_python_type(self) -> type:
-        return str
+        return list
 
     def bind_schema(self, model: type) -> None:
+        import typing
         field_info = _resolve_field_info(model, self.field_path)
         if field_info is None:
             raise ValueError(
                 f"{self.__class__.__name__}: field '{self.field_path}' not found in {model.__name__}"
             )
         inner = _unwrap_optional(field_info.annotation)
-        if inner is not str:
+        origin = typing.get_origin(inner)
+        args = typing.get_args(inner)
+        if not (origin is list and args and args[0] is str):
             raise TypeError(
-                f"{self.__class__.__name__}: field '{self.field_path}' must be str or "
-                f"Optional[str], got {field_info.annotation!r}"
+                f"{self.__class__.__name__}: field '{self.field_path}' must be List[str] or "
+                f"Optional[List[str]], got {field_info.annotation!r}"
             )
 
     # ------------------------------------------------------------------
@@ -221,16 +225,11 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
-        # If _initial_nav_path was set by repeater rendering, use it so the
-        # sections render with the correct selection immediately (no flash).
+        # _initial_nav_path is the full path (including selected node) set by
+        # repeater rendering from the stored List[str] annotation value.
         init_path = list(self._initial_nav_path)
-        selected_value = None
-        render_path = init_path
-        if init_path:
-            tip = _node_at(self.root, init_path)
-            if tip and tip.is_leaf:
-                selected_value = init_path[-1]
-                render_path = init_path[:-1]
+        selected_value = init_path[-1] if init_path else None
+        render_path = init_path[:-1] if init_path else []
         initial_sections = self._render_sections(render_path, pipe_field, selected_value)
 
         return self._input_wrapper(dmc.Stack(
@@ -425,6 +424,134 @@ class HierarchicalLabelTagsWidget(HierarchicalLabelWidget):
 
     def _render_sections(self, path, pipe_field, selected_value):
         return []  # Tags widget renders via callbacks, not _render_sections
+
+
+# ---------------------------------------------------------------------------
+# HierarchicalLabelMultiWidget
+# ---------------------------------------------------------------------------
+
+_PATH_SEP = "|"
+
+
+def _build_multiselect_data(root: Node, allow_non_leaf: bool = False) -> list:
+    """Build dmc.MultiSelect data from a Node tree.
+
+    Each item: ``{value: "A|B|C", label: "C"}``.
+    ``value`` is the full path joined by ``_PATH_SEP`` (unique even for duplicate leaf names).
+    ``label`` is the plain node name; depth-based indentation is handled by the
+    ``hlMultiRenderOption`` JS function via the ``renderOption`` prop.
+    Depth is relative to root's children (root itself is not included).
+    """
+    items = []
+
+    def _walk(node: Node, path: list[str]) -> None:
+        if node.name == "__root__":
+            for child in node.children:
+                _walk(child, [])
+            return
+        current_path = path + [node.name]
+        value = _PATH_SEP.join(current_path)
+        if node.is_leaf:
+            items.append({"value": value, "label": node.name, "leaf": True})
+        else:
+            # Non-leaf nodes always appear to provide hierarchy context.
+            # Disabled when allow_non_leaf=False so they act as visual headers only.
+            item = {"value": value, "label": node.name, "leaf": False}
+            if not allow_non_leaf:
+                item["disabled"] = True
+            items.append(item)
+            for child in node.children:
+                _walk(child, current_path)
+
+    for child in root.children:
+        _walk(child, [])
+    return items
+
+
+@dataclass(eq=False)
+class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
+    """Multi-select hierarchical widget using dmc.MultiSelect with depth-indented options.
+
+    Stores ``Optional[List[List[str]]]`` — a list of full paths, one per selection.
+    The dropdown uses ``renderOption`` (``hlMultiRenderOption`` JS function) to indent
+    each option based on its depth in the hierarchy. Selected pills show the node name only.
+    Search is handled natively by Mantine (matches against the label, i.e. node name).
+
+    ``search_show_siblings``: also show sibling nodes of each matched term.
+    ``search_show_children``: also show direct children of each matched term.
+    Ancestor nodes are always included to provide hierarchy context.
+
+    Component IDs use ``hl-multi-*`` types; a single MATCH callback in
+    ``setup_hl_multi_callbacks`` handles all instances.
+    """
+
+    search_show_siblings: bool = False
+    search_show_children: bool = False
+
+    def to_python_type(self) -> type:
+        return list
+
+    def bind_schema(self, model: type) -> None:
+        import typing as _t
+        field_info = _resolve_field_info(model, self.field_path)
+        if field_info is None:
+            raise ValueError(
+                f"{self.__class__.__name__}: field '{self.field_path}' not found in {model.__name__}"
+            )
+        inner = _unwrap_optional(field_info.annotation)
+        origin = _t.get_origin(inner)
+        args = _t.get_args(inner)
+        # Expect List[List[str]]
+        if origin is list and args:
+            item_origin = _t.get_origin(args[0])
+            item_args = _t.get_args(args[0])
+            if item_origin is list and item_args and item_args[0] is str:
+                return
+        raise TypeError(
+            f"{self.__class__.__name__}: field '{self.field_path}' must be "
+            f"List[List[str]] or Optional[List[List[str]]], got {field_info.annotation!r}"
+        )
+
+    @property
+    def _show_breadcrumb(self) -> bool:
+        return False
+
+    def _render_sections(self, path, pipe_field, selected_value):
+        return []  # Not used — MultiSelect renders its own dropdown
+
+    def component(self) -> Any:
+        pipe_field = self.field_path.replace(".", "|")
+        data = _build_multiselect_data(self.root, self.allow_non_leaf)
+        # Prepend a hidden sentinel item encoding filter config as JSON for the JS filter
+        # function (hlMultiFilter in utils.js). The sentinel value starts with "__config__"
+        # followed by a JSON object. The filter function detects this prefix, parses the
+        # config, and strips the sentinel from the returned options.
+        sentinel_config = json.dumps({"showSiblings": self.search_show_siblings, "showChildren": self.search_show_children})
+        sentinel = {"value": f"__config__{sentinel_config}", "label": "", "disabled": True}
+        return self._input_wrapper(
+            dmc.Stack(
+                [
+                    dmc.MultiSelect(
+                        id={"type": "hl-multi", "field": pipe_field},
+                        data=[sentinel] + data,
+                        value=[],
+                        searchable=True,
+                        clearSearchOnChange=False,
+                        clearable=True,
+                        placeholder="Search…",
+                        size="sm",
+                        renderOption={"function": "hlMultiRenderOption"},
+                        filter={"function": "hlMultiFilter"},
+                    ),
+                    dcc.Store(id={"type": "hl-multi-relay", "field": pipe_field}, data=None),
+                ],
+                gap="xs",
+            ),
+            self.label,
+        )
+
+    def register_callbacks(self, app: Any) -> None:
+        pass  # Handled by setup_hl_multi_callbacks
 
 
 # ---------------------------------------------------------------------------

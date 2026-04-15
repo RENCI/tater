@@ -47,3 +47,187 @@ Object.assign(window.dash_clientside.tater, {
     },
 
 });
+
+
+// ---------------------------------------------------------------------------
+// DMC Functions-as-Props (window.dashMantineFunctions)
+// ---------------------------------------------------------------------------
+
+window.dashMantineFunctions = window.dashMantineFunctions || {};
+
+/**
+ * filter / renderOption for HierarchicalLabelMultiWidget.
+ *
+ * hlMultiFilter: matches on node name (label); ancestors of any match are always
+ * included. Optionally also includes siblings and/or direct children of matched
+ * nodes, controlled by a sentinel config item prepended to the data array by
+ * HierarchicalLabelMultiWidget.component() in hierarchical_label.py.
+ *
+ * Sentinel format: value = "__config__" + JSON, e.g.:
+ *   __config__{"showSiblings":true,"showChildren":false}
+ * The sentinel has an empty label and disabled=true so it is never rendered or selected.
+ * The search term is stashed in _hlMultiSearch for use by hlMultiRenderOption.
+ *
+ * hlMultiRenderOption: indents each option by depth (from "|"-separated value),
+ * renders non-leaf nodes bold, highlights the matched substring, shows a
+ * chevron-down for non-leaf nodes, and a check icon (right-aligned) when selected.
+ */
+
+// Shared search term written by hlMultiFilter, read by hlMultiRenderOption.
+let _hlMultiSearch = "";
+
+const _CONFIG_PREFIX = "__config__";
+
+window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
+    _hlMultiSearch = (search || "").toLowerCase();
+
+    // Extract and strip the sentinel config item.
+    let showSiblings = false;
+    let showChildren = false;
+    const dataOptions = options.filter((o) => {
+        if (!o.value.startsWith(_CONFIG_PREFIX)) return true;
+        try {
+            const config = JSON.parse(o.value.slice(_CONFIG_PREFIX.length));
+            showSiblings = !!config.showSiblings;
+            showChildren = !!config.showChildren;
+        } catch (e) {
+            console.warn("hlMultiFilter: failed to parse sentinel config", o.value);
+        }
+        return false;  // always strip sentinel from results
+    });
+
+    if (!_hlMultiSearch) return dataOptions;
+
+    const includedPaths = new Set();
+
+    dataOptions.forEach((option) => {
+        if (!option.label.toLowerCase().includes(_hlMultiSearch)) return;
+
+        const segments = option.value.split("|");
+
+        // Always include ancestors (full spine to root).
+        for (let i = 1; i <= segments.length; i++) {
+            includedPaths.add(segments.slice(0, i).join("|"));
+        }
+
+        // Siblings: all options sharing the same parent path.
+        if (showSiblings && segments.length > 1) {
+            const parentPrefix = segments.slice(0, -1).join("|") + "|";
+            dataOptions.forEach((o) => {
+                if (o.value.startsWith(parentPrefix) && !o.value.slice(parentPrefix.length).includes("|")) {
+                    includedPaths.add(o.value);
+                }
+            });
+        }
+
+        // Direct children: one level below the matched node.
+        if (showChildren) {
+            const childPrefix = option.value + "|";
+            dataOptions.forEach((o) => {
+                if (o.value.startsWith(childPrefix) && !o.value.slice(childPrefix.length).includes("|")) {
+                    includedPaths.add(o.value);
+                }
+            });
+        }
+    });
+
+    return dataOptions.filter((option) => includedPaths.has(option.value));
+};
+
+// ---------------------------------------------------------------------------
+// SVG icon helpers
+// ---------------------------------------------------------------------------
+
+// Renders a Tabler-style SVG icon. strokeWidth compensates for the 24×24 viewBox
+// being scaled to `size` px so line weight stays consistent.
+function _tablerSvg(points, stroke, size, svgStyle) {
+    return React.createElement(
+        "svg",
+        {
+            xmlns: "http://www.w3.org/2000/svg",
+            width: size, height: size,
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke,
+            strokeWidth: Math.round(2 * 24 / size),
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            style: svgStyle,
+        },
+        React.createElement("polyline", { points })
+    );
+}
+
+// tabler:chevron-down — indicates a non-leaf (expandable) node.
+function _chevronDown() {
+    return _tablerSvg(
+        "6 9 12 15 18 9",
+        "var(--mantine-color-dimmed)",
+        12,
+        { marginLeft: "4px", flexShrink: 0 }
+    );
+}
+
+// tabler:check — right-aligned selection indicator; hidden when unchecked.
+function _checkIcon(visible) {
+    return React.createElement(
+        "span",
+        {
+            style: {
+                marginLeft: "auto",
+                paddingLeft: "8px",
+                flexShrink: 0,
+                visibility: visible ? "visible" : "hidden",
+                display: "flex",
+                alignItems: "center",
+            },
+        },
+        _tablerSvg(
+            "20 6 9 17 4 12",
+            "var(--mantine-color-dimmed)",
+            14,
+            {}
+        )
+    );
+}
+
+window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked }) {
+    const depth = option.value.split("|").length - 1;
+    const label = option.label;
+    const lower = _hlMultiSearch;
+    const isLeaf = option.leaf !== false;  // default true if field absent
+
+    // Build label — highlight the matched substring if present.
+    let labelContent;
+    const matchIdx = lower ? label.toLowerCase().indexOf(lower) : -1;
+    if (matchIdx !== -1) {
+        labelContent = [
+            label.slice(0, matchIdx),
+            React.createElement(
+                "mark",
+                { key: "m", style: { background: "var(--mantine-color-yellow-3)", borderRadius: "3px", padding: "0 0" } },
+                label.slice(matchIdx, matchIdx + lower.length)
+            ),
+            label.slice(matchIdx + lower.length),
+        ];
+    } else {
+        labelContent = label;
+    }
+
+    return React.createElement(
+        "span",
+        {
+            style: {
+                display: "flex",
+                alignItems: "center",
+                flex: 1,
+                paddingLeft: `${depth * 14}px`,
+                fontWeight: option.disabled ? 600 : "normal",
+                opacity: option.disabled ? 0.75 : 1,
+            },
+        },
+        React.createElement("span", null, labelContent),
+        !isLeaf ? _chevronDown() : null,
+        _checkIcon(checked),
+    );
+};

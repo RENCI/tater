@@ -15,7 +15,8 @@
         "label": "Tags Breed",
         "description": "Navigate via pill tags \u2014 click a tag to go back, \u00d7 to deselect.",
         "hierarchy_ref": "ontology",
-        "searchable": true
+        "searchable": true,
+        "allow_non_leaf": true
       }
     },
     {
@@ -26,7 +27,8 @@
         "label": "Primary Breed",
         "description": "Navigate the ontology to select a breed or type.",
         "hierarchy_ref": "ontology",
-        "searchable": true
+        "searchable": true,
+        "allow_non_leaf": true
       }
     },
     {
@@ -37,7 +39,8 @@
         "label": "Secondary Breed (Mixed)",
         "description": "Select a secondary breed if the pet is a mix.",
         "hierarchy_ref": "ontology",
-        "searchable": true
+        "searchable": true,
+        "allow_non_leaf": true
       }
     }
   ]

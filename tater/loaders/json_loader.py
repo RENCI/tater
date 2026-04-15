@@ -118,6 +118,7 @@ Widget type strings (``"widget": {"type": "..."}``):
   ``hierarchical_label_tags``    — for ``hierarchical_label`` fields (default)
   ``hierarchical_label_compact`` — for ``hierarchical_label`` fields
   ``hierarchical_label_full``    — for ``hierarchical_label`` fields
+  ``hierarchical_label_multi``   — for ``hierarchical_label_multi`` fields (multi-select)
   ``listable``                   — for ``repeater`` fields (default)
   ``tabs``                       — for ``repeater`` fields
   ``accordion``                  — for ``repeater`` fields
@@ -135,6 +136,7 @@ Widget config keys (inside the ``widget`` block):
   ``max_value``      — maximum (number_input, slider, range_slider)
   ``step``           — step size (slider, range_slider, number_input)
   ``searchable``     — enable search (hierarchical_label_*)
+  ``allow_non_leaf`` — allow selecting intermediate nodes (hierarchical_label_*)
   ``hierarchy_ref``  — key into the top-level ``hierarchies`` dict
   ``entity_types``   — list of entity type names (span_annotation)
   ``item_label``     — singular label for list items (listable, tabs, accordion)
@@ -144,7 +146,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Optional, Literal
+from typing import Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, create_model
 
@@ -244,7 +246,10 @@ def _build_pydantic_field(
         return fid, (list[SpanAnnotation], Field(default_factory=list))
 
     if ftype == "hierarchical_label":
-        return fid, (Optional[str], None)
+        return fid, (Optional[List[str]], None)
+
+    if ftype == "hierarchical_label_multi":
+        return fid, (Optional[List[List[str]]], None)
 
     raise ValueError(f"Unknown field type {ftype!r} for field {fid!r}")
 
@@ -394,8 +399,17 @@ def _build_widget_from_spec(
         ref = widget_spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         searchable = widget_spec.get("searchable", True)
+        allow_non_leaf = widget_spec.get("allow_non_leaf", False)
         cls = WIDGET_CLASS[wtype]
-        w = cls(fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable)
+        w = cls(fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable, allow_non_leaf=allow_non_leaf)
+
+    elif wtype == "hierarchical_label_multi":
+        ref = widget_spec.get("hierarchy_ref")
+        hierarchy = hierarchy_map.get(ref) if ref else None
+        allow_non_leaf = widget_spec.get("allow_non_leaf", False)
+        search_show_siblings = widget_spec.get("search_show_siblings", False)
+        search_show_children = widget_spec.get("search_show_children", False)
+        w = WIDGET_CLASS[wtype](fid, label=label, description=description, hierarchy=hierarchy, allow_non_leaf=allow_non_leaf, search_show_siblings=search_show_siblings, search_show_children=search_show_children)
 
     elif wtype == "divider":
         w = DividerWidget(label=label, description=description)
