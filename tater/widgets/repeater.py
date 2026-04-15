@@ -111,6 +111,7 @@ class RepeaterWidget(ContainerWidget):
         """Render widgets for a single list item with pattern-matching IDs."""
         from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
+        from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.ui import value_helpers
         rendered = []
         pipe_ld = self.field_path.replace(".", "|")
@@ -161,6 +162,14 @@ class RepeaterWidget(ContainerWidget):
                     if widget._condition is not None:
                         cf = widget._condition[0].split(".")[-1]
                         widget._initial_hidden = (direct_defaults.get(cf) != widget._condition[1])
+                elif isinstance(template, HierarchicalLabelWidget):
+                    ann = (annotations_data or {}).get(doc_id) if doc_id else None
+                    if ann is None and tater_app and doc_id:
+                        ann = tater_app.annotations.get(doc_id)
+                    if ann is not None:
+                        v = value_helpers.get_model_value(ann, widget.field_path)
+                        if v is not None:
+                            widget._preset_value = widget._serialize_value(v)
                 comp = widget.component()
 
             stack = dmc.Stack([comp], gap="xs", mt="sm")
@@ -348,20 +357,28 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
+        from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
         from tater.ui import value_helpers
         rendered = []
         for template in self.item_widgets:
-            if isinstance(template, HierarchicalLabelWidget):
-                widget = copy.deepcopy(template)
-                widget._finalize_paths(
-                    parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
-                )
-                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
-                continue
             nested_ld = f"{outer_list_field}|{item_field}"
             nested_path = f"{outer_li}.{inner_index}"
             parent_path = f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
+
+            if isinstance(template, HierarchicalLabelWidget):
+                widget = copy.deepcopy(template)
+                widget._finalize_paths(parent_path=parent_path)
+                if doc_id:
+                    ann = (annotations_data or {}).get(doc_id)
+                    if ann is None and tater_app and doc_id in tater_app.annotations:
+                        ann = tater_app.annotations[doc_id]
+                    if ann is not None:
+                        v = value_helpers.get_model_value(ann, widget.field_path)
+                        if v is not None:
+                            widget._preset_value = widget._serialize_value(v)
+                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
+                continue
 
             if isinstance(template, GroupWidget):
                 widget = copy.deepcopy(template)
@@ -369,6 +386,12 @@ class RepeaterWidget(ContainerWidget):
                 widget._set_repeater_context(nested_ld, nested_path)
                 _load_defaults_from_annotation(widget, tater_app, doc_id, annotations_data)
                 rendered.append(widget.render_field(mt="sm"))
+                continue
+
+            if isinstance(template, SpanAnnotationWidget):
+                widget = copy.deepcopy(template)
+                widget._finalize_paths(parent_path=parent_path)
+                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue
 
             if not isinstance(template, ControlWidget):

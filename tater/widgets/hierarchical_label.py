@@ -202,6 +202,9 @@ class HierarchicalLabelWidget(TaterWidget):
     hierarchy: Union[Node, dict, list, str, Path, None] = None
     allow_non_leaf: bool = False
     root: Node = dc_field(init=False, repr=False)
+    # Pre-serialized value injected by repeater._render_item_widgets so the
+    # component renders with the correct value without waiting for a callback.
+    _preset_value: Any = dc_field(init=False, repr=False, default=None)
 
     def __post_init__(self) -> None:
         if isinstance(self.hierarchy, (str, Path)):
@@ -268,6 +271,10 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
     search_show_siblings: bool = False
     search_show_children: bool = False
 
+    def _serialize_value(self, v: Any) -> Any:
+        """Serialize a stored path list to the string value expected by dmc.Select."""
+        return json.dumps(v, separators=(",", ":")) if v else None
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -283,7 +290,7 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                     dmc.Select(
                         id={"type": "hl-select", "field": pipe_field},
                         data=[sentinel] + data,
-                        value=None,
+                        value=self._preset_value,
                         searchable=True,
                         clearable=True,
                         autoSelectOnBlur=True,
@@ -351,6 +358,10 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
             f"List[List[str]] or Optional[List[List[str]]], got {field_info.annotation!r}"
         )
 
+    def _serialize_value(self, v: Any) -> Any:
+        """Serialize a list of stored paths to the list of JSON strings expected by dmc.MultiSelect."""
+        return [json.dumps(p, separators=(",", ":")) for p in v] if v else []
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -366,7 +377,7 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                     dmc.MultiSelect(
                         id={"type": "hl-multi", "field": pipe_field},
                         data=[sentinel] + data,
-                        value=[],
+                        value=self._preset_value if self._preset_value is not None else [],
                         searchable=True,
                         clearSearchOnChange=False,
                         clearable=True,

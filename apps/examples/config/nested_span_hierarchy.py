@@ -86,7 +86,6 @@ widgets = [
                         label="Breed / Species",
                         description="Navigate the pet ontology to select the breed or species.",
                         hierarchy=ontology,
-                        searchable=True,
                     ),
                     SegmentedControlWidget(
                         schema_field="confidence",
