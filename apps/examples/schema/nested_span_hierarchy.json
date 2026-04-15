@@ -46,11 +46,10 @@
               "id": "breed",
               "type": "hierarchical_label",
               "widget": {
-                "type": "hierarchical_label_tags",
+                "type": "hierarchical_label_select",
                 "label": "Breed / Species",
                 "description": "Navigate the pet ontology to select the breed or species.",
-                "hierarchy_ref": "ontology",
-                "searchable": true
+                "hierarchy_ref": "ontology"
               }
             },
             {

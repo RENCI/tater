@@ -56,30 +56,32 @@ Object.assign(window.dash_clientside.tater, {
 window.dashMantineFunctions = window.dashMantineFunctions || {};
 
 /**
- * filter / renderOption for HierarchicalLabelMultiWidget.
+ * filter / renderOption for HierarchicalLabel*Widget (shared by Select and MultiSelect).
  *
- * hlMultiFilter: matches on node name (label); ancestors of any match are always
- * included. Optionally also includes siblings and/or direct children of matched
- * nodes, controlled by a sentinel config item prepended to the data array by
- * HierarchicalLabelMultiWidget.component() in hierarchical_label.py.
+ * Option values are compact JSON arrays encoding the full path, e.g. '["Animals","Mammals","Dog"]'.
+ * Depth is path.length - 1. JSON.stringify is used for ancestor/sibling/child comparisons,
+ * which is safe because Python builds values with the same compact format (separators=(',',':')).
+ *
+ * hlFilter: matches on node name (label); ancestors of any match are always included.
+ * Optionally also includes siblings and/or direct children of matched nodes, controlled
+ * by a sentinel config item prepended to the data array by HierarchicalLabel*Widget.component().
  *
  * Sentinel format: value = "__config__" + JSON, e.g.:
  *   __config__{"showSiblings":true,"showChildren":false}
  * The sentinel has an empty label and disabled=true so it is never rendered or selected.
- * The search term is stashed in _hlMultiSearch for use by hlMultiRenderOption.
+ * The search term is stashed in _hlSearch for use by hlRenderOption.
  *
- * hlMultiRenderOption: indents each option by depth (from "|"-separated value),
- * renders non-leaf nodes bold, highlights the matched substring, shows a
- * chevron-down for non-leaf nodes, and a check icon (right-aligned) when selected.
+ * hlRenderOption: indents each option by depth, renders non-leaf nodes bold, highlights the
+ * matched substring, shows a chevron-down for non-leaf nodes, and a check icon when selected.
  */
 
-// Shared search term written by hlMultiFilter, read by hlMultiRenderOption.
-let _hlMultiSearch = "";
+// Shared search term written by hlFilter, read by hlRenderOption.
+let _hlSearch = "";
 
 const _CONFIG_PREFIX = "__config__";
 
-window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
-    _hlMultiSearch = (search || "").toLowerCase();
+window.dashMantineFunctions.hlFilter = function ({ options, search }) {
+    _hlSearch = (search || "").toLowerCase();
 
     // Extract and strip the sentinel config item.
     let showSiblings = false;
@@ -91,47 +93,49 @@ window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
             showSiblings = !!config.showSiblings;
             showChildren = !!config.showChildren;
         } catch (e) {
-            console.warn("hlMultiFilter: failed to parse sentinel config", o.value);
+            console.warn("hlFilter: failed to parse sentinel config", o.value);
         }
         return false;  // always strip sentinel from results
     });
 
-    if (!_hlMultiSearch) return dataOptions;
+    if (!_hlSearch) return dataOptions;
 
-    const includedPaths = new Set();
+    // Parse all paths once upfront so comparisons don't re-parse on every check.
+    const parsed = dataOptions.map((o) => JSON.parse(o.value));
 
-    dataOptions.forEach((option) => {
-        if (!option.label.toLowerCase().includes(_hlMultiSearch)) return;
+    const includedValues = new Set();
 
-        const segments = option.value.split("|");
+    dataOptions.forEach((option, i) => {
+        if (!option.label.toLowerCase().includes(_hlSearch)) return;
+
+        const path = parsed[i];
 
         // Always include ancestors (full spine to root).
-        for (let i = 1; i <= segments.length; i++) {
-            includedPaths.add(segments.slice(0, i).join("|"));
+        for (let j = 1; j <= path.length; j++) {
+            includedValues.add(JSON.stringify(path.slice(0, j)));
         }
 
-        // Siblings: all options sharing the same parent path.
-        if (showSiblings && segments.length > 1) {
-            const parentPrefix = segments.slice(0, -1).join("|") + "|";
-            dataOptions.forEach((o) => {
-                if (o.value.startsWith(parentPrefix) && !o.value.slice(parentPrefix.length).includes("|")) {
-                    includedPaths.add(o.value);
+        // Siblings: all options at the same depth sharing the same parent path.
+        if (showSiblings && path.length > 1) {
+            const parentStr = JSON.stringify(path.slice(0, -1));
+            parsed.forEach((p, k) => {
+                if (p.length === path.length && JSON.stringify(p.slice(0, -1)) === parentStr) {
+                    includedValues.add(dataOptions[k].value);
                 }
             });
         }
 
         // Direct children: one level below the matched node.
         if (showChildren) {
-            const childPrefix = option.value + "|";
-            dataOptions.forEach((o) => {
-                if (o.value.startsWith(childPrefix) && !o.value.slice(childPrefix.length).includes("|")) {
-                    includedPaths.add(o.value);
+            parsed.forEach((p, k) => {
+                if (p.length === path.length + 1 && JSON.stringify(p.slice(0, -1)) === option.value) {
+                    includedValues.add(dataOptions[k].value);
                 }
             });
         }
     });
 
-    return dataOptions.filter((option) => includedPaths.has(option.value));
+    return dataOptions.filter((option) => includedValues.has(option.value));
 };
 
 // ---------------------------------------------------------------------------
@@ -191,10 +195,10 @@ function _checkIcon(visible) {
     );
 }
 
-window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked }) {
-    const depth = option.value.split("|").length - 1;
+window.dashMantineFunctions.hlRenderOption = function ({ option, checked }) {
+    const depth = JSON.parse(option.value).length - 1;
     const label = option.label;
-    const lower = _hlMultiSearch;
+    const lower = _hlSearch;
     const isLeaf = option.leaf !== false;  // default true if field absent
 
     // Build label — highlight the matched substring if present.

@@ -22,7 +22,7 @@ class Schema(BaseModel):
     not_breast: bool = False
 
 
-title = "tater - coarse breast pathologycoarse label"
+title = "tater - coarse breast pathology"
 description = "Assign a single high-level diagnosis category to each breast pathology report."
 
 widgets = [

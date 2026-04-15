@@ -129,8 +129,8 @@ storage. The upload page detects these file-path references, shows a compact per
 zone for each, and rewrites the paths in the schema to absolute temp paths before writing
 `schema.json`. Inline hierarchy dicts work without any upload.
 
-**Always-register callbacks:** span, repeater, nested-repeater, hierarchical-label, and
-hierarchical-label-tags callbacks are registered once at server startup (not per-session).
+**Always-register callbacks:** span, repeater, nested-repeater, hierarchical-label-select, and
+hierarchical-label-multi callbacks are registered once at server startup (not per-session).
 They use a `_ta()` runtime resolver — `app._tater_get_current_app` is a function stored on
 the Dash app that looks up the calling user's `TaterApp` from `_session_cache` via
 `flask.session` at callback invocation time. This avoids re-registering callbacks for each
@@ -159,8 +159,7 @@ and writes to `annotations-store`. Simple (non-MATCH) widgets write directly to
 Widgets that use this pattern each include a relay store in their rendered output:
 - Repeater: `{"type": "repeater-ann-relay", "field": pipe_field}`
 - Nested repeater: `{"type": "nested-repeater-ann-relay", "ld": ld, "li": li}`
-- HierarchicalLabel (full/compact): `{"type": "hier-ann-relay", "field": pipe_field}`
-- HierarchicalLabelTags: `{"type": "hl-tags-ann-relay", "field": pipe_field}`
+- HierarchicalLabelSelect: `{"type": "hl-select-relay", "field": pipe_field}`
 - Span: span-trigger store data carries `{"count": N, "annotations_update": {...}}`
 
 ## DMC version constraints
@@ -245,8 +244,9 @@ Widget base class hierarchy in `base.py`:
   - `TextWidget` — string field
     - `TextInputWidget`, `TextAreaWidget`
   - `SpanAnnotationWidget` — `List[SpanAnnotation]` field (in `span.py`)
-  - `HierarchicalLabelWidget` (abstract, in `hierarchical_label.py`) — `str` / `Optional[str]` field
-    - `HierarchicalLabelTagsWidget`, `HierarchicalLabelCompactWidget`, `HierarchicalLabelFullWidget`
+  - `HierarchicalLabelWidget` (abstract base, in `hierarchical_label.py`) — `List[str]` / `Optional[List[str]]` field
+    - `HierarchicalLabelSelectWidget` — single-select dropdown (`dmc.Select`); stores one path
+    - `HierarchicalLabelMultiWidget` — multi-select dropdown (`dmc.MultiSelect`); stores `List[List[str]]`
 - `ContainerWidget(TaterWidget)` — widgets that contain other widgets
   - `GroupWidget` — groups widgets for a nested sub-model (`schema_field` is a dot-path prefix)
   - `RepeaterWidget` (abstract, in `repeater.py`) — manages a `List[ItemModel]` field; subclasses:
@@ -274,13 +274,22 @@ Widget base class hierarchy in `base.py`:
 
 ## HierarchicalLabel specifics
 
-- `HierarchicalLabelCompactWidget`: shows only the selected node per navigated level; uses
-  `tabler:chevron-right` icon separators between levels; wraps sections in `dmc.Stack(gap=2)`.
-- `HierarchicalLabelFullWidget`: shows all siblings at every expanded level; shows path breadcrumb
-  below search bar.
-- `_find_path(root, name)` does a DFS from root returning the full path list to a node.
-- Search result buttons all have `idx=0`; the fallback in `handle_click` searches `root.all_leaves()`
-  and sets `is_search_result=True` to navigate via `_find_path` and clear the search box.
+Both `HierarchicalLabelSelectWidget` and `HierarchicalLabelMultiWidget` use `dmc.Select` /
+`dmc.MultiSelect` with depth-indented options via the `hlRenderOption` JS function and
+custom filtering via `hlFilter`. Both share `_build_dropdown_data` to flatten the
+`Node` tree into a list of `{value: '["A","B","C"]', label: "C"}` items where value is the
+full path as a compact JSON array (no spaces, matching JS `JSON.stringify` output). The sentinel
+config item (`"__config__..."`) encodes `search_show_siblings` and `search_show_children` for
+the JS filter.
+
+- `HierarchicalLabelSelectWidget`: stores `Optional[List[str]]` (single path). Callbacks in
+  `setup_hl_select_callbacks`: load serializes stored path → compact JSON string for `dmc.Select`;
+  save deserializes the JSON string → path and writes via `hl-select-relay`.
+- `HierarchicalLabelMultiWidget`: stores `Optional[List[List[str]]]` (list of paths). Callbacks
+  in `setup_hl_multi_callbacks`: load serializes each path → compact JSON string; save
+  deserializes each string → path list and writes via `hl-multi-relay`.
+- `_find_path(root, name)` does a DFS from root returning the full path list to a node (used
+  internally by tree utilities).
 
 ## What is and isn't implemented
 
@@ -290,14 +299,14 @@ Widget base class hierarchy in `base.py`:
 - Nested models via GroupWidget (dot-path `schema_field`)
 - Repeatable lists via ListableWidget (card stack), TabsWidget (tabs), AccordionWidget (accordion)
 - Span annotation, including SpanAnnotationWidget nested inside ListableWidget/TabsWidget
-- Hierarchical label (tags, compact, full)
+- Hierarchical label (single-select and multi-select dropdown)
 - Auto-save, progress tracking, flag/notes, annotation timing
 - Conditional visibility (`conditional_on`)
 - Full widget suite: SegmentedControlWidget, RadioGroupWidget, SelectWidget, ChipRadioWidget,
   MultiSelectWidget, CheckboxGroupWidget, CheckboxWidget, SwitchWidget, ChipWidget,
   NumberInputWidget, SliderWidget, RangeSliderWidget, TextInputWidget, TextAreaWidget,
-  SpanAnnotationWidget, HierarchicalLabelTagsWidget, HierarchicalLabelCompactWidget,
-  HierarchicalLabelFullWidget, DividerWidget
+  SpanAnnotationWidget, HierarchicalLabelSelectWidget, HierarchicalLabelMultiWidget,
+  DividerWidget
 
 ## Tests
 
