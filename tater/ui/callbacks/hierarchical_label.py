@@ -1,6 +1,7 @@
 """Hierarchical label callbacks."""
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Optional
 
 from dash import Input, Output, State, ALL, MATCH, ctx, no_update, ClientsideFunction
@@ -12,7 +13,6 @@ from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
     HierarchicalLabelSelectWidget,
     HierarchicalLabelMultiWidget,
-    _PATH_SEP,
 )
 from tater.widgets.repeater import RepeaterWidget
 
@@ -91,7 +91,7 @@ def setup_hl_select_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         stored = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if stored:
-            return _PATH_SEP.join(stored)
+            return json.dumps(stored, separators=(",", ":"))
         return None
 
     # 2. On selection change, write path to relay store
@@ -106,7 +106,7 @@ def setup_hl_select_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         if ann is None:
             return no_update
-        path = selected_value.split(_PATH_SEP) if selected_value else None
+        path = json.loads(selected_value) if selected_value else None
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         return {"field": field_path, "value": path}
@@ -152,7 +152,7 @@ def setup_hl_multi_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         stored = value_helpers.get_model_value(ann, field_path) if ann is not None else None
         if stored:
-            return [_PATH_SEP.join(p) for p in stored]
+            return [json.dumps(p, separators=(",", ":")) for p in stored]
         return []
 
     # 2. On selection change, write full paths to relay store
@@ -169,7 +169,7 @@ def setup_hl_multi_callbacks(tater_app: TaterApp) -> None:
         ann = _get_ann(annotations_data, doc_id) if doc_id else None
         if ann is None:
             return no_update
-        paths = [v.split(_PATH_SEP) for v in (selected_values or [])]
+        paths = [json.loads(v) for v in (selected_values or [])]
         pipe_field = ctx.outputs_list["id"]["field"]
         field_path = pipe_field.replace("|", ".")
         return {"field": field_path, "value": paths if paths else None}

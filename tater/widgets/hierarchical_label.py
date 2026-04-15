@@ -151,14 +151,12 @@ def load_hierarchy_from_yaml(path: Union[str, Path]) -> Node:
 # Shared data-building helper
 # ---------------------------------------------------------------------------
 
-_PATH_SEP = "|"
-
-
 def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
     """Build dmc.Select / dmc.MultiSelect data from a Node tree.
 
-    Each item: ``{value: "A|B|C", label: "C"}``.
-    ``value`` is the full path joined by ``_PATH_SEP`` (unique even for duplicate leaf names).
+    Each item: ``{value: '["A","B","C"]', label: "C"}``.
+    ``value`` is the full path serialized as a compact JSON array (no spaces), which
+    uniquely identifies the node even when leaf names are duplicated across the tree.
     ``label`` is the plain node name; depth-based indentation is handled by the
     ``hlRenderOption`` JS function via the ``renderOption`` prop.
     Depth is relative to root's children (root itself is not included).
@@ -171,7 +169,7 @@ def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
                 _walk(child, [])
             return
         current_path = path + [node.name]
-        value = _PATH_SEP.join(current_path)
+        value = json.dumps(current_path, separators=(",", ":"))
         if node.is_leaf:
             items.append({"value": value, "label": node.name, "leaf": True})
         else:

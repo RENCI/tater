@@ -277,16 +277,17 @@ Widget base class hierarchy in `base.py`:
 Both `HierarchicalLabelSelectWidget` and `HierarchicalLabelMultiWidget` use `dmc.Select` /
 `dmc.MultiSelect` with depth-indented options via the `hlRenderOption` JS function and
 custom filtering via `hlFilter`. Both share `_build_dropdown_data` to flatten the
-`Node` tree into a list of `{value: "A|B|C", label: "C"}` items where value is the full
-pipe-joined path. The sentinel config item (`"__config__..."`) encodes `search_show_siblings`
-and `search_show_children` for the JS filter.
+`Node` tree into a list of `{value: '["A","B","C"]', label: "C"}` items where value is the
+full path as a compact JSON array (no spaces, matching JS `JSON.stringify` output). The sentinel
+config item (`"__config__..."`) encodes `search_show_siblings` and `search_show_children` for
+the JS filter.
 
 - `HierarchicalLabelSelectWidget`: stores `Optional[List[str]]` (single path). Callbacks in
-  `setup_hl_select_callbacks`: load converts stored path → pipe-joined string for `dmc.Select`;
-  save splits the string → path and writes via `hl-select-relay`.
+  `setup_hl_select_callbacks`: load serializes stored path → compact JSON string for `dmc.Select`;
+  save deserializes the JSON string → path and writes via `hl-select-relay`.
 - `HierarchicalLabelMultiWidget`: stores `Optional[List[List[str]]]` (list of paths). Callbacks
-  in `setup_hl_multi_callbacks`: load converts paths → list of pipe-joined strings; save splits
-  each string → path list and writes via `hl-multi-relay`.
+  in `setup_hl_multi_callbacks`: load serializes each path → compact JSON string; save
+  deserializes each string → path list and writes via `hl-multi-relay`.
 - `_find_path(root, name)` does a DFS from root returning the full path list to a node (used
   internally by tree utilities).
 
