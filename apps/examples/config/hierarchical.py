@@ -9,6 +9,8 @@ from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 class Schema(BaseModel):
     breed: Optional[List[str]] = None
     breeds_multi: Optional[List[List[str]]] = None
+    breed_any: Optional[List[str]] = None
+    breeds_multi_any: Optional[List[List[str]]] = None
 
 
 title = "tater - hierarchical"
@@ -19,6 +21,7 @@ instructions = """## Usage
 - Type to search the ontology by name
 - Select a breed from the filtered dropdown
 - Use the multi-select widget to choose multiple breeds
+- The "any level" variants allow selecting intermediate nodes (e.g. a species group)
 """
 
 ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
@@ -35,5 +38,19 @@ widgets = [
         label="Breeds (Multi)",
         description="Select one or more breeds.",
         hierarchy=ontology,
+    ),
+    HierarchicalLabelSelectWidget(
+        schema_field="breed_any",
+        label="Breed (Any Level)",
+        description="Select a breed or any intermediate category.",
+        hierarchy=ontology,
+        allow_non_leaf=True,
+    ),
+    HierarchicalLabelMultiWidget(
+        schema_field="breeds_multi_any",
+        label="Breeds (Multi, Any Level)",
+        description="Select one or more breeds or intermediate categories.",
+        hierarchy=ontology,
+        allow_non_leaf=True,
     ),
 ]
