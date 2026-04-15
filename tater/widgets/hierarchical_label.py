@@ -288,6 +288,7 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                         value=None,
                         searchable=True,
                         clearable=True,
+                        autoSelectOnBlur=True,
                         placeholder="Search…",
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
