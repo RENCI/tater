@@ -67,6 +67,7 @@ class Schema(BaseModel):
     score: Optional[int] = None
     flags: List[Literal["urgent", "review"]] = Field(default_factory=list)
     measurements: Optional[Measurements] = None
+    hl_path: Optional[List[str]] = None
 
 
 # ---------------------------------------------------------------------------
