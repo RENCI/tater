@@ -109,7 +109,6 @@ class RepeaterWidget(ContainerWidget):
         annotations_data: dict | None = None,
     ) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
-        from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
         from tater.ui import value_helpers
@@ -141,18 +140,6 @@ class RepeaterWidget(ContainerWidget):
                     nested_ld, index, self.field_path, template.schema_field,
                     tater_app, doc_id, annotations_data,
                 )
-            elif isinstance(template, HierarchicalLabelWidget):
-                # Bake the initial nav path from annotation so the hier-nav store
-                # starts with the correct value — avoids a race where update_repeater
-                # re-renders with data=[] and wins over reset_nav's output.
-                ann = (annotations_data or {}).get(doc_id) if doc_id else None
-                if ann is None and tater_app and doc_id:
-                    ann = tater_app.annotations.get(doc_id)
-                if ann is not None:
-                    v = value_helpers.get_model_value(ann, widget.field_path)
-                    if v:
-                        widget._initial_nav_path = list(v)
-                comp = widget.component()
             else:
                 # Set repeater context BEFORE component() so the rendered
                 # component gets MATCH-compatible schema_id (ld/path/tf) rather
@@ -370,15 +357,6 @@ class RepeaterWidget(ContainerWidget):
                 widget._finalize_paths(
                     parent_path=f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
                 )
-                if doc_id:
-                    ann = (annotations_data or {}).get(doc_id)
-                    if ann is None and tater_app and doc_id in tater_app.annotations:
-                        ann = tater_app.annotations[doc_id]
-                    if ann is not None:
-                        value = value_helpers.get_model_value(ann, widget.field_path)
-                        if value:
-                            widget._initial_nav_path = list(value)
-                nested_ld = f"{outer_list_field}-{item_field}-{template.schema_field}"
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
                 continue
             nested_ld = f"{outer_list_field}|{item_field}"

@@ -95,7 +95,7 @@ Field types (``"type"`` at the top level of a field spec):
   ``range_slider``      — numeric range; requires ``min_value``/``max_value`` in ``widget``
   ``text``              — free text (default: TextInputWidget)
   ``span_annotation``   — text span labelling (SpanAnnotationWidget)
-  ``hierarchical_label``— tree-based label (default: HierarchicalLabelTagsWidget)
+  ``hierarchical_label``— tree-based single-select label (default: HierarchicalLabelSelectWidget)
   ``group``             — nested sub-model with ``fields``
   ``repeater``          — repeatable list of sub-items with ``item_fields``
 
@@ -115,9 +115,7 @@ Widget type strings (``"widget": {"type": "..."}``):
   ``slider``                     — for ``numeric`` fields
   ``range_slider``               — for ``range_slider`` fields (default)
   ``span_annotation``            — for ``span_annotation`` fields (default)
-  ``hierarchical_label_tags``    — for ``hierarchical_label`` fields (default)
-  ``hierarchical_label_compact`` — for ``hierarchical_label`` fields
-  ``hierarchical_label_full``    — for ``hierarchical_label`` fields
+  ``hierarchical_label_select``  — for ``hierarchical_label`` fields (default, single-select)
   ``hierarchical_label_multi``   — for ``hierarchical_label_multi`` fields (multi-select)
   ``listable``                   — for ``repeater`` fields (default)
   ``tabs``                       — for ``repeater`` fields
@@ -135,8 +133,9 @@ Widget config keys (inside the ``widget`` block):
   ``min_value``      — minimum (number_input, slider, range_slider)
   ``max_value``      — maximum (number_input, slider, range_slider)
   ``step``           — step size (slider, range_slider, number_input)
-  ``searchable``     — enable search (hierarchical_label_*)
-  ``allow_non_leaf`` — allow selecting intermediate nodes (hierarchical_label_*)
+  ``allow_non_leaf``        — allow selecting intermediate nodes (hierarchical_label_*)
+  ``search_show_siblings``  — also show siblings of matched nodes (hierarchical_label_*)
+  ``search_show_children``  — also show direct children of matched nodes (hierarchical_label_*)
   ``hierarchy_ref``  — key into the top-level ``hierarchies`` dict
   ``entity_types``   — list of entity type names (span_annotation)
   ``item_label``     — singular label for list items (listable, tabs, accordion)
@@ -395,15 +394,7 @@ def _build_widget_from_spec(
         entity_types = [EntityType(name=et) for et in widget_spec.get("entity_types", [])]
         w = WIDGET_CLASS[wtype](fid, label=label, entity_types=entity_types, description=description)
 
-    elif wtype in ("hierarchical_label_tags", "hierarchical_label_compact", "hierarchical_label_full"):
-        ref = widget_spec.get("hierarchy_ref")
-        hierarchy = hierarchy_map.get(ref) if ref else None
-        searchable = widget_spec.get("searchable", True)
-        allow_non_leaf = widget_spec.get("allow_non_leaf", False)
-        cls = WIDGET_CLASS[wtype]
-        w = cls(fid, label=label, description=description, hierarchy=hierarchy, searchable=searchable, allow_non_leaf=allow_non_leaf)
-
-    elif wtype == "hierarchical_label_multi":
+    elif wtype in ("hierarchical_label_select", "hierarchical_label_multi"):
         ref = widget_spec.get("hierarchy_ref")
         hierarchy = hierarchy_map.get(ref) if ref else None
         allow_non_leaf = widget_spec.get("allow_non_leaf", False)

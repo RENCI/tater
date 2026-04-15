@@ -58,28 +58,28 @@ window.dashMantineFunctions = window.dashMantineFunctions || {};
 /**
  * filter / renderOption for HierarchicalLabelMultiWidget.
  *
- * hlMultiFilter: matches on node name (label); ancestors of any match are always
+ * hlFilter: matches on node name (label); ancestors of any match are always
  * included. Optionally also includes siblings and/or direct children of matched
  * nodes, controlled by a sentinel config item prepended to the data array by
- * HierarchicalLabelMultiWidget.component() in hierarchical_label.py.
+ * HierarchicalLabel*Widget.component() in hierarchical_label.py.
  *
  * Sentinel format: value = "__config__" + JSON, e.g.:
  *   __config__{"showSiblings":true,"showChildren":false}
  * The sentinel has an empty label and disabled=true so it is never rendered or selected.
- * The search term is stashed in _hlMultiSearch for use by hlMultiRenderOption.
+ * The search term is stashed in _hlSearch for use by hlRenderOption.
  *
- * hlMultiRenderOption: indents each option by depth (from "|"-separated value),
+ * hlRenderOption: indents each option by depth (from "|"-separated value),
  * renders non-leaf nodes bold, highlights the matched substring, shows a
  * chevron-down for non-leaf nodes, and a check icon (right-aligned) when selected.
  */
 
-// Shared search term written by hlMultiFilter, read by hlMultiRenderOption.
-let _hlMultiSearch = "";
+// Shared search term written by hlFilter, read by hlRenderOption.
+let _hlSearch = "";
 
 const _CONFIG_PREFIX = "__config__";
 
-window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
-    _hlMultiSearch = (search || "").toLowerCase();
+window.dashMantineFunctions.hlFilter = function ({ options, search }) {
+    _hlSearch = (search || "").toLowerCase();
 
     // Extract and strip the sentinel config item.
     let showSiblings = false;
@@ -91,17 +91,17 @@ window.dashMantineFunctions.hlMultiFilter = function ({ options, search }) {
             showSiblings = !!config.showSiblings;
             showChildren = !!config.showChildren;
         } catch (e) {
-            console.warn("hlMultiFilter: failed to parse sentinel config", o.value);
+            console.warn("hlFilter: failed to parse sentinel config", o.value);
         }
         return false;  // always strip sentinel from results
     });
 
-    if (!_hlMultiSearch) return dataOptions;
+    if (!_hlSearch) return dataOptions;
 
     const includedPaths = new Set();
 
     dataOptions.forEach((option) => {
-        if (!option.label.toLowerCase().includes(_hlMultiSearch)) return;
+        if (!option.label.toLowerCase().includes(_hlSearch)) return;
 
         const segments = option.value.split("|");
 
@@ -191,10 +191,10 @@ function _checkIcon(visible) {
     );
 }
 
-window.dashMantineFunctions.hlMultiRenderOption = function ({ option, checked }) {
+window.dashMantineFunctions.hlRenderOption = function ({ option, checked }) {
     const depth = option.value.split("|").length - 1;
     const label = option.label;
-    const lower = _hlMultiSearch;
+    const lower = _hlSearch;
     const isLeaf = option.leaf !== false;  // default true if field absent
 
     // Build label — highlight the matched substring if present.

@@ -11,7 +11,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from tater.widgets import (
-    CheckboxWidget, HierarchicalLabelTagsWidget,
+    CheckboxWidget, HierarchicalLabelSelectWidget,
     AccordionWidget
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
@@ -43,12 +43,11 @@ widgets = [
         description="Add each diagnosis mentioned in the pathology report",
         item_label="Diagnosis",
         item_widgets=[
-            HierarchicalLabelTagsWidget(
+            HierarchicalLabelSelectWidget(
                 schema_field="diagnosis_code",
                 label="Diagnosis",
                 description="Browse the hierarchical diagnosis ontology",
                 hierarchy=ontology,
-                searchable=True,
             ),
             
             CheckboxWidget(
