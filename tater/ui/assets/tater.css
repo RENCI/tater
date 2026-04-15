@@ -4,12 +4,6 @@
   border: none !important;
 }
 
-/* HierarchicalLabelTagsWidget search input placeholder */
-[id*="hl-tags-search"]::placeholder {
-  color: var(--mantine-color-placeholder);
-  opacity: 1;
-}
-
 /* Make the schema-mismatch notification close button span the full notification height */
 .mantine-Notification-closeButton {
   align-self: stretch;

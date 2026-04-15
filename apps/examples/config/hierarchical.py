@@ -2,57 +2,57 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
-from tater.widgets import HierarchicalLabelFullWidget, HierarchicalLabelCompactWidget, HierarchicalLabelTagsWidget, HierarchicalLabelMultiWidget
+from tater.widgets import HierarchicalLabelSelectWidget, HierarchicalLabelMultiWidget, DividerWidget
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 
 class Schema(BaseModel):
-    tags_breed: Optional[List[str]] = None
-    primary_breed: Optional[List[str]] = None
-    secondary_breed: Optional[List[str]] = None
+    breed: Optional[List[str]] = None
+    breeds_multi: Optional[List[List[str]]] = None
+    breed_any: Optional[List[str]] = None
+    breeds_multi_any: Optional[List[List[str]]] = None
 
 
 title = "tater - hierarchical"
-description = "Ontology-driven annotation using tags, compact, and full hierarchical label widgets."
+description = "Ontology-driven annotation using single-select and multi-select hierarchical label widgets."
 
-instructions = """## Navigation
+instructions = """## Usage
 
-- Use **chevron buttons** (→) to explore the ontology
-- Use **search** to find breeds by name
-- Expand/collapse branches with the tree UI
-
-**Tags Breed** uses tags view (path shown as dismissible pills).
-**Primary Breed** uses compact view (shows only selected).
-**Secondary Breed** uses full view (shows all siblings).
+- Type to search the ontology by name
+- Select a breed from the filtered dropdown
+- Use the multi-select widget to choose multiple breeds
+- The "any level" variants allow selecting intermediate nodes (e.g. a species group)
 """
 
 ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 
-allow_non_leaf = False
-
 widgets = [
-    HierarchicalLabelTagsWidget(
-        schema_field="tags_breed",
-        label="Tags Breed",
-        description="Navigate via pill tags to select a breed or type.",
+    DividerWidget(label="Leaf nodes only"),
+    HierarchicalLabelSelectWidget(
+        schema_field="breed",
+        label="Breed",
+        description="Select a single breed or type.",
         hierarchy=ontology,
-        searchable=True,
-        allow_non_leaf=allow_non_leaf,
     ),
-    HierarchicalLabelCompactWidget(
-        schema_field="primary_breed",
-        label="Primary Breed",
-        description="Navigate the ontology to select a breed or type.",
+    HierarchicalLabelMultiWidget(
+        schema_field="breeds_multi",
+        label="Breeds (Multi)",
+        description="Select one or more breeds.",
         hierarchy=ontology,
-        searchable=True,
-        allow_non_leaf=allow_non_leaf,
     ),
-    HierarchicalLabelFullWidget(
-        schema_field="secondary_breed",
-        label="Secondary Breed (Mixed)",
-        description="Select a secondary breed if the pet is a mix.",
+    DividerWidget(label="Any level"),
+    HierarchicalLabelSelectWidget(
+        schema_field="breed_any",
+        label="Breed",
+        description="Select a breed or any intermediate category.",
         hierarchy=ontology,
-        searchable=True,
-        allow_non_leaf=allow_non_leaf,
+        allow_non_leaf=True,
+    ),
+    HierarchicalLabelMultiWidget(
+        schema_field="breeds_multi_any",
+        label="Breeds (Multi)",
+        description="Select one or more breeds or intermediate categories.",
+        hierarchy=ontology,
+        allow_non_leaf=True,
     ),
 ]

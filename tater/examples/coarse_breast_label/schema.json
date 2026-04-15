@@ -11,7 +11,7 @@
       "id": "diagnosis",
       "type": "hierarchical_label",
       "widget": {
-        "type": "hierarchical_label_compact",
+        "type": "hierarchical_label_select",
         "label": "Diagnosis",
         "description": "Select the primary pathological diagnosis from the FDX ontology.",
         "hierarchy_ref": "fdx",

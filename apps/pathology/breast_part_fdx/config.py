@@ -9,14 +9,14 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     TextInputWidget, SelectWidget, CheckboxWidget,
-    HierarchicalLabelTagsWidget, ListableWidget, AccordionWidget,
+    HierarchicalLabelSelectWidget, ListableWidget, AccordionWidget,
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
 
 class DiagnosisConcept(BaseModel):
     """A single diagnosis concept with definitive flag."""
-    label: Optional[str] = None
+    label: Optional[List[str]] = None
     not_definitive: bool = False
 
 
@@ -45,12 +45,11 @@ ontology = load_hierarchy_from_yaml("apps/examples/data/breast_fdx_ontology.yaml
 
 # Build the diagnosis concept widget (reusable for each list item)
 diagnosis_concept_children = [
-    HierarchicalLabelTagsWidget(
+    HierarchicalLabelSelectWidget(
         schema_field="label",
         label="Diagnosis Concept",
         description="Navigate to select the most specific diagnosis concept",
         hierarchy=ontology,
-        searchable=True,
     ),
     CheckboxWidget(
         schema_field="not_definitive",

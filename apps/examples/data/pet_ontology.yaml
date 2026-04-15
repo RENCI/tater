@@ -213,11 +213,13 @@ Exotic and Specialty Pets:
     - Miniature Horse
     - Miniature Donkey
     - Chicken (bantam)
-    Arachnids:
-    - Tarantula
-    - Emperor Scorpion
     Invertebrates:
-    - Hermit Crab
-    - Madagascar Hissing Cockroach
-    - Stick Insect
-    - Mantis
+        Arachnids:
+        - Tarantula
+        - Emperor Scorpion
+        Insects:
+        - Madagascar Hissing Cockroach
+        - Stick Insect
+        - Mantis
+        Crustaceans:
+        - Hermit Crab
