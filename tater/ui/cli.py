@@ -48,13 +48,13 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.getenv("TATER_PORT", "8050")),
-        help="Port to run the server on (default: 8050, or TATER_PORT env var)"
+        default=int(os.getenv("TATER_APP_PORT", "8050")),
+        help="Port to run the server on (default: 8050, or TATER_APP_PORT env var)"
     )
     parser.add_argument(
         "--host",
-        default=os.getenv("TATER_HOST", "127.0.0.1"),
-        help="Host to bind to (default: 127.0.0.1, or TATER_HOST env var)"
+        default=os.getenv("TATER_APP_HOST", "127.0.0.1"),
+        help="Host to bind to (default: 127.0.0.1, or TATER_APP_HOST env var)"
     )
 
     args = parser.parse_args()

@@ -20,7 +20,7 @@ FROM python:3.12-slim
 # environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8050
+    TATER_APP_PORT=8050
 
 WORKDIR /app
 
@@ -35,7 +35,7 @@ USER 10001:10001
 ENV PATH="/app/.venv/bin:$PATH"
 
 # expose the port
-EXPOSE $PORT
+EXPOSE $TATER_APP_PORT
 
 # run tater in hosted mode
-CMD ["sh", "-c", "exec tater --hosted --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-c", "exec tater --hosted --host 0.0.0.0 --port $TATER_APP_PORT"]
