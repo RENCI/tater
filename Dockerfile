@@ -1,7 +1,5 @@
-ARG UV_BASE_IMAGE=ghcr.io/astral-sh/uv:0.8.15-python3.12-bookworm-slim
-
 # stage 1: the build
-FROM ${UV_BASE_IMAGE} AS builder
+FROM ghcr.io/astral-sh/uv:0.11.7-python3.12-trixie-slim AS builder
 
 WORKDIR /app
 
@@ -12,13 +10,12 @@ COPY pyproject.toml uv.lock ./
 COPY tater ./tater
 COPY README.md ./
 
-# install deps
-RUN uv venv && . .venv/bin/activate && uv sync --locked --no-dev
+# install deps into a virtual environment
+RUN uv venv && . .venv/bin/activate && uv sync --locked --no-dev --no-editable
 
 
 # stage 2: the final image
-# Use the same base family as the builder so the copied venv remains valid.
-FROM ${UV_BASE_IMAGE}
+FROM python:3.12-slim
 
 # environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -27,11 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# copy the virtual environment from the builder stage
+# copy only the virtual environment from the builder; the tater package and all
+# dependencies are installed inside it — no source files needed at runtime
 COPY --from=builder --chown=10001:10001 /app/.venv .venv
-
-# copy the application code from the builder stage
-COPY --from=builder --chown=10001:10001 /app .
 
 # run as non-root in the runtime image
 USER 10001:10001
@@ -43,4 +38,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE $PORT
 
 # run tater in hosted mode
-CMD ["sh", "-c", "exec tater --hosted --host 0.0.0.0 --port ${PORT:-8050}"]
+CMD ["sh", "-c", "exec tater --hosted --host 0.0.0.0 --port $PORT"]
