@@ -12,13 +12,70 @@ Object.assign(window.dash_clientside.tater, {
     },
 
     /**
-     * Conditional visibility toggle.
-     * v         – current value of the controlling widget
-     * config    – {target, empty} from the tater-cond-config dcc.Store
+     * Unified visibility toggle for ALL conditional widgets — flat and repeater.
+     * Registered once at startup using ALL patterns for ld/path/tf.
+     *
+     * Uses ctx.outputs_list to iterate over output wrappers, finds each wrapper's
+     * config store by matching tf/ld/path in ctx.states_list[0], then looks up the
+     * controlling widget's current value from ctx.inputs_list[0] (tater-control) or
+     * ctx.inputs_list[1] (tater-bool-control) by matching ctrl_tf + ld + path.
+     * Row correlation (ld/path) ensures repeater items match their own row's controls.
+     *
+     * controlValues – values of ALL tater-control widgets (flat and repeater)
+     * boolValues    – checked values of ALL tater-bool-control widgets
+     * configs       – {target, empty, ctrl_tf} from ALL tater-cond-config stores
      */
-    conditionalVisibility: function (v, config) {
-        if (config === null || config === undefined) return {};
-        return v === config.target ? {} : { "display": "none" };
+    conditionalVisibilityAll: function (controlValues, boolValues, configs) {
+        var ctx = window.dash_clientside.callback_context;
+        var outputs = (ctx.outputs_list || []);
+        if (!outputs.length) { return []; }
+
+        var controlInputs = (ctx.inputs_list && ctx.inputs_list[0]) ? ctx.inputs_list[0] : [];
+        var boolInputs    = (ctx.inputs_list && ctx.inputs_list[1]) ? ctx.inputs_list[1] : [];
+        var configMeta    = (ctx.states_list && ctx.states_list[0]) ? ctx.states_list[0] : [];
+
+        return outputs.map(function (out) {
+            var outId = out.id;
+
+            // Find the config whose store id matches this wrapper's tf/ld/path.
+            var config = null;
+            for (var k = 0; k < configMeta.length; k++) {
+                var cm = configMeta[k];
+                if (cm && cm.id &&
+                    cm.id.tf === outId.tf &&
+                    cm.id.ld === outId.ld &&
+                    cm.id.path === outId.path) {
+                    config = configs[k];
+                    break;
+                }
+            }
+            if (!config || config.ctrl_tf === undefined) { return {}; }
+
+            var ctrlTf = config.ctrl_tf;
+            var ld     = outId.ld   || "";
+            var path   = outId.path || "";
+
+            // Find the controlling widget in the same row (ld + path) by tf.
+            for (var i = 0; i < controlInputs.length; i++) {
+                var inp = controlInputs[i];
+                if (inp && inp.id &&
+                    inp.id.tf === ctrlTf &&
+                    inp.id.ld === ld &&
+                    inp.id.path === path) {
+                    return controlValues[i] === config.target ? {} : { "display": "none" };
+                }
+            }
+            for (var i = 0; i < boolInputs.length; i++) {
+                var inp = boolInputs[i];
+                if (inp && inp.id &&
+                    inp.id.tf === ctrlTf &&
+                    inp.id.ld === ld &&
+                    inp.id.path === path) {
+                    return boolValues[i] === config.target ? {} : { "display": "none" };
+                }
+            }
+            return {};
+        });
     },
 
     /**

@@ -2,5 +2,5 @@
   "name": "Span Annotation",
   "description": "Highlight named entities in text — pets, breeds, behaviors, and activities — using both the span annotation and span popup widgets.",
   "order": 4,
-  "category": "General"
+  "category": "Demos"
 }

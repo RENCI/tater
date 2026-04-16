@@ -56,28 +56,20 @@ def _build_conditional_callbacks(
     value_prop: str,
     config_id: Any,
 ) -> None:
-    """Register the clientside visibility toggle and value-clear callbacks.
+    """Register the value-clear callback for repeater conditional widgets.
 
-    Used by both ``_register_conditional_callbacks`` (standalone widgets, plain
-    dict IDs) and ``_register_repeater_conditional_callbacks`` (repeater items,
-    MATCH dict IDs).  The caller is responsible for building the correct ID dicts.
+    Visibility for ALL conditionals (flat and repeater) is handled by the
+    single ``conditionalVisibilityAll`` ALL callback registered in
+    ``TaterApp._setup_conditional_visibility_callback`` — no per-widget or
+    MATCH-based visibility registration is needed here.
 
-    ``config_id`` is the ID of the ``dcc.Store`` holding ``{target, empty}``
-    that is embedded in the conditional wrapper div by ``render_field``.
+    Only the value-clear callback is registered here, using MATCH IDs so it
+    fires once per repeater row.  ``config_id`` is the ``dcc.Store`` holding
+    ``{target, empty}`` embedded in the conditional wrapper div by ``render_field``.
     """
     from dash import ClientsideFunction, Output, Input, State
 
-    # Named JS: show wrapper when controlling value matches target, hide otherwise.
-    app.clientside_callback(
-        ClientsideFunction(namespace="tater", function_name="conditionalVisibility"),
-        Output(wrapper_id, "style"),
-        Input(controlling_id, controlling_prop),
-        State(config_id, "data"),
-        prevent_initial_call=False,
-    )
-
     # Named JS: clear the widget value when its controlling field hides it.
-    # Runs clientside so it never reads a stale server-side annotations-store State.
     app.clientside_callback(
         ClientsideFunction(namespace="tater", function_name="conditionalClear"),
         Output(self_id, value_prop, allow_duplicate=True),
@@ -183,10 +175,30 @@ class TaterWidget:
         content = self._build_field_content(mt)
         if self._condition is not None:
             from dash import html, dcc
-            style = {"display": "none"} if self._initial_hidden else {}
+            # Flat widgets always start hidden; conditionalVisibilityAll fires when a
+            # controlling widget changes (prevent_initial_call=True) and corrects visibility.
+            # Repeater items set _initial_hidden explicitly based on loaded annotation defaults.
+            is_flat = not getattr(self, "_repeater_ld", "")
+            hidden = is_flat or self._initial_hidden
+            style = {"display": "none"} if hidden else {}
+            # ctrl_tf must match the controlling widget's _item_relative_tf.
+            # For widgets inside a GroupWidget within a repeater, that tf is
+            # group-prefixed (e.g. "booleans|is_indoor").  If _condition[0] is
+            # a relative name (no dots → no pipes after replace) and this
+            # widget's own tf has a group prefix, prepend that prefix.
+            ctrl_field_tf = self._condition[0].replace(".", "|")
+            self_tf = getattr(self, "_item_relative_tf", self.field_path.replace(".", "|"))
+            if "|" not in ctrl_field_tf and "|" in self_tf:
+                ctrl_tf = self_tf.rsplit("|", 1)[0] + "|" + ctrl_field_tf
+            else:
+                ctrl_tf = ctrl_field_tf
             config_store = dcc.Store(
                 id=self.conditional_config_id,
-                data={"target": self._condition[1], "empty": getattr(self, "empty_value", None)},
+                data={
+                    "target": self._condition[1],
+                    "empty": getattr(self, "empty_value", None),
+                    "ctrl_tf": ctrl_tf,
+                },
             )
             return html.Div([config_store, content], id=self.conditional_wrapper_id, style=style)
         return content
@@ -206,44 +218,11 @@ class TaterWidget:
         )
 
     def _register_conditional_callbacks(self, app: Any) -> None:
-        """Register clientside + server callbacks for conditional visibility.
-
-        The clientside callback immediately toggles display style (no round-trip).
-        The server callback clears the widget value when it becomes hidden, so
-        stale values are not saved. Supports boolean and option-based conditions.
-
-        This method handles standalone (non-repeater) widgets only.  For widgets
-        inside a RepeaterWidget call ``_register_repeater_conditional_callbacks``
-        from the repeater's ``register_callbacks``.
+        """No-op: flat conditional visibility is handled by the single
+        ``conditionalVisibilityAll`` ALL callback registered once in
+        ``TaterApp._setup_conditional_visibility_callback``.
         """
-        if self._condition is None:
-            return
-        from dash import Output, Input, no_update
-
-        controlling_field, target_value = self._condition
-        controlling_widget, controlling_prop = self._get_controlling_widget(app, controlling_field)
-
-        # Use the controlling widget's own schema_id (new 3-key format).
-        if controlling_widget is not None:
-            controlling_schema_id = controlling_widget.schema_id
-        else:
-            # Fallback: assume non-boolean standalone widget.
-            controlling_schema_id = {
-                "type": "tater-control",
-                "ld": "",
-                "path": "",
-                "tf": controlling_field.replace(".", "|"),
-            }
-
-        _build_conditional_callbacks(
-            app,
-            wrapper_id=self.conditional_wrapper_id,
-            controlling_id=controlling_schema_id,
-            controlling_prop=controlling_prop,
-            self_id=self.schema_id,
-            value_prop=self.value_prop,
-            config_id=self.conditional_config_id,
-        )
+        return
 
     def _get_controlling_widget(self, app: Any, controlling_field: str) -> tuple:
         """Look up the controlling widget and its value property.

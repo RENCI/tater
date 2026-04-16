@@ -171,12 +171,12 @@ class RepeaterWidget(ContainerWidget):
                             widget._preset_value = widget._serialize_value(v)
                 comp = widget.component()
 
-            stack = dmc.Stack([comp], gap="xs", mt="sm")
             if widget._condition is not None:
-                initial_style = {"display": "none"} if widget._initial_hidden else {}
-                rendered.append(html.Div(stack, id=widget.conditional_wrapper_id, style=initial_style))
+                # Use render_field so the conditional wrapper includes the
+                # tater-cond-config Store (needed by conditionalVisibilityAll).
+                rendered.append(widget.render_field(mt="sm"))
             else:
-                rendered.append(stack)
+                rendered.append(dmc.Stack([comp], gap="xs", mt="sm"))
         return rendered
 
     # ------------------------------------------------------------------

@@ -165,12 +165,7 @@ def _build_annotation_components(widgets: list[TaterWidget]) -> list:
     """Create annotation fields from widgets."""
     annotation_components = []
     for widget in widgets:
-        if widget._condition is not None:
-            annotation_components.append(
-                html.Div([widget._build_field_content()], id=widget.conditional_wrapper_id)
-            )
-        else:
-            annotation_components.append(widget.render_field())
+        annotation_components.append(widget.render_field())
     return annotation_components
 
 

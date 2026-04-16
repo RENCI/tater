@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from tater.widgets import (
     CheckboxWidget, SwitchWidget, ChipWidget, SelectWidget, RadioGroupWidget,
-    TextInputWidget, TextAreaWidget, AccordionWidget,
+    TextInputWidget, TextAreaWidget, AccordionWidget, DividerWidget,
 )
 from tater.widgets.group import GroupWidget
 
@@ -39,24 +39,43 @@ class PetItem(BaseModel):
 
 
 class Schema(BaseModel):
+    source_type: Optional[Literal["shelter", "breeder", "rescue"]] = None
+    shelter_name: Optional[str] = None
+    is_multi_pet: bool = False
+    multi_pet_notes: Optional[str] = None
     pets: List[PetItem] = Field(default_factory=list)
 
 
 title = "tater - conditional"
 description = "Widgets that appear based on boolean toggles or the selected option."
 
-instructions = """Try toggling or selecting inside each accordion item:
+instructions = """**Flat conditions** (top-level, outside any repeater)
+- **Source Type** – Select "shelter" to reveal a shelter name field
+- **Multiple pets?** – Toggle to reveal a notes field
 
-**Boolean conditions** (Status group)
+**Repeater conditions** (inside each accordion item)
+
+*Boolean conditions* (Status group)
 - **Indoor?** – Reveals an indoor location field
 - **Has health issue?** – Reveals a health description
 - **Is stray?** – Reveals rescue organisation and notes
 
-**Choice conditions** (Type & Breed group)
+*Choice conditions* (Type & Breed group)
 - **Pet Type** – Reveals dog, cat, or fish-specific fields
 """
 
 widgets = [
+    DividerWidget(label="Flat Conditions"),
+    SelectWidget("source_type", label="Source Type",
+                 description="Where did the pets come from?"),
+    TextInputWidget("shelter_name", label="Shelter Name",
+                    placeholder="e.g. Happy Paws Shelter",
+                    ).conditional_on("source_type", "shelter"),
+    SwitchWidget("is_multi_pet", label="Multiple pets?"),
+    TextAreaWidget("multi_pet_notes", label="Multi-pet Notes",
+                   placeholder="Notes about this group of pets...",
+                   ).conditional_on("is_multi_pet", True),
+    DividerWidget(label="Conditional in Repeater"),
     AccordionWidget(
         schema_field="pets",
         label="Conditional in Repeater",

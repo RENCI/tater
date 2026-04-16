@@ -2,5 +2,5 @@
   "name": "Hierarchical Labels",
   "description": "Navigate a pet species ontology using single-select and multi-select hierarchical label widgets.",
   "order": 3,
-  "category": "General"
+  "category": "Demos"
 }
