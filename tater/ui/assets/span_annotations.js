@@ -710,56 +710,69 @@ function applySpanStyles() {
 
 
 // ---------- initialise active widget on page load + watch for new ones ----------
-// On page load: poll until the first [data-tater-field] button container is in
-// the DOM, then activate it.
-// After that: a MutationObserver on the annotation panel fires applySpanStyles()
-// whenever a new [data-tater-field] element is added (e.g. a new list item), so
-// newly rendered button groups get the correct faded/filled state immediately.
+// watchAnnotationPanel() is started immediately so the MutationObserver is ready
+// before any repeater items are added (the list may start empty).  activate() is
+// called by both the observer (on new additions) and directly on page load so that
+// any [data-tater-field] elements already in the DOM are activated right away.
 
 (function () {
     var debounceTimer = null;
-
-    function activate() {
-        if (!window._taterActiveWidget) {
-            var first = document.querySelector('[data-tater-field]');
-            if (first) {
-                window._taterActiveWidget = first.getAttribute('data-tater-field');
-            }
-        }
-        applySpanStyles();
-    }
+    var knownFieldKeys = {};
 
     function watchAnnotationPanel() {
         var panel = document.getElementById('tater-annotation-panel');
         if (!panel) { setTimeout(watchAnnotationPanel, 200); return; }
+
+        // Seed known fields from whatever is already in the DOM
+        var existing = document.querySelectorAll('[data-tater-field]');
+        for (var e = 0; e < existing.length; e++) {
+            knownFieldKeys[existing[e].getAttribute('data-tater-field')] = true;
+        }
+
         new MutationObserver(function (mutations) {
+            var newFieldKey = null;
             for (var m = 0; m < mutations.length; m++) {
                 var added = mutations[m].addedNodes;
                 for (var n = 0; n < added.length; n++) {
                     var node = added[n];
-                    if (node.nodeType === 1 && node.querySelector &&
-                            node.querySelector('[data-tater-field]')) {
-                        clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(applySpanStyles, 50);
-                        return;
+                    if (node.nodeType === 1 && node.querySelector) {
+                        var el = node.querySelector('[data-tater-field]');
+                        if (el) {
+                            var key = el.getAttribute('data-tater-field');
+                            if (!(key in knownFieldKeys)) { newFieldKey = key; }
+                        }
                     }
                 }
             }
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                // Rebuild known-keys from current DOM so deletions are handled
+                var current = document.querySelectorAll('[data-tater-field]');
+                knownFieldKeys = {};
+                for (var i = 0; i < current.length; i++) {
+                    knownFieldKeys[current[i].getAttribute('data-tater-field')] = true;
+                }
+                if (newFieldKey) {
+                    // A genuinely new repeater item appeared — auto-activate it
+                    window._taterActiveWidget = newFieldKey;
+                } else if (!window._taterActiveWidget) {
+                    var first = document.querySelector('[data-tater-field]');
+                    if (first) { window._taterActiveWidget = first.getAttribute('data-tater-field'); }
+                }
+                applySpanStyles();
+            }, 50);
         }).observe(panel, { childList: true, subtree: true });
     }
 
-    function tryInit() {
-        if (document.querySelector('[data-tater-field]')) {
-            activate();
-            // Watch for future additions (new list items, etc.) — scoped to
-            // the annotation panel only to avoid interfering with Dash's
-            // own DOM operations elsewhere on the page.
-            watchAnnotationPanel();
-        } else {
-            setTimeout(tryInit, 200);
-        }
+    // Activate any elements already in the DOM on page load
+    if (!window._taterActiveWidget) {
+        var first = document.querySelector('[data-tater-field]');
+        if (first) { window._taterActiveWidget = first.getAttribute('data-tater-field'); }
     }
-    tryInit();
+    applySpanStyles();
+
+    // Start observer immediately so it catches the first repeater item added
+    watchAnnotationPanel();
 })();
 
 

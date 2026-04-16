@@ -301,7 +301,6 @@ class SpanPopupWidget(SpanBaseWidget):
                                 "fontSize": "0.75rem",
                                 "fontWeight": 600,
                                 "color": et.color,
-                                "cursor": "default",
                             },
                         ),
                         html.Span(

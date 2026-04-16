@@ -47,6 +47,18 @@ mark {
   display: inline-flex;
 }
 
+/* SpanPopupWidget counter strip: pointer cursor + subtle hover highlight to
+   communicate that clicking activates the widget. */
+[data-tater-field][data-tater-entities] {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+[data-tater-field][data-tater-entities]:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 /* Inline variant for SpanPopupWidget counter strip.
    The JS still sets class to tater-count-badge / tater-count-badge tater-count-visible
    as usual; the container context overrides absolute positioning to keep the
