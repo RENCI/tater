@@ -92,3 +92,17 @@ def setup_span_callbacks(tater_app: TaterApp) -> None:
         State("span-color-map", "data"),
         prevent_initial_call=True,
     )
+
+    # ---- Popup: read window._taterPopupPending and add span to annotations ----
+    # Mirrors the captureDelete pattern: proxy n_clicks triggers the callback,
+    # which drains window._taterPopupPending and writes directly to annotations.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="addSpanFromPopup"),
+        Output("span-any-change", "data", allow_duplicate=True),
+        Output("annotations-store", "data", allow_duplicate=True),
+        Input("span-popup-proxy", "n_clicks"),
+        State("current-doc-id", "data"),
+        State("span-any-change", "data"),
+        State("annotations-store", "data"),
+        prevent_initial_call=True,
+    )

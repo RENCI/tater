@@ -22,7 +22,7 @@ from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
-from tater.widgets.span import SpanAnnotationWidget
+from tater.widgets.span import SpanAnnotationWidget, SpanPopupWidget
 from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
@@ -67,6 +67,7 @@ WIDGET_CLASS: dict[str, type[TaterWidget]] = {
 
     # span annotation
     "span_annotation":            SpanAnnotationWidget,
+    "span_popup":                 SpanPopupWidget,
 
     # hierarchical label
     "hierarchical_label_select":  HierarchicalLabelSelectWidget,
