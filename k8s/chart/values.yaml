@@ -6,6 +6,7 @@ replicaCount: 1
 
 image:
   repository: containers.renci.org/clin-ann/tater
+  # This is ignored on Sterling, which uses Always regardless
   pullPolicy: Always
   # Empty string uses Chart.appVersion; override with --set image.tag=<version>
   tag: ""
