@@ -109,7 +109,6 @@ class RepeaterWidget(ContainerWidget):
         annotations_data: dict | None = None,
     ) -> list[Any]:
         """Render widgets for a single list item with pattern-matching IDs."""
-        from tater.widgets.span import SpanAnnotationWidget
         from tater.widgets.group import GroupWidget
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
         from tater.ui import value_helpers
@@ -357,7 +356,7 @@ class RepeaterWidget(ContainerWidget):
     ) -> list[Any]:
         """Render widget components for one inner-list row with nested dict IDs."""
         from tater.widgets.hierarchical_label import HierarchicalLabelWidget
-        from tater.widgets.span import SpanAnnotationWidget
+        from tater.widgets.span import SpanBaseWidget
         from tater.widgets.group import GroupWidget
         from tater.ui import value_helpers
         rendered = []
@@ -388,7 +387,7 @@ class RepeaterWidget(ContainerWidget):
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
-            if isinstance(template, SpanAnnotationWidget):
+            if isinstance(template, SpanBaseWidget):
                 widget = copy.deepcopy(template)
                 widget._finalize_paths(parent_path=parent_path)
                 rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))

@@ -47,6 +47,38 @@ mark {
   display: inline-flex;
 }
 
+/* SpanPopupWidget counter strip: shared padding for both states. */
+[data-tater-field][data-tater-entities] {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Inactive span widget containers (both SpanAnnotationWidget and SpanPopupWidget)
+   are faded; no !important needed since nothing sets filter as an inline style. */
+[data-tater-field].tater-widget-outlined {
+  filter: opacity(0.25);
+}
+
+/* Clickable affordances only on inactive popup strips — active strip is
+   a live display, not a button. */
+[data-tater-field][data-tater-entities].tater-widget-outlined {
+  cursor: pointer;
+}
+
+[data-tater-field][data-tater-entities].tater-widget-outlined:hover {
+  filter: opacity(0.5);
+}
+
+/* Inline variant for SpanPopupWidget counter strip.
+   The JS still sets class to tater-count-badge / tater-count-badge tater-count-visible
+   as usual; the container context overrides absolute positioning to keep the
+   badge in normal flow next to the entity label. */
+.tater-count-container .tater-count-badge {
+  position: static;
+  bottom: auto;
+  right: auto;
+}
+
 .tater-tooltip-delete {
   border: none;
   border-left: 1px solid rgba(0, 0, 0, 0.2);
