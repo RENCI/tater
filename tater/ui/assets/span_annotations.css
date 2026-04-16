@@ -47,16 +47,26 @@ mark {
   display: inline-flex;
 }
 
-/* SpanPopupWidget counter strip: pointer cursor + subtle hover highlight to
-   communicate that clicking activates the widget. */
+/* SpanPopupWidget counter strip: shared padding for both states. */
 [data-tater-field][data-tater-entities] {
-  cursor: pointer;
+  padding: 4px 8px;
   border-radius: 4px;
-  transition: background-color 0.15s;
 }
 
-[data-tater-field][data-tater-entities]:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+/* Inactive span widget containers (both SpanAnnotationWidget and SpanPopupWidget)
+   are faded; no !important needed since nothing sets filter as an inline style. */
+[data-tater-field].tater-widget-outlined {
+  filter: opacity(0.25);
+}
+
+/* Clickable affordances only on inactive popup strips — active strip is
+   a live display, not a button. */
+[data-tater-field][data-tater-entities].tater-widget-outlined {
+  cursor: pointer;
+}
+
+[data-tater-field][data-tater-entities].tater-widget-outlined:hover {
+  filter: opacity(0.5);
 }
 
 /* Inline variant for SpanPopupWidget counter strip.

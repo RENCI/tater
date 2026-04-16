@@ -627,17 +627,15 @@ Object.assign(window.dash_clientside.tater, {
 
 
 // ---------- inject CSS for faded (inactive) spans ----------
-// Using a CSS class with !important ensures the faded state survives React
-// reconciliation, which sets inline background-color on <mark> elements.
+// !important is required here because renderDocumentSpans sets background-color
+// as an inline style on <mark> elements; a plain CSS rule cannot override that.
+// The widget-outlined fade uses a plain CSS class in span_annotations.css instead.
 
 (function () {
     var s = document.createElement('style');
     s.textContent =
         'mark[data-start].tater-span-outlined {' +
         '  background-color: var(--tater-mark-faded, rgba(200,200,200,0.25)) !important;' +
-        '}' +
-        '[data-tater-field].tater-widget-outlined {' +
-        '  filter: opacity(0.25) !important;' +
         '}';
     document.head.appendChild(s);
 })();
