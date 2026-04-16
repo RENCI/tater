@@ -4,7 +4,7 @@
 
 replicaCount: 1
 
-imagehttps://www.overleaf.com/project:
+image:
   repository: containers.renci.org/clin-ann/tater
   pullPolicy: Always
   # Empty string uses Chart.appVersion; override with --set image.tag=<version>
