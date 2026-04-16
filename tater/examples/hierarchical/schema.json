@@ -23,7 +23,7 @@
       "type": "hierarchical_label_multi",
       "widget": {
         "type": "hierarchical_label_multi",
-        "label": "Breeds (Multi)",
+        "label": "Breeds - Multiselect",
         "description": "Select one or more breeds. Search shows matched terms and their ancestors.",
         "hierarchy_ref": "ontology",
         "search_show_siblings": false,
@@ -47,7 +47,7 @@
       "type": "hierarchical_label_multi",
       "widget": {
         "type": "hierarchical_label_multi",
-        "label": "Breeds (Multi)",
+        "label": "Breeds - Multiselect",
         "description": "Select one or more breeds or intermediate categories. Search uses context mode — shows siblings and children of matched terms.",
         "hierarchy_ref": "ontology",
         "allow_non_leaf": true,

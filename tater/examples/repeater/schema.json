@@ -1,0 +1,41 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - repeater",
+  "description": "Annotate repeatable list items using the accordion repeater widget.",
+  "instructions": "Add one or more pets using the + button. Each pet is an accordion panel with its own set of fields.\n\nRemove items with the trash icon.",
+  "data_schema": [
+    {
+      "id": "pets",
+      "type": "repeater",
+      "item_fields": [
+        {
+          "id": "kind",
+          "type": "choice",
+          "options": ["cat", "dog", "fish"],
+          "widget": {"type": "segmented_control", "label": "Pet Type"}
+        },
+        {
+          "id": "neutered",
+          "type": "boolean",
+          "widget": {"type": "checkbox", "label": "Neutered / spayed"}
+        },
+        {
+          "id": "indoor",
+          "type": "boolean",
+          "widget": {"type": "switch", "label": "Indoor"}
+        },
+        {
+          "id": "notes",
+          "type": "text",
+          "widget": {"type": "text_area", "label": "Notes", "placeholder": "Additional notes..."}
+        }
+      ],
+      "widget": {
+        "type": "accordion",
+        "label": "Pets",
+        "item_label": "Pet",
+        "description": "Add and annotate one or more pets."
+      }
+    }
+  ]
+}

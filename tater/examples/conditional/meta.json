@@ -1,0 +1,6 @@
+{
+  "name": "Conditional",
+  "description": "Widgets that appear based on boolean toggles or the selected option.",
+  "order": 6,
+  "category": "Demos"
+}
