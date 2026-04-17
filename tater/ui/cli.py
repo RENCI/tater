@@ -42,8 +42,8 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--debug",
         action="store_true",
-        default=os.getenv("TATER_DEBUG", "").lower() in ("true", "1", "yes"),
-        help="Enable debug mode with hot reloading (or set TATER_DEBUG env var)"
+        default=os.getenv("TATER_APP_DEBUG", "").lower() in ("true", "1", "yes"),
+        help="Enable debug mode with hot reloading (or set TATER_APP_DEBUG env var)"
     )
     parser.add_argument(
         "--port",

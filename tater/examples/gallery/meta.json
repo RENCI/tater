@@ -2,5 +2,5 @@
   "name": "Widget Gallery",
   "description": "Showcases all built-in widget types: boolean, choice, multi-choice, numeric, and text.",
   "order": 2,
-  "category": "General"
+  "category": "Demos"
 }

@@ -232,6 +232,7 @@ class TaterApp:
             self._setup_span_callbacks()
             self._setup_repeater_callbacks()
             self._setup_hl_callbacks()
+            self._setup_conditional_visibility_callback()
             if self.is_hosted:
                 self.app._tater_callbacks_registered = True
 
@@ -374,6 +375,29 @@ class TaterApp:
         """Setup unified MATCH-based repeater callbacks."""
         callbacks.setup_repeater_callbacks(self)
         callbacks.setup_nested_repeater_callbacks(self)
+
+    def _setup_conditional_visibility_callback(self) -> None:
+        """Register one ALL-based visibility callback covering ALL conditional widgets.
+
+        A single ``conditionalVisibilityAll`` callback handles both flat widgets
+        (ld="", path="") and repeater widgets (ld="pets", path="0") in one shot.
+        Visibility is no longer handled per-widget or via MATCH patterns — this
+        callback fires whenever any tater-control or tater-bool-control value changes
+        and updates every matching wrapper's style.  The JS uses ``ctx.outputs_list``
+        to iterate over output wrappers, finds each wrapper's config by matching
+        tf/ld/path in ``ctx.states_list``, then looks up the controlling widget's
+        current value from ``ctx.inputs_list`` by matching ctrl_tf/ld/path.
+        """
+        from dash import ClientsideFunction, Output, Input, State, ALL
+
+        self.app.clientside_callback(
+            ClientsideFunction(namespace="tater", function_name="conditionalVisibilityAll"),
+            Output({"type": "tater-cond-wrapper", "ld": ALL, "path": ALL, "tf": ALL}, "style"),
+            Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
+            Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
+            State({"type": "tater-cond-config", "ld": ALL, "path": ALL, "tf": ALL}, "data"),
+            prevent_initial_call=True,
+        )
 
     def _setup_hl_callbacks(self) -> None:
         """Setup unified MATCH-based HierarchicalLabel callbacks."""

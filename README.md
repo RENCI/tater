@@ -279,6 +279,35 @@ DividerWidget(label="Clinical Findings")
 DividerWidget(label="Demographics", description="Patient background info")
 ```
 
+### Conditional visibility
+
+Any widget can be conditionally shown or hidden based on another field's value using `.conditional_on(field, value)`:
+
+```python
+SwitchWidget("is_indoor", label="Indoor?"),
+TextInputWidget("indoor_location", label="Indoor Location").conditional_on("is_indoor", True),
+
+SelectWidget("pet_type", label="Pet Type"),
+TextInputWidget("dog_breed", label="Dog Breed").conditional_on("pet_type", "dog"),
+RadioGroupWidget("dog_temperament", label="Dog Temperament").conditional_on("pet_type", "dog"),
+```
+
+The widget is hidden until the controlling field equals `value`. Conditional widgets work at any level: top-level, inside a `GroupWidget`, or inside a repeater item. When inside a `GroupWidget`, use the field name relative to that group:
+
+```python
+GroupWidget("booleans", label="Status", children=[
+    SwitchWidget("is_indoor", label="Indoor?"),
+    TextInputWidget("indoor_location", label="Indoor Location").conditional_on("is_indoor", True),
+])
+```
+
+The `controlling_field` argument can also be a dot-joined path or a list of path segments for cross-group references:
+
+```python
+TextInputWidget("location").conditional_on("booleans.is_indoor", True)
+TextInputWidget("location").conditional_on(["booleans", "is_indoor"], True)
+```
+
 ## JSON schema reference
 
 A JSON schema file has this top-level structure:
@@ -345,7 +374,7 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 | `search_show_siblings` | Include sibling nodes in search results; default `false` (`hierarchical_label_select`, `hierarchical_label_multi`) |
 | `search_show_children` | Include direct children of matched nodes in search results; default `false` (`hierarchical_label_select`, `hierarchical_label_multi`) |
 | `item_label` | Singular label for list items (`listable`, `tabs`, `accordion`) |
-| `conditional_on` | `{"field": "field_id", "value": ...}` — show this widget only when the named field equals the given value |
+| `conditional_on` | `{"field": "field_id", "value": ...}` — show this widget only when the named field equals the given value. Works at any level: top-level fields, inside groups, and inside repeater items. |
 
 ### Field types
 
@@ -426,7 +455,7 @@ tater --hosted [options]
 | `--host STR` | Bind address (default: `127.0.0.1`) |
 | `--debug` | Enable debug/hot-reload mode |
 
-Environment variables: `TATER_PORT`, `TATER_HOST`, `TATER_DEBUG`, `TATER_SECRET_KEY`.
+Environment variables: `TATER_APP_PORT`, `TATER_APP_HOST`, `TATER_APP_DEBUG`, `TATER_SECRET_KEY`.
 
 ## Hosted mode
 

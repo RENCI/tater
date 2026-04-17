@@ -15,7 +15,6 @@
         "label": "Diagnosis",
         "description": "Select the primary pathological diagnosis from the FDX ontology.",
         "hierarchy_ref": "fdx",
-        "searchable": true,
         "required": true
       }
     },

@@ -15,7 +15,7 @@ RUN uv venv && . .venv/bin/activate && uv sync --locked --no-dev --no-editable
 
 
 # stage 2: the final image
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 # environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
