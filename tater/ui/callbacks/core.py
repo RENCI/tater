@@ -62,6 +62,17 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=False,
     )
 
+    # Update session-level status distribution bar in the header.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="updateStatusBadges"),
+        Output("prog-ns", "value"),
+        Output("prog-ip", "value"),
+        Output("prog-c",  "value"),
+        Output("icon-all-complete", "style"),
+        Input("metadata-store", "data"),
+        State("doc-list-store", "data"),
+    )
+
     # Setup timing callbacks
     _setup_timing_callbacks(tater_app, _ta)
 

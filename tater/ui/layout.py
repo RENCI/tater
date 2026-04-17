@@ -76,7 +76,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 shadow="sm",
             )
         ], span={"base": 12, "md": 5}),
-    ], gutter="xl")
+    ], gutter="xl", align="flex-start")
 
     app_shell = dmc.AppShell(
         [
@@ -85,9 +85,12 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 dmc.Container([
                     dmc.Stack([
                         dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
-                        dmc.Text(id="document-metadata", size="sm", c="dimmed"),
+                        dmc.Group([
+                            dmc.Text(id="document-title", fw=500, size="sm"),
+                            dmc.Badge(id="status-badge", variant="light", size="sm"),
+                        ], gap="xs"),
                         content_grid,
-                    ], gap="lg"),
+                    ], gap="xs"),
                 ], size="xl", pt="xs", px="xs", fluid=True),
             ),
             _build_app_footer(is_hosted=is_hosted),
@@ -195,7 +198,10 @@ def _build_document_viewer() -> dmc.Paper:
 def _build_document_controls() -> dmc.Stack:
     """Build the flag/notes control stack."""
     return dmc.Stack([
-        dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+        dmc.Group([
+            dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+            dmc.Text(id="document-metadata", size="sm", c="dimmed"),
+        ], justify="space-between", wrap="nowrap"),
         dmc.Textarea(
             id="document-notes",
             label="Notes",
@@ -220,9 +226,24 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     )
 
     left = dmc.Group([
-        dmc.Text(id="document-title", fw=500, size="sm"),
-        dmc.Badge(id="status-badge", variant="light", size="sm"),
-    ], style={"flex": "1", "columnGap": "var(--mantine-spacing-sm)", "rowGap": "2px"})
+        dmc.ProgressRoot(
+            [
+                dmc.ProgressSection(value=0, id="prog-c",  color="var(--mantine-color-teal-filled)"),
+                dmc.ProgressSection(value=0, id="prog-ip", color="var(--mantine-color-blue-filled)"),
+                dmc.ProgressSection(value=0, id="prog-ns", color="var(--mantine-color-gray-light)"),
+            ],
+            size="sm",
+            radius="sm",
+            style={"flex": "1"},
+        ),
+        DashIconify(
+            id="icon-all-complete",
+            icon="tabler:circle-check",
+            width=20,
+            color="var(--mantine-color-teal-filled)",
+            style={"visibility": "hidden", "flexShrink": 0},
+        ),
+    ], gap="xs", style={"flex": "1"}, wrap="nowrap")
 
     center = dmc.Group(
         [dmc.Title(tater_app.title, order=3, lineClamp=1)],
