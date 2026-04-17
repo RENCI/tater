@@ -2,8 +2,68 @@
   "spec_version": "1.0",
   "title": "tater - conditional",
   "description": "Widgets that appear based on boolean toggles or the selected option.",
-  "instructions": "Try toggling or selecting inside each accordion item:\n\n**Boolean conditions** (Status group)\n- **Indoor?** \u2013 Reveals an indoor location field\n- **Has health issue?** \u2013 Reveals a health description\n- **Is stray?** \u2013 Reveals rescue organisation and notes\n\n**Choice conditions** (Type & Breed group)\n- **Pet Type** \u2013 Reveals dog, cat, or fish-specific fields\n",
+  "instructions": "**Flat conditions** (top-level, outside any repeater)\n- **Source Type** \u2013 Select \"shelter\" to reveal a shelter name field\n- **Multiple pets?** \u2013 Toggle to reveal a notes field\n\n**Repeater conditions** (inside each accordion item)\n\n*Boolean conditions* (Status group)\n- **Indoor?** \u2013 Reveals an indoor location field\n- **Has health issue?** \u2013 Reveals a health description\n- **Is stray?** \u2013 Reveals rescue organisation and notes\n\n*Choice conditions* (Type & Breed group)\n- **Pet Type** \u2013 Reveals dog, cat, or fish-specific fields\n",
   "data_schema": [
+    {
+      "widget": {
+        "type": "divider",
+        "label": "Flat Conditions"
+      }
+    },
+    {
+      "id": "source_type",
+      "type": "choice",
+      "options": [
+        "shelter",
+        "breeder",
+        "rescue"
+      ],
+      "widget": {
+        "type": "select",
+        "label": "Source Type",
+        "description": "Where did the pets come from?"
+      }
+    },
+    {
+      "id": "shelter_name",
+      "type": "text",
+      "widget": {
+        "type": "text_input",
+        "label": "Shelter Name",
+        "placeholder": "e.g. Happy Paws Shelter",
+        "conditional_on": {
+          "field": "source_type",
+          "value": "shelter"
+        }
+      }
+    },
+    {
+      "id": "is_multi_pet",
+      "type": "boolean",
+      "widget": {
+        "type": "switch",
+        "label": "Multiple pets?"
+      }
+    },
+    {
+      "id": "multi_pet_notes",
+      "type": "text",
+      "widget": {
+        "type": "text_area",
+        "label": "Multi-pet Notes",
+        "placeholder": "Notes about this group of pets...",
+        "conditional_on": {
+          "field": "is_multi_pet",
+          "value": true
+        }
+      }
+    },
+    {
+      "widget": {
+        "type": "divider",
+        "label": "Conditional in Repeater"
+      }
+    },
     {
       "id": "pets",
       "type": "repeater",

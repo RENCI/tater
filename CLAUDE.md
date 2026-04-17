@@ -59,7 +59,7 @@ tater --hosted [--port 8050] [--host 0.0.0.0]
 
 CLI flags: `--documents` (required in single mode), `--config` or `--schema` (one required in single mode),
 `--annotations`, `--no-restore`, `--port`, `--host`, `--debug`, `--hosted`
-(also via `TATER_DEBUG` / `TATER_PORT` / `TATER_HOST` env vars).
+(also via `TATER_APP_PORT` / `TATER_APP_HOST` / `TATER_APP_DEBUG` env vars).
 
 ## Architecture
 
@@ -207,9 +207,9 @@ output must also use `allow_duplicate=True`. Missing it on one will cause Dash t
 - **Widget value props** (`tater-control` / `value` and `tater-bool-control` / `checked`) —
   `loadValues`/`loadChecked` (ALL pattern, `prevent_initial_call="initial_duplicate"`) and
   `conditionalClear` (MATCH pattern, `allow_duplicate=True`) both write to these props for
-  conditional widgets. The ALL callbacks use `prevent_initial_call="initial_duplicate"` rather
-  than `allow_duplicate=True`; Dash treats ALL and MATCH pattern callbacks as distinct writers
-  for the same component type, so this combination is valid.
+  conditional widgets inside repeaters. The ALL callbacks use `prevent_initial_call="initial_duplicate"`
+  rather than `allow_duplicate=True`; Dash treats ALL and MATCH pattern callbacks as distinct
+  writers for the same component type, so this combination is valid.
 
 **`prevent_initial_call=True` does not suppress pattern-matching fires** caused by component
 re-renders — only the very first page load. Use the value guard above instead.
@@ -222,11 +222,30 @@ prohibited for Dash 4 compatibility. Dash 4 stores inline strings under a SHA-25
 `window.dash_clientside.tater` and reference them via
 `ClientsideFunction(namespace="tater", function_name="...")`.
 
-**Conditional callbacks use a `tater-cond-config` store** — `render_field` (in `base.py`)
-embeds a `dcc.Store(id=conditional_config_id, data={"target": ..., "empty": ...})` inside each
-conditional wrapper div. The `conditionalVisibility` and `conditionalClear` JS functions read
-this store as `State` rather than having the target/empty values baked into inline JS. This
-avoids parameterizing named JS functions with per-widget string arguments.
+**Conditional visibility uses a single `conditionalVisibilityAll` ALL callback** registered
+once in `TaterApp._setup_conditional_visibility_callback`. It uses `ALL` for all three ID keys
+(`ld`, `path`, `tf`) so it covers both flat widgets (`ld=""`) and repeater rows (`ld="pets"`,
+`path="0"`) in one shot, with `prevent_initial_call=True`.
+
+`render_field` (in `base.py`) wraps every conditional widget in an `html.Div` with:
+- `id = conditional_wrapper_id` (`type: tater-cond-wrapper`, same ld/path/tf as the widget)
+- `style = {"display": "none"}` for flat widgets; `{"display": "none"}` or `{}` for repeater
+  items depending on `_initial_hidden` (set from loaded annotation defaults)
+- A child `dcc.Store(id=conditional_config_id, data={"target": ..., "empty": ..., "ctrl_tf": ...})`
+
+The `ctrl_tf` field identifies the controlling widget's `_item_relative_tf`. For widgets inside
+a GroupWidget within a repeater (e.g. `_item_relative_tf = "booleans|indoor_location"`), the
+group prefix is prepended to the relative condition field name so `ctrl_tf` correctly resolves
+to `"booleans|is_indoor"` rather than just `"is_indoor"`.
+
+`conditionalVisibilityAll` in `utils.js` iterates over `ctx.outputs_list` (one per wrapper),
+finds each wrapper's config store by matching `tf/ld/path` in `ctx.states_list[0]`, then finds
+the controlling widget's current value in `ctx.inputs_list[0]` (tater-control) or
+`ctx.inputs_list[1]` (tater-bool-control) by matching `ctrl_tf + ld + path`. Row correlation
+via `ld + path` ensures repeater items match only their own row's controls.
+
+`conditionalClear` (clears the widget value when its controlling field hides it) is registered
+via MATCH IDs only for widgets inside repeaters. Flat conditionals do not get a clear callback.
 
 ## Widget conventions
 

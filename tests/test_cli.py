@@ -89,22 +89,22 @@ class TestNonHostedMode:
 
 class TestPortAndHost:
     def test_default_port(self, monkeypatch):
-        monkeypatch.delenv("TATER_PORT", raising=False)
+        monkeypatch.delenv("TATER_APP_PORT", raising=False)
         args = _parse("--hosted")
         assert args.port == 8050
 
     def test_default_host(self, monkeypatch):
-        monkeypatch.delenv("TATER_HOST", raising=False)
+        monkeypatch.delenv("TATER_APP_HOST", raising=False)
         args = _parse("--hosted")
         assert args.host == "127.0.0.1"
 
     def test_port_flag(self, monkeypatch):
-        monkeypatch.delenv("TATER_PORT", raising=False)
+        monkeypatch.delenv("TATER_APP_PORT", raising=False)
         args = _parse("--hosted", "--port", "9090")
         assert args.port == 9090
 
     def test_host_flag(self, monkeypatch):
-        monkeypatch.delenv("TATER_HOST", raising=False)
+        monkeypatch.delenv("TATER_APP_HOST", raising=False)
         args = _parse("--hosted", "--host", "0.0.0.0")
         assert args.host == "0.0.0.0"
 
@@ -115,41 +115,41 @@ class TestPortAndHost:
 
 class TestEnvVars:
     def test_port_env_var(self, monkeypatch):
-        monkeypatch.setenv("TATER_PORT", "9090")
+        monkeypatch.setenv("TATER_APP_PORT", "9090")
         args = _parse("--hosted")
         assert args.port == 9090
 
     def test_host_env_var(self, monkeypatch):
-        monkeypatch.setenv("TATER_HOST", "0.0.0.0")
+        monkeypatch.setenv("TATER_APP_HOST", "0.0.0.0")
         args = _parse("--hosted")
         assert args.host == "0.0.0.0"
 
     def test_debug_env_var_true(self, monkeypatch):
-        monkeypatch.setenv("TATER_DEBUG", "true")
+        monkeypatch.setenv("TATER_APP_DEBUG", "true")
         args = _parse("--hosted")
         assert args.debug is True
 
     def test_debug_env_var_1(self, monkeypatch):
-        monkeypatch.setenv("TATER_DEBUG", "1")
+        monkeypatch.setenv("TATER_APP_DEBUG", "1")
         args = _parse("--hosted")
         assert args.debug is True
 
     def test_debug_env_var_yes(self, monkeypatch):
-        monkeypatch.setenv("TATER_DEBUG", "yes")
+        monkeypatch.setenv("TATER_APP_DEBUG", "yes")
         args = _parse("--hosted")
         assert args.debug is True
 
     def test_debug_env_var_false(self, monkeypatch):
-        monkeypatch.setenv("TATER_DEBUG", "false")
+        monkeypatch.setenv("TATER_APP_DEBUG", "false")
         args = _parse("--hosted")
         assert args.debug is False
 
     def test_debug_env_var_absent(self, monkeypatch):
-        monkeypatch.delenv("TATER_DEBUG", raising=False)
+        monkeypatch.delenv("TATER_APP_DEBUG", raising=False)
         args = _parse("--hosted")
         assert args.debug is False
 
     def test_port_env_var_overridden_by_flag(self, monkeypatch):
-        monkeypatch.setenv("TATER_PORT", "9090")
+        monkeypatch.setenv("TATER_APP_PORT", "9090")
         args = _parse("--hosted", "--port", "7777")
         assert args.port == 7777

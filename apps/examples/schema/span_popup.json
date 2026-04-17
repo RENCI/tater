@@ -1,0 +1,37 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - popup span annotation",
+  "description": "Select text in the document to tag entities with a floating popup.",
+  "instructions": "1. Highlight text in the document\n2. A popup appears near the selection \u2014 click an entity type to label it:\n   - `Pet` - animal name or subject\n   - `Breed` - species or breed\n   - `Behavior` - actions or states\n   - `Activity` - what the pet is doing\n3. Click the counter strip on the right to switch which widget is active\n   when multiple span fields are present\n",
+  "data_schema": [
+    {
+      "id": "entities",
+      "type": "span_annotation",
+      "widget": {
+        "type": "span_popup",
+        "label": "Pet Entities",
+        "description": "Highlight text to tag \u2014 popup appears near the selection.",
+        "entity_types": [
+          "Pet",
+          "Breed",
+          "Behavior",
+          "Activity"
+        ]
+      }
+    },
+    {
+      "id": "quality",
+      "type": "choice",
+      "options": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Record Quality",
+        "required": true
+      }
+    }
+  ]
+}

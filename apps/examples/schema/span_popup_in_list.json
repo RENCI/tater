@@ -1,0 +1,59 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - popup spans in list",
+  "description": "Popup span annotation inside a repeatable list \u2014 select text to tag evidence per finding.",
+  "instructions": "## Steps\n\n1. Click **Add Finding** to create a new finding card\n2. Select the finding label (positive / negative / uncertain)\n3. Click a finding's evidence strip to make it the active widget\n4. Highlight text in the document \u2014 a popup appears near the selection\n5. Click an entity type in the popup to tag that span\n6. Repeat for each finding\n7. Set the overall assessment at the bottom\n\nThe active finding's evidence strip is fully highlighted; inactive ones are faded.\n",
+  "data_schema": [
+    {
+      "id": "findings",
+      "type": "repeater",
+      "item_fields": [
+        {
+          "id": "label",
+          "type": "choice",
+          "options": [
+            "positive",
+            "negative",
+            "uncertain"
+          ],
+          "widget": {
+            "type": "segmented_control",
+            "label": "Label"
+          }
+        },
+        {
+          "id": "evidence",
+          "type": "span_annotation",
+          "widget": {
+            "type": "span_popup",
+            "label": "Evidence Spans",
+            "description": "Click to activate, then highlight text to tag evidence for this finding.",
+            "entity_types": [
+              "Support",
+              "Against",
+              "Context"
+            ]
+          }
+        }
+      ],
+      "widget": {
+        "type": "listable",
+        "label": "Findings",
+        "item_label": "Finding"
+      }
+    },
+    {
+      "id": "overall",
+      "type": "choice",
+      "options": [
+        "normal",
+        "abnormal"
+      ],
+      "widget": {
+        "type": "segmented_control",
+        "label": "Overall Assessment",
+        "required": true
+      }
+    }
+  ]
+}
