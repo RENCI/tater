@@ -16,10 +16,9 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--documents",
         type=str,
-        required=False,
         help="Path to documents JSON file (required in non-hosted mode)"
     )
-    group = parser.add_mutually_exclusive_group(required=False)
+    group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--config",
         type=str,
@@ -33,25 +32,29 @@ def parse_args() -> Namespace:
     parser.add_argument(
         "--annotations",
         type=str,
-        required=False,
         help="Path to save/load annotations (default: <documents>_annotations.json)"
+    )
+    parser.add_argument(
+        "--no-restore",
+        action="store_true",
+        help="Skip loading existing annotations on startup",
     )
     parser.add_argument(
         "--debug",
         action="store_true",
-        default=os.getenv("TATER_DEBUG", "").lower() in ("true", "1", "yes"),
-        help="Enable debug mode with hot reloading (or set TATER_DEBUG env var)"
+        default=os.getenv("TATER_APP_DEBUG", "").lower() in ("true", "1", "yes"),
+        help="Enable debug mode with hot reloading (or set TATER_APP_DEBUG env var)"
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=int(os.getenv("TATER_PORT", "8050")),
-        help="Port to run the server on (default: 8050, or TATER_PORT env var)"
+        default=int(os.getenv("TATER_APP_PORT", "8050")),
+        help="Port to run the server on (default: 8050, or TATER_APP_PORT env var)"
     )
     parser.add_argument(
         "--host",
-        default=os.getenv("TATER_HOST", "127.0.0.1"),
-        help="Host to bind to (default: 127.0.0.1, or TATER_HOST env var)"
+        default=os.getenv("TATER_APP_HOST", "127.0.0.1"),
+        help="Host to bind to (default: 127.0.0.1, or TATER_APP_HOST env var)"
     )
 
     args = parser.parse_args()
@@ -62,5 +65,8 @@ def parse_args() -> Namespace:
     # Validate: non-hosted mode also requires --documents
     if not args.hosted and not args.documents:
         parser.error("--documents is required in non-hosted mode (or use --hosted)")
+    # Validate: --no-restore only applies in non-hosted mode
+    if args.hosted and args.no_restore:
+        parser.error("--no-restore is not applicable in hosted mode")
 
     return args

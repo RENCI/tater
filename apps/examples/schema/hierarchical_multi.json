@@ -1,0 +1,59 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - hierarchical multi search modes",
+  "description": "Compares the four search filter modes for HierarchicalLabelMultiWidget.",
+  "instructions": "## Search filter modes\n\nAll four widgets share the same ontology. Try searching **\"spaniel\"** (a leaf term)\nor **\"sporting\"** (a non-leaf group) to see how results differ.\n\n| Widget | `search_show_siblings` | `search_show_children` | What you see |\n|--------|----------------------|----------------------|--------------|\n| **Ancestors only** | \u2717 | \u2717 | Matched terms + spine to root |\n| **Siblings** | \u2713 | \u2717 | Matched terms + ancestors + peer nodes |\n| **Children** | \u2717 | \u2713 | Matched terms + ancestors + direct children |\n| **Context** | \u2713 | \u2713 | Matched terms + ancestors + siblings + children |\n",
+  "hierarchies": {
+    "ontology": "../data/pet_ontology.yaml"
+  },
+  "data_schema": [
+    {
+      "id": "breeds_ancestors",
+      "type": "hierarchical_label_multi",
+      "widget": {
+        "type": "hierarchical_label_multi",
+        "label": "Ancestors only",
+        "description": "Matched terms + spine to root. Try searching 'spaniel' or 'sporting'.",
+        "hierarchy_ref": "ontology",
+        "search_show_siblings": false,
+        "search_show_children": false
+      }
+    },
+    {
+      "id": "breeds_siblings",
+      "type": "hierarchical_label_multi",
+      "widget": {
+        "type": "hierarchical_label_multi",
+        "label": "Siblings",
+        "description": "Matched terms + ancestors + peer nodes at the same level.",
+        "hierarchy_ref": "ontology",
+        "search_show_siblings": true,
+        "search_show_children": false
+      }
+    },
+    {
+      "id": "breeds_children",
+      "type": "hierarchical_label_multi",
+      "widget": {
+        "type": "hierarchical_label_multi",
+        "label": "Children",
+        "description": "Matched terms + ancestors + direct children of matched terms.",
+        "hierarchy_ref": "ontology",
+        "search_show_siblings": false,
+        "search_show_children": true
+      }
+    },
+    {
+      "id": "breeds_context",
+      "type": "hierarchical_label_multi",
+      "widget": {
+        "type": "hierarchical_label_multi",
+        "label": "Context (siblings + children)",
+        "description": "Matched terms + ancestors + siblings + direct children.",
+        "hierarchy_ref": "ontology",
+        "search_show_siblings": true,
+        "search_show_children": true
+      }
+    }
+  ]
+}

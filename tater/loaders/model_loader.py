@@ -22,14 +22,13 @@ from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.slider import SliderWidget
 from tater.widgets.textarea import TextAreaWidget
 from tater.widgets.range_slider import RangeSliderWidget
-from tater.widgets.span import SpanAnnotationWidget
+from tater.widgets.span import SpanAnnotationWidget, SpanPopupWidget
 from tater.widgets.divider import DividerWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.hierarchical_label import (
-    HierarchicalLabelCompactWidget,
-    HierarchicalLabelFullWidget,
-    HierarchicalLabelTagsWidget,
+    HierarchicalLabelSelectWidget,
+    HierarchicalLabelMultiWidget,
 )
 from tater.models.span import SpanAnnotation
 
@@ -68,11 +67,11 @@ WIDGET_CLASS: dict[str, type[TaterWidget]] = {
 
     # span annotation
     "span_annotation":            SpanAnnotationWidget,
+    "span_popup":                 SpanPopupWidget,
 
     # hierarchical label
-    "hierarchical_label_tags":    HierarchicalLabelTagsWidget,
-    "hierarchical_label_compact": HierarchicalLabelCompactWidget,
-    "hierarchical_label_full":    HierarchicalLabelFullWidget,
+    "hierarchical_label_select":  HierarchicalLabelSelectWidget,
+    "hierarchical_label_multi":   HierarchicalLabelMultiWidget,
 
     # group widget doesn't have a type string since it's not directly specifiable in JSON
 
@@ -97,7 +96,8 @@ DEFAULT_WIDGET: dict[str, type[TaterWidget]] = {
     "numeric":            NumberInputWidget,
     "range_slider":       RangeSliderWidget,
     "span_annotation":    SpanAnnotationWidget,
-    "hierarchical_label": HierarchicalLabelTagsWidget,
+    "hierarchical_label":       HierarchicalLabelSelectWidget,
+    "hierarchical_label_multi": HierarchicalLabelMultiWidget,
 }
 
 
@@ -189,8 +189,8 @@ def widgets_from_model(
         overrides: Widgets to use in place of the generated defaults. Matched
                    by field name. Two widget types **must** always be supplied
                    via overrides and cannot be usefully auto-generated:
-                   ``HierarchicalLabel*`` widgets (``Optional[str]`` is
-                   indistinguishable from a plain text field without a
+                   ``HierarchicalLabel*`` widgets (``Optional[List[str]]`` is
+                   indistinguishable from a plain list field without a
                    hierarchy) and ``SpanAnnotationWidget`` (auto-generation
                    produces a widget with no entity types). Use overrides for
                    any other field where a non-default widget is desired.

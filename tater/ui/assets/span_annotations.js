@@ -29,7 +29,511 @@
 window.dash_clientside = window.dash_clientside || {};
 window.dash_clientside.tater = window.dash_clientside.tater || {};
 
+// ---------- dot-path helpers used by span callbacks ----------
+
+/**
+ * Decode a widget schema_id (ld, path, tf) to a dot-notation field path.
+ *
+ * Mirrors _decode_field_path() in tater/ui/callbacks/core.py.
+ *
+ * For standalone widgets (ld == ""):  tf is the full pipe-encoded path.
+ * For repeater items: ld = pipe-joined list fields, path = dot-joined indices,
+ * tf = item-relative pipe-encoded field (possibly group-prefixed).
+ */
+function _taterDecodePath(ld, path, tf) {
+    var tfDot = tf.replace(/\|/g, '.');
+    if (!ld) { return tfDot; }
+    var listFields = ld.split('|');
+    var indices = path.split('.');
+    var parts = [];
+    for (var i = 0; i < listFields.length; i++) {
+        parts.push(listFields[i]);
+        if (i < indices.length) { parts.push(indices[i]); }
+    }
+    parts.push(tfDot);
+    return parts.join('.');
+}
+
+// Return the dot-path up to and including the deepest numeric index segment,
+// or null if the path contains no numeric segment (i.e. not a repeater item field).
+// e.g. "findings.0.kind" → "findings.0"
+//      "findings.0.evidence.2.tag" → "findings.0.evidence.2"
+//      "label" → null
+function _taterListItemPath(dotPath) {
+    var parts = dotPath.split('.');
+    for (var i = parts.length - 1; i >= 0; i--) {
+        if (!isNaN(parts[i]) && parts[i] !== '') {
+            return parts.slice(0, i + 1).join('.');
+        }
+    }
+    return null;
+}
+
+function _taterGet(obj, dotPath) {
+    var keys = dotPath.split('.');
+    var cur = obj;
+    for (var i = 0; i < keys.length; i++) {
+        if (cur == null) { return null; }
+        cur = cur[keys[i]];
+    }
+    return cur != null ? cur : null;
+}
+
+function _taterSet(obj, dotPath, value) {
+    var keys = dotPath.split('.');
+    var cur = obj;
+    for (var i = 0; i < keys.length - 1; i++) {
+        var k = keys[i];
+        if (cur[k] == null) { cur[k] = isNaN(keys[i + 1]) ? {} : []; }
+        cur = cur[k];
+    }
+    cur[keys[keys.length - 1]] = value;
+    return obj;
+}
+
+// Collect {dotPath, pipePath, spans, colors} for every span field in an annotation.
+// colorMap keys are template pipe paths with numeric segments removed,
+// e.g. "tests|relevant_spans".
+function _taterSpanInstances(ann, colorMap) {
+    var instances = [];
+    function walk(obj, dot, pipe) {
+        if (obj == null || typeof obj !== 'object') { return; }
+        if (Array.isArray(obj)) {
+            for (var i = 0; i < obj.length; i++) {
+                walk(obj[i], dot ? dot + '.' + i : String(i), pipe ? pipe + '|' + i : String(i));
+            }
+        } else {
+            var keys = Object.keys(obj);
+            for (var j = 0; j < keys.length; j++) {
+                var k = keys[j];
+                var val = obj[k];
+                var newDot = dot ? dot + '.' + k : k;
+                var newPipe = pipe ? pipe + '|' + k : k;
+                var templateKey = newPipe.split('|').filter(function(s) { return isNaN(s); }).join('|');
+                if (templateKey in colorMap) {
+                    instances.push({
+                        dotPath: newDot,
+                        pipePath: newPipe,
+                        spans: Array.isArray(val) ? val : [],
+                        colors: colorMap[templateKey] || {}
+                    });
+                } else {
+                    walk(val, newDot, newPipe);
+                }
+            }
+        }
+    }
+    walk(ann, '', '');
+    return instances;
+}
+
+
 Object.assign(window.dash_clientside.tater, {
+
+    // ---- addSpan: trim whitespace, check overlaps, append to annotation ----
+    addSpan: function(selection, docId, triggerData, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        if (!selection || !docId || !annotationsData) { return nu; }
+
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+
+        var propId = ctx.triggered[0].prop_id;
+        var triggeredId;
+        try { triggeredId = JSON.parse(propId.split('.data')[0]); } catch(e) { return nu; }
+        var pipeField = triggeredId.field;
+        if (!pipeField) { return nu; }
+        var dotField = pipeField.replace(/\|/g, '.');
+
+        var start = selection.start;
+        var end   = selection.end;
+        var tag   = selection.tag;
+        var text  = selection.text || '';
+        if (start == null || end == null || !tag) { return nu; }
+
+        // Trim leading/trailing whitespace and adjust offsets
+        var trimmed = text.replace(/^\s+/, '');
+        start += text.length - trimmed.length;
+        trimmed = trimmed.replace(/\s+$/, '');
+        end = start + trimmed.length;
+        text = trimmed;
+        if (!text) { return nu; }
+
+        var ann = annotationsData[docId];
+        if (!ann) { return nu; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        for (var i = 0; i < currentSpans.length; i++) {
+            var s = currentSpans[i];
+            if (start < s.end && end > s.start) { return nu; }
+        }
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        var newSpans = (JSON.parse(JSON.stringify(currentSpans))).concat([
+            {start: start, end: end, text: text, tag: tag}
+        ]);
+        _taterSet(newAnn, dotField, newSpans);
+        var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var prevCount = (triggerData && typeof triggerData === 'object') ? (triggerData.count || 0) : (triggerData || 0);
+        return {count: prevCount + 1, annotations_update: newAnnotationsData};
+    },
+
+    // ---- relaySpanTriggers: unpack annotation update, increment span-any-change ----
+    relaySpanTriggers: function(_allTriggers, globalCount) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length || !ctx.triggered[0].value) {
+            return [nu, nu];
+        }
+        var val = ctx.triggered[0].value;
+        var annUpdate = (val && typeof val === 'object') ? (val.annotations_update || nu) : nu;
+        return [(globalCount || 0) + 1, annUpdate];
+    },
+
+    // ---- deleteSpan: remove matching span from annotation ----
+    deleteSpan: function(deleteData, docId, globalCount, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        if (!deleteData || !docId || !annotationsData) { return [nu, nu]; }
+
+        var pipeField = deleteData.field;
+        var delStart  = deleteData.start;
+        var delEnd    = deleteData.end;
+        if (!pipeField || delStart == null || delEnd == null) { return [nu, nu]; }
+
+        var dotField = pipeField.replace(/\|/g, '.');
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        var newSpans = currentSpans.filter(function(s) {
+            return !(s.start === delStart && s.end === delEnd);
+        });
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, newSpans);
+        var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
+        return [(globalCount || 0) + 1, newAnnotationsData];
+    },
+
+    // ---- renderDocumentSpans: rebuild document-content marks in the browser ----
+    // Fires on both nav (rawText Input) and span edits (_anyChange Input).
+    renderDocumentSpans: function(rawText, _anyChange, docId, annotationsData, colorMap) {
+        var nu = window.dash_clientside.no_update;
+        if (!docId || rawText === null || rawText === undefined || !annotationsData || !colorMap) { return nu; }
+
+        var ann = annotationsData[docId];
+        if (!ann) { return rawText; }
+
+        var instances = _taterSpanInstances(ann, colorMap);
+
+        var allSpans = [];
+        for (var i = 0; i < instances.length; i++) {
+            var inst = instances[i];
+            for (var j = 0; j < inst.spans.length; j++) {
+                var sp = inst.spans[j];
+                var color = inst.colors[sp.tag] || '#ffe066';
+                allSpans.push({
+                    start: sp.start, end: sp.end, text: sp.text, tag: sp.tag,
+                    pipePath: inst.pipePath, color: color
+                });
+            }
+        }
+
+        if (!allSpans.length) { return rawText; }
+
+        allSpans.sort(function(a, b) { return a.start - b.start; });
+
+        var components = [];
+        var pos = 0;
+        for (var k = 0; k < allSpans.length; k++) {
+            var sp = allSpans[k];
+            if (sp.start < pos) { continue; }
+            if (sp.start > pos) { components.push(rawText.slice(pos, sp.start)); }
+            components.push({
+                type: 'Mark',
+                namespace: 'dash_html_components',
+                props: {
+                    children: sp.text,
+                    'data-start': sp.start,
+                    'data-end': sp.end,
+                    'data-field': sp.pipePath,
+                    'data-tag': sp.tag,
+                    'data-color': sp.color,
+                    style: {
+                        backgroundColor: sp.color
+                    }
+                }
+            });
+            pos = sp.end;
+        }
+        if (pos < rawText.length) { components.push(rawText.slice(pos)); }
+        return components.length ? components : rawText;
+    },
+
+    // ---- loadValues: push annotation values into non-boolean widget value props ----
+    // Replaces the server-side load_values callback.  Reads annotations-store and
+    // ev-lookup-store directly in the browser — no server round-trip on doc nav.
+    // Output IDs come from ctx.outputs_list; ev-lookup keys are tf-encoded field paths.
+    loadValues: function(docId, _trigger, annotationsData, evLookup) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list) { return []; }
+        var outputs = ctx.outputs_list;
+        if (!outputs.length) { return []; }
+        var nu = window.dash_clientside.no_update;
+        var ann = (annotationsData && docId) ? annotationsData[docId] : null;
+        return outputs.map(function(out) {
+            var id = out.id;
+            var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            // If this widget is a repeater item and its list item doesn't exist yet
+            // in the annotation (e.g. a phantom fire during an add before
+            // applyRepeaterOp has run), preserve the server-rendered value.
+            var itemPath = _taterListItemPath(dotField);
+            if (itemPath !== null && (!ann || _taterGet(ann, itemPath) == null)) { return nu; }
+            var v = ann ? _taterGet(ann, dotField) : null;
+            if (v === null || v === undefined) {
+                v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
+            }
+            return v !== undefined ? v : null;
+        });
+    },
+
+    // ---- loadChecked: push annotation values into boolean widget checked props ----
+    // Same as loadValues but coerces to boolean and defaults to false.
+    loadChecked: function(docId, _trigger, annotationsData, evLookup) {
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list) { return []; }
+        var outputs = ctx.outputs_list;
+        if (!outputs.length) { return []; }
+        var nu = window.dash_clientside.no_update;
+        var ann = (annotationsData && docId) ? annotationsData[docId] : null;
+        return outputs.map(function(out) {
+            var id = out.id;
+            var dotField = _taterDecodePath(id.ld || '', id.path || '', id.tf || '');
+            // Same phantom-fire guard as loadValues.
+            var itemPath = _taterListItemPath(dotField);
+            if (itemPath !== null && (!ann || _taterGet(ann, itemPath) == null)) { return nu; }
+            var v = ann ? _taterGet(ann, dotField) : null;
+            if (v === null || v === undefined) {
+                v = (evLookup && id.tf in evLookup) ? evLookup[id.tf] : null;
+            }
+            return (v !== null && v !== undefined) ? Boolean(v) : false;
+        });
+    },
+
+    // ---- captureValue: write non-boolean widget value to annotations-store ----
+    // Replaces the server-side capture_values callback.  Runs in the browser so
+    // annotations-store is always current (no stale-State race with span adds).
+    // Also handles auto-advance: increments auto-advance-store when the changed
+    // field is in aaFields and the value actually changed.
+    captureValue: function(_allValues, docId, annotationsData, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu]; }
+        var t = ctx.triggered[0];
+        if (!t || t.value === undefined) { return [nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu]; }
+
+        var tid;
+        try { tid = JSON.parse(t.prop_id.split('.value')[0]); } catch(e) { return [nu, nu]; }
+        var dotField = _taterDecodePath(tid.ld || '', tid.path || '', tid.tf || '');
+        var value = t.value === '' ? null : t.value;
+
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        // Guard: if this widget is a repeater item (dotField has a numeric index),
+        // verify the list item actually exists in the annotation before writing.
+        // Prevents stale DOM components from a previous document creating phantom
+        // list entries when loadValues fires before update_repeater re-renders.
+        var itemPath = _taterListItemPath(dotField);
+        if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
+
+        var oldValue = _taterGet(ann, dotField);
+        if (JSON.stringify(value) === JSON.stringify(oldValue)) { return [nu, nu]; }
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, value);
+        var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var advanceUpdate = nu;
+        if (Array.isArray(aaFields) && aaFields.indexOf(dotField) !== -1) {
+            if (value !== oldValue && value !== null) {
+                advanceUpdate = (window._taterAutoAdvanceCount || 0) + 1;
+                window._taterAutoAdvanceCount = advanceUpdate;
+            }
+        }
+        return [newAnnotations, advanceUpdate];
+    },
+
+    // ---- captureChecked: write boolean widget value to annotations-store ----
+    // Same as captureValue but for the checked prop; no empty-string conversion,
+    // and auto-advance does not require a truthy value.
+    captureChecked: function(_allChecked, docId, annotationsData, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu]; }
+        var t = ctx.triggered[0];
+        if (!t || t.value === undefined) { return [nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu]; }
+
+        var tid;
+        try { tid = JSON.parse(t.prop_id.split('.checked')[0]); } catch(e) { return [nu, nu]; }
+        var dotField = _taterDecodePath(tid.ld || '', tid.path || '', tid.tf || '');
+        var value = t.value;
+
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        // Same stale-DOM guard as captureValue.
+        var itemPath = _taterListItemPath(dotField);
+        if (itemPath !== null && _taterGet(ann, itemPath) == null) { return [nu, nu]; }
+
+        var oldValue = _taterGet(ann, dotField);
+        if (value === oldValue) { return [nu, nu]; }
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, value);
+        var newAnnotations = Object.assign({}, annotationsData, {[docId]: newAnn});
+
+        var advanceUpdate = nu;
+        if (Array.isArray(aaFields) && aaFields.indexOf(dotField) !== -1) {
+            if (value !== oldValue) {
+                advanceUpdate = (window._taterAutoAdvanceCount || 0) + 1;
+                window._taterAutoAdvanceCount = advanceUpdate;
+            }
+        }
+        return [newAnnotations, advanceUpdate];
+    },
+
+    // ---- applyFieldOp: apply a {field, value} descriptor to annotations-store ----
+    // Used by HL relay callbacks (hier-ann-relay, hl-tags-ann-relay).
+    applyFieldOp: function(_allRelays, docId, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+        var val = ctx.triggered[0].value;
+        if (!val || !val.field) { return nu; }
+        if (!docId || !annotationsData) { return nu; }
+        var ann = annotationsData[docId];
+        if (!ann) { return nu; }
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, val.field, val.value !== undefined ? val.value : null);
+        return Object.assign({}, annotationsData, {[docId]: newAnn});
+    },
+
+    // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----
+    // Runs clientside so it reads the CURRENT browser-side annotations (including any
+    // clientside span adds that haven't been reflected in server-side State yet).
+    // Always increments repeater-load-trigger so loadValues re-fires after the
+    // re-render, pushing correct values from the current annotations-store into all
+    // items (existing items may have been re-rendered with stale server-side State).
+    applyRepeaterOp: function(_allRelays, docId, annotationsData, spanCount, loadTrigger) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return [nu, nu, nu]; }
+        // Iterate through all triggered entries — a re-rendered nested repeater may
+        // emit a null relay store first, which must not block the real op.
+        var val = null;
+        for (var i = 0; i < ctx.triggered.length; i++) {
+            var v = ctx.triggered[i].value;
+            if (v && v.op) { val = v; break; }
+        }
+        if (!val) { return [nu, nu, nu]; }
+        if (!docId || !annotationsData) { return [nu, nu, nu]; }
+
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu, nu]; }
+
+        // field is stored as dot-path (e.g. "findings" or "findings.0.annotations")
+        var dotField = val.field;
+        var currentList = _taterGet(ann, dotField);
+        if (!Array.isArray(currentList)) { return [nu, nu, nu]; }
+
+        var newList = currentList.slice();
+        var isDelete = false;
+
+        if (val.op === 'delete') {
+            if (val.pos < 0 || val.pos >= newList.length) { return [nu, nu, nu]; }
+            newList.splice(val.pos, 1);
+            isDelete = true;
+        } else if (val.op === 'add') {
+            newList.push(val.item !== undefined ? val.item : null);
+        } else {
+            return [nu, nu, nu];
+        }
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, newList);
+        var newAnnotationsData = Object.assign({}, annotationsData, {[docId]: newAnn});
+        return [
+            newAnnotationsData,
+            isDelete ? (spanCount || 0) + 1 : nu,
+            (loadTrigger || 0) + 1,
+        ];
+    },
+
+    // ---- updateNavInfo: update document title, metadata, progress bar and nav buttons ----
+    // Fires clientside immediately on current-doc-id change — no server round-trip needed
+    // since all required information is preloaded in doc-list-store at layout time.
+    updateNavInfo: function(docId, docListStore) {
+        var nu = window.dash_clientside.no_update;
+        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu]; }
+        var idx = docListStore.index[docId];
+        if (idx === undefined) { return [nu, nu, nu, nu, nu]; }
+        var total = docListStore.total;
+        return [
+            (idx + 1) + " / " + total,
+            docListStore.metadata[docId] || "",
+            ((idx + 1) / total) * 100,
+            idx === 0,
+            idx === total - 1
+        ];
+    },
+
+    // ---- updateSpanCounts: update badge children + style for all span-count elements ----
+    updateSpanCounts: function(_anyChange, docId, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.outputs_list || !ctx.outputs_list[0]) { return [nu, nu]; }
+
+        var countOutputs = ctx.outputs_list[0];
+        if (!countOutputs.length) { return [nu, nu]; }
+
+        // Build counts map: pipePath -> tag -> count directly from outputs field paths
+        var counts = {};
+        if (docId && annotationsData) {
+            var ann = annotationsData[docId];
+            if (ann) {
+                // Collect unique field paths from the outputs and count spans
+                var seenFields = {};
+                for (var fi = 0; fi < countOutputs.length; fi++) {
+                    var fld = countOutputs[fi].id.field;
+                    if (seenFields[fld]) { continue; }
+                    seenFields[fld] = true;
+                    var dotPath = fld.replace(/\|/g, '.');
+                    var spans = _taterGet(ann, dotPath);
+                    if (!Array.isArray(spans)) { continue; }
+                    counts[fld] = {};
+                    for (var si = 0; si < spans.length; si++) {
+                        var t = spans[si].tag;
+                        counts[fld][t] = (counts[fld][t] || 0) + 1;
+                    }
+                }
+            }
+        }
+
+        // Build parallel output arrays
+        var childrenArr = [];
+        var classArr = [];
+        for (var k = 0; k < countOutputs.length; k++) {
+            var id = countOutputs[k].id;
+            var field = id.field;
+            var tag = id.tag;
+            var count = (counts[field] && counts[field][tag]) ? counts[field][tag] : 0;
+            childrenArr.push(String(count));
+            classArr.push(count > 0 ? 'tater-count-badge tater-count-visible' : 'tater-count-badge');
+        }
+        return [childrenArr, classArr];
+    },
 
     captureSelection: function (_n_clicks_list) {
         var ctx = window.dash_clientside.callback_context;
@@ -75,23 +579,63 @@ Object.assign(window.dash_clientside.tater, {
         if (!d) { return window.dash_clientside.no_update; }
         window._taterDeletePending = null;
         return d;
+    },
+
+    // ---- addSpanFromPopup: read pending popup data and add span to annotations ----
+    // Mirrors captureDelete: reads window._taterPopupPending set by span_popup.js
+    // and writes directly to span-any-change + annotations-store (no relay needed).
+    addSpanFromPopup: function (_n_clicks, docId, globalCount, annotationsData) {
+        var nu = window.dash_clientside.no_update;
+        var d = window._taterPopupPending;
+        if (!d || !docId || !annotationsData) { return [nu, nu]; }
+        window._taterPopupPending = null;
+
+        var pipeField = d.field;
+        var text      = d.text || '';
+        var start     = d.start;
+        var end       = d.end;
+        var tag       = d.tag;
+        if (!pipeField || !tag || start == null || end == null) { return [nu, nu]; }
+
+        // Trim leading/trailing whitespace and adjust offsets (mirrors addSpan logic)
+        var trimmed = text.replace(/^\s+/, '');
+        start += text.length - trimmed.length;
+        trimmed = trimmed.replace(/\s+$/, '');
+        end = start + trimmed.length;
+        if (!trimmed) { return [nu, nu]; }
+
+        var dotField = pipeField.replace(/\|/g, '.');
+        var ann = annotationsData[docId];
+        if (!ann) { return [nu, nu]; }
+
+        var currentSpans = _taterGet(ann, dotField) || [];
+        for (var i = 0; i < currentSpans.length; i++) {
+            if (start < currentSpans[i].end && end > currentSpans[i].start) { return [nu, nu]; }
+        }
+
+        var newAnn = JSON.parse(JSON.stringify(ann));
+        _taterSet(newAnn, dotField, currentSpans.concat([
+            { start: start, end: end, text: trimmed, tag: tag }
+        ]));
+        return [
+            (globalCount || 0) + 1,
+            Object.assign({}, annotationsData, { [docId]: newAnn }),
+        ];
     }
 
 });
 
 
 // ---------- inject CSS for faded (inactive) spans ----------
-// Using a CSS class with !important ensures the faded state survives React
-// reconciliation, which sets inline background-color on <mark> elements.
+// !important is required here because renderDocumentSpans sets background-color
+// as an inline style on <mark> elements; a plain CSS rule cannot override that.
+// The widget-outlined fade uses a plain CSS class in span_annotations.css instead.
 
 (function () {
     var s = document.createElement('style');
     s.textContent =
         'mark[data-start].tater-span-outlined {' +
         '  background-color: var(--tater-mark-faded, rgba(200,200,200,0.25)) !important;' +
-        '}' +
-        '[data-tater-field].tater-widget-outlined {' +
-        '  filter: opacity(0.25) !important;' +
         '}';
     document.head.appendChild(s);
 })();
@@ -164,56 +708,69 @@ function applySpanStyles() {
 
 
 // ---------- initialise active widget on page load + watch for new ones ----------
-// On page load: poll until the first [data-tater-field] button container is in
-// the DOM, then activate it.
-// After that: a MutationObserver on the annotation panel fires applySpanStyles()
-// whenever a new [data-tater-field] element is added (e.g. a new list item), so
-// newly rendered button groups get the correct faded/filled state immediately.
+// watchAnnotationPanel() is started immediately so the MutationObserver is ready
+// before any repeater items are added (the list may start empty).  activate() is
+// called by both the observer (on new additions) and directly on page load so that
+// any [data-tater-field] elements already in the DOM are activated right away.
 
 (function () {
     var debounceTimer = null;
-
-    function activate() {
-        if (!window._taterActiveWidget) {
-            var first = document.querySelector('[data-tater-field]');
-            if (first) {
-                window._taterActiveWidget = first.getAttribute('data-tater-field');
-            }
-        }
-        applySpanStyles();
-    }
+    var knownFieldKeys = {};
 
     function watchAnnotationPanel() {
         var panel = document.getElementById('tater-annotation-panel');
         if (!panel) { setTimeout(watchAnnotationPanel, 200); return; }
+
+        // Seed known fields from whatever is already in the DOM
+        var existing = document.querySelectorAll('[data-tater-field]');
+        for (var e = 0; e < existing.length; e++) {
+            knownFieldKeys[existing[e].getAttribute('data-tater-field')] = true;
+        }
+
         new MutationObserver(function (mutations) {
+            var newFieldKey = null;
             for (var m = 0; m < mutations.length; m++) {
                 var added = mutations[m].addedNodes;
                 for (var n = 0; n < added.length; n++) {
                     var node = added[n];
-                    if (node.nodeType === 1 && node.querySelector &&
-                            node.querySelector('[data-tater-field]')) {
-                        clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(applySpanStyles, 50);
-                        return;
+                    if (node.nodeType === 1 && node.querySelector) {
+                        var el = node.querySelector('[data-tater-field]');
+                        if (el) {
+                            var key = el.getAttribute('data-tater-field');
+                            if (!(key in knownFieldKeys)) { newFieldKey = key; }
+                        }
                     }
                 }
             }
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+                // Rebuild known-keys from current DOM so deletions are handled
+                var current = document.querySelectorAll('[data-tater-field]');
+                knownFieldKeys = {};
+                for (var i = 0; i < current.length; i++) {
+                    knownFieldKeys[current[i].getAttribute('data-tater-field')] = true;
+                }
+                if (newFieldKey) {
+                    // A genuinely new repeater item appeared — auto-activate it
+                    window._taterActiveWidget = newFieldKey;
+                } else if (!window._taterActiveWidget) {
+                    var first = document.querySelector('[data-tater-field]');
+                    if (first) { window._taterActiveWidget = first.getAttribute('data-tater-field'); }
+                }
+                applySpanStyles();
+            }, 50);
         }).observe(panel, { childList: true, subtree: true });
     }
 
-    function tryInit() {
-        if (document.querySelector('[data-tater-field]')) {
-            activate();
-            // Watch for future additions (new list items, etc.) — scoped to
-            // the annotation panel only to avoid interfering with Dash's
-            // own DOM operations elsewhere on the page.
-            watchAnnotationPanel();
-        } else {
-            setTimeout(tryInit, 200);
-        }
+    // Activate any elements already in the DOM on page load
+    if (!window._taterActiveWidget) {
+        var first = document.querySelector('[data-tater-field]');
+        if (first) { window._taterActiveWidget = first.getAttribute('data-tater-field'); }
     }
-    tryInit();
+    applySpanStyles();
+
+    // Start observer immediately so it catches the first repeater item added
+    watchAnnotationPanel();
 })();
 
 

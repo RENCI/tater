@@ -6,7 +6,7 @@ from tater.widgets import (
     TextInputWidget, TextAreaWidget, ListableWidget,
     NumberInputWidget, SliderWidget, RangeSliderWidget,
     GroupWidget, DividerWidget, TabsWidget, AccordionWidget,
-    HierarchicalLabelCompactWidget, HierarchicalLabelFullWidget, HierarchicalLabelTagsWidget,
+    HierarchicalLabelSelectWidget, HierarchicalLabelMultiWidget,
     SpanAnnotationWidget, EntityType,
 )
 from tests.conftest import Schema, Pet, Measurements
@@ -298,33 +298,44 @@ class TestTabsAndAccordionBindSchema:
 class TestHierarchicalLabelBindSchema:
     _hierarchy = {"Animals": {"Mammals": None, "Birds": None}}
 
-    def test_compact_binds_str_field(self):
-        w = HierarchicalLabelCompactWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
+    def test_select_binds_list_str_field(self):
+        w = HierarchicalLabelSelectWidget(
+            schema_field="hl_path", label="HL", hierarchy=self._hierarchy
         )
         w.bind_schema(Schema)
 
-    def test_full_binds_str_field(self):
-        w = HierarchicalLabelFullWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
-        )
-        w.bind_schema(Schema)
+    def test_multi_binds_list_list_str_field(self):
+        from tests.conftest import Schema as S
+        import inspect
+        # hl_multi_path field would be Optional[List[List[str]]] — use a custom model
+        from pydantic import BaseModel
+        from typing import Optional, List
 
-    def test_tags_binds_str_field(self):
-        w = HierarchicalLabelTagsWidget(
-            schema_field="overall", label="HL", hierarchy=self._hierarchy
-        )
-        w.bind_schema(Schema)
+        class M(BaseModel):
+            tags: Optional[List[List[str]]] = None
 
-    def test_raises_for_non_str_field(self):
-        w = HierarchicalLabelCompactWidget(
+        w = HierarchicalLabelMultiWidget(
+            schema_field="tags", label="HL Multi", hierarchy=self._hierarchy
+        )
+        w.bind_schema(M)
+
+    def test_select_raises_for_non_list_str_field(self):
+        w = HierarchicalLabelSelectWidget(
             schema_field="score", label="HL", hierarchy=self._hierarchy
         )
         with pytest.raises(TypeError):
             w.bind_schema(Schema)
 
-    def test_raises_for_missing_field(self):
-        w = HierarchicalLabelFullWidget(
+    def test_select_raises_for_plain_str_field(self):
+        # str is not accepted — must be List[str]
+        w = HierarchicalLabelSelectWidget(
+            schema_field="overall", label="HL", hierarchy=self._hierarchy
+        )
+        with pytest.raises(TypeError):
+            w.bind_schema(Schema)
+
+    def test_select_raises_for_missing_field(self):
+        w = HierarchicalLabelSelectWidget(
             schema_field="nonexistent", label="HL", hierarchy=self._hierarchy
         )
         with pytest.raises(ValueError):

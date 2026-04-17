@@ -1,43 +1,58 @@
 {
   "spec_version": "1.0",
   "title": "tater - hierarchical",
-  "description": "Pet/animal ontology with tags, compact, and full hierarchical label widgets.",
-  "instructions": "## Navigation\n\n- Use **chevron buttons** (\u2192) to explore the ontology\n- Use **search** to find breeds by name\n- Expand/collapse branches with the tree UI\n\n**Tags Breed** uses tags view (path shown as dismissible pills).\n**Primary Breed** uses compact view (shows only selected).\n**Secondary Breed** uses full view (shows all siblings).\n",
+  "description": "Ontology-driven annotation using single-select and multi-select hierarchical label widgets.",
+  "instructions": "## Leaf nodes only\n\nSelect only terminal nodes in the ontology (e.g. a specific breed).\nSearch shows matched terms and their ancestors.\n\n## Any level\n\nAllows selecting intermediate nodes (e.g. a species group like \"Sporting\").\nSearch uses context mode — matched terms plus siblings and children — useful for browsing broader categories.\n",
   "hierarchies": {
     "ontology": "pet_ontology.yaml"
   },
   "data_schema": [
+    {"widget": {"type": "divider", "label": "Leaf nodes only"}},
     {
-      "id": "tags_breed",
+      "id": "breed",
       "type": "hierarchical_label",
       "widget": {
-        "type": "hierarchical_label_tags",
-        "label": "Tags Breed",
-        "description": "Navigate via pill tags \u2014 click a tag to go back, \u00d7 to deselect.",
-        "hierarchy_ref": "ontology",
-        "searchable": true
+        "type": "hierarchical_label_select",
+        "label": "Breed",
+        "description": "Select a single breed or type.",
+        "hierarchy_ref": "ontology"
       }
     },
     {
-      "id": "primary_breed",
+      "id": "breeds_multi",
+      "type": "hierarchical_label_multi",
+      "widget": {
+        "type": "hierarchical_label_multi",
+        "label": "Breeds - Multiselect",
+        "description": "Select one or more breeds. Search shows matched terms and their ancestors.",
+        "hierarchy_ref": "ontology",
+        "search_show_siblings": false,
+        "search_show_children": false
+      }
+    },
+    {"widget": {"type": "divider", "label": "Any level"}},
+    {
+      "id": "breed_any",
       "type": "hierarchical_label",
       "widget": {
-        "type": "hierarchical_label_tags",
-        "label": "Primary Breed",
-        "description": "Navigate the ontology to select a breed or type.",
+        "type": "hierarchical_label_select",
+        "label": "Breed",
+        "description": "Select a breed or any intermediate category.",
         "hierarchy_ref": "ontology",
-        "searchable": true
+        "allow_non_leaf": true
       }
     },
     {
-      "id": "secondary_breed",
-      "type": "hierarchical_label",
+      "id": "breeds_multi_any",
+      "type": "hierarchical_label_multi",
       "widget": {
-        "type": "hierarchical_label_full",
-        "label": "Secondary Breed (Mixed)",
-        "description": "Select a secondary breed if the pet is a mix.",
+        "type": "hierarchical_label_multi",
+        "label": "Breeds - Multiselect",
+        "description": "Select one or more breeds or intermediate categories. Search uses context mode — shows siblings and children of matched terms.",
         "hierarchy_ref": "ontology",
-        "searchable": true
+        "allow_non_leaf": true,
+        "search_show_siblings": true,
+        "search_show_children": true
       }
     }
   ]

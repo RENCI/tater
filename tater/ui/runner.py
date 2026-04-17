@@ -53,6 +53,7 @@ def run_single(args) -> None:
         instructions=instructions,
         annotations_path=args.annotations,
         schema_model=schema_model,
+        restore_annotations=not args.no_restore,
     )
 
     if not app.load_documents(args.documents):

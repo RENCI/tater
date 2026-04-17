@@ -1,0 +1,28 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - span annotation",
+  "description": "Tag named entities in pet-related text using the span annotation and span popup widgets.",
+  "instructions": "This example demonstrates two span annotation styles using the same entity types.\n\n**Span Annotation - Sidebar**:\n\n1. Click the widget in the sidebar to activate it\n2. Highlight text in the document\n3. Click an entity type button to label it\n\n**Span Annotation - Popup**:\n\n1. Click the widget in the sidebar to activate it\n2. Highlight text in the document\n3. Click an entity type in the popup that appears near the selection\n\nEntity types:\n\n- `Pet` - animal name or subject\n- `Breed` - species or breed\n- `Behavior` - actions or states\n- `Activity` - what the pet is doing",
+  "data_schema": [
+    {
+      "id": "entities",
+      "type": "span_annotation",
+      "widget": {
+        "type": "span_annotation",
+        "label": "Pet Entities - Sidebar",
+        "description": "Highlight text then click an entity type to label it.",
+        "entity_types": ["Pet", "Breed", "Behavior", "Activity"]
+      }
+    },
+    {
+      "id": "entities_popup",
+      "type": "span_annotation",
+      "widget": {
+        "type": "span_popup",
+        "label": "Pet Entities - Popup",
+        "description": "Highlight text — a popup appears near the selection to choose the entity type.",
+        "entity_types": ["Pet", "Breed", "Behavior", "Activity"]
+      }
+    }
+  ]
+}

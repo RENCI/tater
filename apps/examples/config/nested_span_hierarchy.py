@@ -15,7 +15,7 @@ from tater.widgets import (
     AccordionWidget,
     ListableWidget,
     SegmentedControlWidget,
-    HierarchicalLabelCompactWidget,
+    HierarchicalLabelSelectWidget,
 )
 from tater.widgets.hierarchical_label import load_hierarchy_from_yaml
 
@@ -24,7 +24,7 @@ ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
 
 
 class Mention(BaseModel):
-    breed: Optional[str] = None
+    breed: Optional[List[str]] = None
     confidence: Optional[Literal["definite", "likely", "uncertain"]] = None
     spans: List[SpanAnnotation] = Field(default_factory=list)
 
@@ -81,12 +81,11 @@ widgets = [
                             EntityType("Species", color="#a9e34b"),
                         ],
                     ),
-                    HierarchicalLabelCompactWidget(
+                    HierarchicalLabelSelectWidget(
                         schema_field="breed",
                         label="Breed / Species",
                         description="Navigate the pet ontology to select the breed or species.",
                         hierarchy=ontology,
-                        searchable=True,
                     ),
                     SegmentedControlWidget(
                         schema_field="confidence",

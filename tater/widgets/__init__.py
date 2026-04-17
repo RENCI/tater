@@ -27,12 +27,11 @@ from tater.widgets.range_slider import RangeSliderWidget
 from tater.widgets.switch import SwitchWidget
 from tater.widgets.chip import ChipWidget
 from tater.widgets.select import SelectWidget
-from tater.widgets.span import SpanAnnotationWidget, EntityType
+from tater.widgets.span import SpanBaseWidget, SpanAnnotationWidget, SpanPopupWidget, EntityType
 from tater.widgets.hierarchical_label import (
     HierarchicalLabelWidget,
-    HierarchicalLabelFullWidget,
-    HierarchicalLabelCompactWidget,
-    HierarchicalLabelTagsWidget,
+    HierarchicalLabelSelectWidget,
+    HierarchicalLabelMultiWidget,
     Node,
     build_tree,
     load_hierarchy_from_yaml,
@@ -67,12 +66,13 @@ __all__ = [
     "SwitchWidget",
     "ChipWidget",
     "SelectWidget",
+    "SpanBaseWidget",
     "SpanAnnotationWidget",
+    "SpanPopupWidget",
     "EntityType",
     "HierarchicalLabelWidget",
-    "HierarchicalLabelFullWidget",
-    "HierarchicalLabelCompactWidget",
-    "HierarchicalLabelTagsWidget",
+    "HierarchicalLabelSelectWidget",
+    "HierarchicalLabelMultiWidget",
     "Node",
     "build_tree",
     "load_hierarchy_from_yaml",

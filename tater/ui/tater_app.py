@@ -14,6 +14,33 @@ from tater.widgets.base import TaterWidget
 from tater.ui import callbacks
 from tater.ui import value_helpers
 from tater.ui.hooks import OnSaveHook
+from tater.ui.callbacks.helpers import (
+    _collect_all_control_templates,
+    _collect_value_capture_widgets,
+    _build_ev_lookup,
+)
+
+
+def _build_span_color_map(widgets: list, parent_pipe: str = "") -> dict:
+    """Build {templatePipePath: {tagName: lightenedColor}} for all span widgets.
+
+    Covers both SpanAnnotationWidget and SpanPopupWidget (both extend SpanBaseWidget).
+    templatePipePath has numeric index segments stripped, e.g. "tests|relevant_spans".
+    Used by the clientside render callback to look up mark colors without a server call.
+    """
+    from tater.widgets.span import SpanBaseWidget, _lighten_hex
+    from tater.widgets.repeater import RepeaterWidget
+    from tater.widgets.base import ContainerWidget
+    result = {}
+    for w in widgets:
+        w_pipe = f"{parent_pipe}|{w.schema_field}" if parent_pipe else w.schema_field
+        if isinstance(w, SpanBaseWidget):
+            result[w_pipe] = {et.name: _lighten_hex(et.color) for et in w.entity_types}
+        elif isinstance(w, RepeaterWidget):
+            result.update(_build_span_color_map(w.item_widgets, w_pipe))
+        elif isinstance(w, ContainerWidget) and hasattr(w, "children"):
+            result.update(_build_span_color_map(w.children, w_pipe))
+    return result
 
 
 class TaterApp:
@@ -29,6 +56,7 @@ class TaterApp:
         on_save: Optional[OnSaveHook] = None,
         is_hosted: bool = False,
         dash_app: Optional[Any] = None,
+        restore_annotations: bool = True,
     ):
         """
         Initialize the Tater app.
@@ -41,6 +69,7 @@ class TaterApp:
             schema_model: Optional Pydantic model class for annotations
             is_hosted: If True, running in hosted mode (no auto-save, download button shown)
             dash_app: External Dash app to register callbacks on (hosted mode)
+            restore_annotations: If False, skip loading existing annotations on startup
         """
         self.title = title or "tater - document annotation"
         self.description = description
@@ -49,6 +78,7 @@ class TaterApp:
         self.schema_model = schema_model
         self.on_save = on_save
         self.is_hosted = is_hosted
+        self.restore_annotations = restore_annotations
         self.app = dash_app if dash_app is not None else Dash(__name__, title="tater", suppress_callback_exceptions=True)
         # In hosted mode the shared Dash app carries a callable that resolves
         # the current user's TaterApp from the Flask session at callback runtime.
@@ -99,8 +129,9 @@ class TaterApp:
                 doc_path = Path(source)
                 self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
             
-            # Load existing annotations if file exists
-            self._load_annotations_from_file()
+            # Load existing annotations if file exists (skipped when restore_annotations=False)
+            if self.restore_annotations:
+                self._load_annotations_from_file()
 
             # Ensure every document has annotation and metadata objects
             for doc in self.documents:
@@ -144,6 +175,21 @@ class TaterApp:
         # Collect all widgets (including nested) for lookup by field_path
         self._all_widgets = self._collect_all_widgets(self.widgets)
 
+        # Cache derived widget-tree lookups used in hot-path callbacks.
+        # These are computed once here because the widget tree is immutable
+        # after set_annotation_widgets() completes.
+        self._ev_lookup: dict[str, object] = _build_ev_lookup(self.widgets)
+        self._aa_fields: set[str] = {
+            w.field_path
+            for w in _collect_value_capture_widgets(self.widgets)
+            if w.auto_advance
+        }
+        self._required_widgets = [
+            w for w in _collect_value_capture_widgets(self.widgets)
+            if w.required and w.to_python_type() is not bool
+        ]
+        self._span_color_map: dict = _build_span_color_map(self.widgets)
+
         # Duplicate field check
         seen: set[str] = set()
         for widget in self._all_widgets:
@@ -186,6 +232,7 @@ class TaterApp:
             self._setup_span_callbacks()
             self._setup_repeater_callbacks()
             self._setup_hl_callbacks()
+            self._setup_conditional_visibility_callback()
             if self.is_hosted:
                 self.app._tater_callbacks_registered = True
 
@@ -329,10 +376,33 @@ class TaterApp:
         callbacks.setup_repeater_callbacks(self)
         callbacks.setup_nested_repeater_callbacks(self)
 
+    def _setup_conditional_visibility_callback(self) -> None:
+        """Register one ALL-based visibility callback covering ALL conditional widgets.
+
+        A single ``conditionalVisibilityAll`` callback handles both flat widgets
+        (ld="", path="") and repeater widgets (ld="pets", path="0") in one shot.
+        Visibility is no longer handled per-widget or via MATCH patterns — this
+        callback fires whenever any tater-control or tater-bool-control value changes
+        and updates every matching wrapper's style.  The JS uses ``ctx.outputs_list``
+        to iterate over output wrappers, finds each wrapper's config by matching
+        tf/ld/path in ``ctx.states_list``, then looks up the controlling widget's
+        current value from ``ctx.inputs_list`` by matching ctrl_tf/ld/path.
+        """
+        from dash import ClientsideFunction, Output, Input, State, ALL
+
+        self.app.clientside_callback(
+            ClientsideFunction(namespace="tater", function_name="conditionalVisibilityAll"),
+            Output({"type": "tater-cond-wrapper", "ld": ALL, "path": ALL, "tf": ALL}, "style"),
+            Input({"type": "tater-control", "ld": ALL, "path": ALL, "tf": ALL}, "value"),
+            Input({"type": "tater-bool-control", "ld": ALL, "path": ALL, "tf": ALL}, "checked"),
+            State({"type": "tater-cond-config", "ld": ALL, "path": ALL, "tf": ALL}, "data"),
+            prevent_initial_call=True,
+        )
+
     def _setup_hl_callbacks(self) -> None:
         """Setup unified MATCH-based HierarchicalLabel callbacks."""
-        callbacks.setup_hl_callbacks(self)
-        callbacks.setup_hl_tags_callbacks(self)
+        callbacks.setup_hl_select_callbacks(self)
+        callbacks.setup_hl_multi_callbacks(self)
 
     def _collect_value_capture_widgets(self, widgets: list[TaterWidget]) -> list[TaterWidget]:
         """

@@ -16,7 +16,7 @@ from tater.widgets.span import SpanAnnotationWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget, TabsWidget, AccordionWidget
 from tater.widgets.divider import DividerWidget
-from tater.widgets.hierarchical_label import HierarchicalLabelTagsWidget, HierarchicalLabelCompactWidget
+from tater.widgets.hierarchical_label import HierarchicalLabelSelectWidget
 
 
 # ---------------------------------------------------------------------------

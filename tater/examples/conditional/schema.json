@@ -1,0 +1,91 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - conditional",
+  "description": "Widgets that appear based on boolean toggles or the selected option.",
+  "instructions": "This example demonstrates two types of conditional visibility.\n\n**Boolean conditions**\n\nToggle a switch or checkbox to reveal a related field:\n\n- **Indoor?** — reveals an indoor location field\n- **Has health issue?** — reveals a health description\n\n**Choice conditions**\n\nSelect a pet type to reveal type-specific fields:\n\n- **Dog** — breed and temperament\n- **Cat** — coat color\n- **Fish** — tank size",
+  "data_schema": [
+    {"widget": {"type": "divider", "label": "Boolean conditions"}},
+    {
+      "id": "is_indoor",
+      "type": "boolean",
+      "widget": {"type": "switch", "label": "Indoor?", "description": "Is this an indoor setting?"}
+    },
+    {
+      "id": "indoor_location",
+      "type": "text",
+      "widget": {
+        "type": "text_input",
+        "label": "Indoor Location",
+        "placeholder": "e.g. living room, kitchen",
+        "conditional_on": {"field": "is_indoor", "value": true}
+      }
+    },
+    {
+      "id": "has_health_issue",
+      "type": "boolean",
+      "widget": {"type": "checkbox", "label": "Has health issue?"}
+    },
+    {
+      "id": "health_description",
+      "type": "text",
+      "widget": {
+        "type": "text_area",
+        "label": "Health Description",
+        "placeholder": "Describe the health issue...",
+        "conditional_on": {"field": "has_health_issue", "value": true}
+      }
+    },
+    {"widget": {"type": "divider", "label": "Choice conditions"}},
+    {
+      "id": "pet_type",
+      "type": "choice",
+      "options": ["cat", "dog", "fish"],
+      "widget": {
+        "type": "select",
+        "label": "Pet Type",
+        "description": "Select a type to reveal type-specific fields.",
+        "required": true
+      }
+    },
+    {
+      "id": "dog_breed",
+      "type": "text",
+      "widget": {
+        "type": "text_input",
+        "label": "Dog Breed",
+        "placeholder": "e.g. Golden Retriever",
+        "conditional_on": {"field": "pet_type", "value": "dog"}
+      }
+    },
+    {
+      "id": "dog_temperament",
+      "type": "choice",
+      "options": ["calm", "playful", "aggressive"],
+      "widget": {
+        "type": "radio_group",
+        "label": "Dog Temperament",
+        "conditional_on": {"field": "pet_type", "value": "dog"}
+      }
+    },
+    {
+      "id": "cat_color",
+      "type": "text",
+      "widget": {
+        "type": "text_input",
+        "label": "Coat Color",
+        "placeholder": "e.g. orange tabby",
+        "conditional_on": {"field": "pet_type", "value": "cat"}
+      }
+    },
+    {
+      "id": "fish_tank_size",
+      "type": "choice",
+      "options": ["small", "medium", "large"],
+      "widget": {
+        "type": "select",
+        "label": "Tank Size",
+        "conditional_on": {"field": "pet_type", "value": "fish"}
+      }
+    }
+  ]
+}

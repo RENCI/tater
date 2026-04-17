@@ -19,6 +19,19 @@ _HEADER_HEIGHT = 52
 _FOOTER_HEIGHT = 84
 
 
+def _build_doc_list_store_data(tater_app: TaterApp) -> dict:
+    """Precompute per-doc display info for the clientside nav-info callback."""
+    docs = tater_app.documents
+    return {
+        "total": len(docs),
+        "index": {d.id: i for i, d in enumerate(docs)},
+        "metadata": {
+            d.id: " | ".join(f"{k}: {v}" for k, v in d.info.items()) if d.info else ""
+            for d in docs
+        },
+    }
+
+
 def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     """Create the Dash layout with navigation and annotation panel."""
     annotation_components = _build_annotation_components(tater_app.widgets)
@@ -28,11 +41,18 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
     has_instructions = bool(tater_app.instructions and tater_app.instructions.strip())
     is_hosted = tater_app.is_hosted
 
+    # Static per-doc info preloaded for the clientside nav-info callback.
+    doc_list_store = dcc.Store(id="doc-list-store", data=_build_doc_list_store_data(tater_app))
+
     # Global span stores — always included so span callbacks are always registered
     span_stores = [
         dcc.Store(id="span-any-change", data=0),
         dcc.Store(id="span-delete-store", data=None),
+        dcc.Store(id="document-text-store", data=""),
+        dcc.Store(id="span-color-map", data=tater_app._span_color_map),
+        dcc.Store(id="repeater-load-trigger", data=0),
         html.Button(id="span-delete-proxy", n_clicks=0, style={"display": "none"}),
+        html.Button(id="span-popup-proxy", n_clicks=0, style={"display": "none"}),
     ]
 
     content_grid = dmc.Grid([
@@ -110,6 +130,8 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
             dcc.Store(id="auto-advance-store", data=0),
+            dcc.Store(id="aa-fields-store", data=list(tater_app._aa_fields)),
+            dcc.Store(id="ev-lookup-store", data=tater_app._ev_lookup),
             dcc.Store(id="schema-warnings-store", data=tater_app._schema_warnings),
             dcc.Store(id="annotations-store", data={
                 doc_id: ann.model_dump()
@@ -120,6 +142,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 for doc_id, meta in tater_app.metadata.items()
             }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
+            doc_list_store,
             *span_stores,
             app_shell,
             dmc.Drawer(
@@ -142,12 +165,7 @@ def _build_annotation_components(widgets: list[TaterWidget]) -> list:
     """Create annotation fields from widgets."""
     annotation_components = []
     for widget in widgets:
-        if widget._condition is not None:
-            annotation_components.append(
-                html.Div([widget._build_field_content()], id=widget.conditional_wrapper_id)
-            )
-        else:
-            annotation_components.append(widget.render_field())
+        annotation_components.append(widget.render_field())
     return annotation_components
 
 
@@ -194,7 +212,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     with a full-width progress bar flush to the bottom edge."""
     help_button = (
         dmc.ActionIcon(
-            DashIconify(icon="tabler:help-circle", width=20),
+            DashIconify(icon="tabler:info-circle", width=20),
             id="btn-open-instructions",
             variant="subtle",
             size="sm",

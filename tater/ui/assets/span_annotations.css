@@ -1,5 +1,7 @@
 mark {
-  border-radius: 2px;
+  border-radius: 3px;
+  padding: 0.1em 0;
+  cursor: pointer;
 }
 
 #tater-span-tooltip {
@@ -19,6 +21,62 @@ mark {
   font-weight: 600;
   font-family: var(--mantine-font-family);
   color: var(--mantine-color-gray-9);
+}
+
+.tater-count-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 99;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.tater-count-badge.tater-count-visible {
+  display: inline-flex;
+}
+
+/* SpanPopupWidget counter strip: shared padding for both states. */
+[data-tater-field][data-tater-entities] {
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Inactive span widget containers (both SpanAnnotationWidget and SpanPopupWidget)
+   are faded; no !important needed since nothing sets filter as an inline style. */
+[data-tater-field].tater-widget-outlined {
+  filter: opacity(0.25);
+}
+
+/* Clickable affordances only on inactive popup strips — active strip is
+   a live display, not a button. */
+[data-tater-field][data-tater-entities].tater-widget-outlined {
+  cursor: pointer;
+}
+
+[data-tater-field][data-tater-entities].tater-widget-outlined:hover {
+  filter: opacity(0.5);
+}
+
+/* Inline variant for SpanPopupWidget counter strip.
+   The JS still sets class to tater-count-badge / tater-count-badge tater-count-visible
+   as usual; the container context overrides absolute positioning to keep the
+   badge in normal flow next to the entity label. */
+.tater-count-container .tater-count-badge {
+  position: static;
+  bottom: auto;
+  right: auto;
 }
 
 .tater-tooltip-delete {

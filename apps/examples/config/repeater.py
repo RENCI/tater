@@ -10,14 +10,14 @@ from tater.widgets import (
     TabsWidget,
     AccordionWidget,
 )
-from tater.widgets.hierarchical_label import HierarchicalLabelCompactWidget
+from tater.widgets.hierarchical_label import HierarchicalLabelSelectWidget
 
 
 class Pet(BaseModel):
     kind: Optional[Literal["cat", "dog", "fish"]] = None
     neutered: Optional[bool] = None
     indoor: Optional[bool] = None
-    breed: Optional[str] = None
+    breed: Optional[List[str]] = None
 
 
 class Schema(BaseModel):
@@ -40,7 +40,7 @@ _item_widgets = lambda: [
     SegmentedControlWidget(schema_field="kind", label="Pet Type"),
     CheckboxWidget(schema_field="neutered", label="Neutered / spayed"),
     SwitchWidget(schema_field="indoor", label="Indoor"),
-    HierarchicalLabelCompactWidget(
+    HierarchicalLabelSelectWidget(
         schema_field="breed",
         label="Breed",
         hierarchy="apps/examples/data/pet_ontology.yaml",

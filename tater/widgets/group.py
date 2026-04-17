@@ -21,12 +21,17 @@ class GroupWidget(ContainerWidget):
         for child in self.children:
             child._set_repeater_context(ld, path)
 
-    def _register_repeater_conditional_callbacks(self, app, ld: str) -> None:
-        """Register MATCH-based conditional callbacks for children inside a repeater."""
+    def _register_repeater_conditional_callbacks(self, app, ld: str, outer_prefix: str = "") -> None:
+        """Register MATCH-based conditional callbacks for children inside a repeater.
+
+        ``outer_prefix`` accumulates any enclosing group schema_fields so that
+        doubly-nested groups produce correct pipe-joined tf keys.
+        """
         from .base import ControlWidget
+        prefix = f"{outer_prefix}|{self.schema_field}" if outer_prefix else self.schema_field
         for child in self.children:
             if isinstance(child, ControlWidget) and child._condition is not None:
-                child._register_repeater_conditional_callbacks(app, ld, self.children)
+                child._register_repeater_conditional_callbacks(app, ld, self.children, group_prefix=prefix)
 
     def component(self) -> dmc.Card:
         child_components = [child.render_field(mt="sm") for child in self.children]

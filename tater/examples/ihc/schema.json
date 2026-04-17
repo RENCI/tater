@@ -1,0 +1,119 @@
+{
+  "spec_version": "1.0",
+  "title": "tater - IHC test results",
+  "description": "Annotate immunohistochemical (IHC) test results with stain, result, block location, and spans.",
+  "instructions": "**Annotation Instructions for IHC Test Results**\n\nIHC (Immunohistochemical) testing uses antibodies to detect specific antigens in tissue samples.\n\n**For each IHC test:**\n\n1. **Select test type**:\n   - General IHC: Any stain with basic positive/negative/other result\n   - Breast biomarker IHC: HER2, ER, PR, etc. with intensity and percentage\n   - Ki67 IHC: Proliferation marker with percentage of positive cells\n\n2. **Fill in test details**:\n   - Stain name (e.g., HER2, ER, PR, Ki67, etc.)\n   - Qualitative result (Negative/Positive/Other)\n   - For breast biomarkers: intensity (Weak/Moderate/Strong) and % of cells staining\n   - For Ki67: percentage of positive cells\n\n3. **Block identification**:\n   - Identify which block/slide the test was run on\n   - Use naming convention: <PART LETTER><BLOCK NUM> (e.g., B3 = part B, block 3)\n   - For slides, append: B3.2\n\n4. **Highlight relevant text**:\n   - Optionally highlight text sections relevant to this test\n\n5. **Handle exceptions**:\n   - If results not reported in this document → check \"Results not reported\"\n   - If results from different tissue → check \"Results from different tissue\"",
+  "data_schema": [
+    {
+      "id": "tests",
+      "type": "repeater",
+      "widget": {
+        "type": "accordion",
+        "label": "IHC Test Results",
+        "description": "Add and annotate each IHC test mentioned in the report",
+        "item_label": "Test"
+      },
+      "item_fields": [
+        {
+          "id": "test_type",
+          "type": "choice",
+          "options": ["general", "breast_biomarker", "ki67"],
+          "widget": {
+            "type": "select",
+            "label": "Test Type",
+            "description": "Select the type of IHC test performed"
+          }
+        },
+        {
+          "id": "stain",
+          "type": "text",
+          "widget": {
+            "type": "text_input",
+            "label": "Stain",
+            "placeholder": "e.g. HER2, ER, PR, Ki67, CD20, etc.",
+            "description": "Name of the antibody stain used (optional for Ki67)"
+          }
+        },
+        {
+          "id": "qualitative_result",
+          "type": "choice",
+          "options": ["Negative", "Positive", "Other"],
+          "widget": {
+            "type": "select",
+            "label": "Result",
+            "description": "Qualitative assessment of the stain"
+          }
+        },
+        {
+          "id": "stain_intensity",
+          "type": "choice",
+          "options": ["Weak", "Moderate", "Strong"],
+          "widget": {
+            "type": "select",
+            "label": "Stain Intensity",
+            "description": "Only for breast biomarker tests",
+            "conditional_on": {"field": "test_type", "value": "breast_biomarker"}
+          }
+        },
+        {
+          "id": "percentage_of_cell_staining",
+          "type": "text",
+          "widget": {
+            "type": "text_input",
+            "label": "Percentage of cells staining",
+            "placeholder": "e.g. 10%, <5%, >90%, etc.",
+            "description": "Only for breast biomarker tests",
+            "conditional_on": {"field": "test_type", "value": "breast_biomarker"}
+          }
+        },
+        {
+          "id": "percentage_of_positive_cells",
+          "type": "text",
+          "widget": {
+            "type": "text_input",
+            "label": "Percentage of positive cells",
+            "placeholder": "e.g. 10%, 15%, 20%, etc.",
+            "description": "Only for Ki67 tests",
+            "conditional_on": {"field": "test_type", "value": "ki67"}
+          }
+        },
+        {
+          "id": "block_run_on",
+          "type": "text",
+          "widget": {
+            "type": "text_input",
+            "label": "Which block was the test run on",
+            "placeholder": "e.g. B3, C4, D1 or B3.2 for slides",
+            "description": "Naming convention: <PART LETTER><BLOCK NUM> (e.g. B3 = part B, block 3). For slides: B3.2"
+          }
+        },
+        {
+          "id": "test_results_not_reported",
+          "type": "boolean",
+          "widget": {
+            "type": "checkbox",
+            "label": "The test results are not reported here"
+          }
+        },
+        {
+          "id": "results_not_from_this_tissue",
+          "type": "boolean",
+          "widget": {
+            "type": "checkbox",
+            "label": "The test results reported here were NOT run on this tissue"
+          }
+        },
+        {
+          "id": "relevant_spans",
+          "type": "span_annotation",
+          "widget": {
+            "type": "span_annotation",
+            "label": "Highlight relevant text",
+            "description": "Select text sections relevant to this IHC test",
+            "entity_types": ["Relevant"]
+          }
+        }
+      ]
+    }
+  ]
+}
