@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from dash import html, dcc
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
+from tater.ui.constants import STATUS_COLORS
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -228,9 +229,9 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     left = dmc.Group([
         dmc.ProgressRoot(
             [
-                dmc.ProgressSection(value=0, id="prog-c",  color="var(--mantine-color-teal-filled)"),
-                dmc.ProgressSection(value=0, id="prog-ip", color="var(--mantine-color-blue-filled)"),
-                dmc.ProgressSection(value=0, id="prog-ns", color="var(--mantine-color-gray-light)"),
+                dmc.ProgressSection(value=0, id="prog-c",  color=f"var(--mantine-color-{STATUS_COLORS['complete']}-light-color)"),
+                dmc.ProgressSection(value=0, id="prog-ip", color=f"var(--mantine-color-{STATUS_COLORS['in_progress']}-light-color)"),
+                dmc.ProgressSection(value=0, id="prog-ns", color=f"var(--mantine-color-{STATUS_COLORS['not_started']}-light)"),
             ],
             size="sm",
             radius="sm",
@@ -240,7 +241,7 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
             id="icon-all-complete",
             icon="tabler:circle-check",
             width=20,
-            color="var(--mantine-color-teal-filled)",
+            color=f"var(--mantine-color-{STATUS_COLORS['complete']}-filled)",
             style={"visibility": "hidden", "flexShrink": 0},
         ),
     ], gap="xs", style={"flex": "1"}, wrap="nowrap")

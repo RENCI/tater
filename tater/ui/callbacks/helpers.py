@@ -8,6 +8,7 @@ from dash import html, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from tater.ui import value_helpers
+from tater.ui.constants import STATUS_COLORS, STATUS_LABELS
 from tater.widgets.base import ContainerWidget, ControlWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import RepeaterWidget
@@ -130,9 +131,7 @@ def _build_ev_lookup(widgets: list[TaterWidget], _group_prefix: str = "") -> dic
 
 def _status_display(status: str) -> tuple[str, str]:
     """Return (label, color) for a document status string."""
-    labels = {"not_started": "Not Started", "in_progress": "In Progress", "complete": "Complete"}
-    colors = {"not_started": "gray", "in_progress": "blue", "complete": "teal"}
-    return labels.get(status, status), colors.get(status, "gray")
+    return STATUS_LABELS.get(status, status), STATUS_COLORS.get(status, "gray")
 
 
 def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
