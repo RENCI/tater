@@ -178,18 +178,26 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             return no_update, no_update, no_update, no_update
         return _perform_navigation(ta, current_doc_id, current_index + 1, timing_data, annotations_data, metadata_data)
 
-    # Refresh menu dropdown with status badges after any navigation or status change
+    # Refresh menu dropdown after any navigation, status change, or filter change.
     @app.callback(
         Output("document-menu-dropdown", "children"),
-        Output("filter-flagged", "variant"),
         Input("timing-store", "data"),
         Input("status-store", "data"),
-        Input("filter-flagged", "n_clicks"),
+        Input("filter-store", "data"),
         State("metadata-store", "data"),
     )
-    def update_menu_items(timing_data, status_data, n_clicks, metadata_data):
-        flagged_only = bool((n_clicks or 0) % 2)
-        return _build_menu_items(_ta(), metadata_data, flagged_only=flagged_only), "filled" if flagged_only else "outline"
+    def update_menu_items(timing_data, status_data, filter_data, metadata_data):
+        return _build_menu_items(_ta(), metadata_data, filter_data=filter_data)
+
+    # Sync filter controls → filter-store.
+    @app.callback(
+        Output("filter-store", "data"),
+        Input("filter-flagged-check", "checked"),
+        Input("filter-status", "value"),
+        prevent_initial_call=True,
+    )
+    def update_filter_store(flagged, statuses):
+        return {"flagged": bool(flagged), "statuses": statuses or []}
 
     # Load flag and notes from metadata when the document changes.
     @app.callback(

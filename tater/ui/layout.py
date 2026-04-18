@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dash import html, dcc
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
-from tater.ui.constants import STATUS_COLORS
+from tater.ui.constants import STATUS_COLORS, STATUS_LABELS
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -146,6 +146,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 for doc_id, meta in tater_app.metadata.items()
             }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
+            dcc.Store(id="filter-store", data={"flagged": False, "statuses": list(STATUS_LABELS.keys())}),
             doc_list_store,
             *span_stores,
             app_shell,
@@ -361,13 +362,39 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
                                 ),
                                 dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
                             ], position="top-start", withArrow=True, withinPortal=True, width="target", zIndex=600),
-                            dmc.Button(
-                                DashIconify(icon="tabler:flag", width=16),
-                                id="filter-flagged",
-                                size="sm",
-                                variant="outline",
-                                px="xs",
-                                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                            dmc.Popover(
+                                [
+                                    dmc.PopoverTarget(
+                                        dmc.Button(
+                                            DashIconify(icon="tabler:filter", width=16),
+                                            id="filter-btn",
+                                            size="sm",
+                                            variant="outline",
+                                            px="xs",
+                                            style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                                        ),
+                                    ),
+                                    dmc.PopoverDropdown(
+                                        dmc.Stack([
+                                            dmc.Text("Status", size="xs", c="dimmed"),
+                                            dmc.CheckboxGroup(
+                                                id="filter-status",
+                                                value=list(STATUS_LABELS.keys()),
+                                                children=dmc.Stack([
+                                                    dmc.Checkbox(value=k, label=v)
+                                                    for k, v in STATUS_LABELS.items()
+                                                ], gap="xs"),
+                                            ),
+                                            dmc.Divider(),
+                                            dmc.Checkbox(id="filter-flagged-check", label="Flagged only", checked=False),
+                                        ], gap="sm", p="xs"),
+                                    ),
+                                ],
+                                position="top-end",
+                                withArrow=True,
+                                withinPortal=True,
+                                keepMounted=True,
+                                zIndex=600,
                             ),
                         ], gap=0, wrap="nowrap", style={"flex": "1"}),
                         # Right nav group

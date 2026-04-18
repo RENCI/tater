@@ -171,8 +171,11 @@ def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: di
 # Navigation + menu
 # ---------------------------------------------------------------------------
 
-def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_only: bool = False) -> list:
+def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, filter_data: dict | None = None) -> list:
     """Build document menu items with status badges and flag indicators."""
+    filter_data = filter_data or {}
+    flagged_only = filter_data.get("flagged", False)
+    allowed_statuses = filter_data.get("statuses") or ["not_started", "in_progress", "complete"]
     items = []
     for i, doc in enumerate(tater_app.documents):
         meta = _get_meta(metadata_data, doc.id)
@@ -180,6 +183,8 @@ def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_o
         if flagged_only and not flagged:
             continue
         status = meta.get("status", "not_started")
+        if status not in allowed_statuses:
+            continue
         status_label, status_color = _status_display(status)
         right_children = []
         if flagged:
@@ -207,7 +212,7 @@ def _build_menu_items(tater_app: TaterApp, metadata_data: dict | None, flagged_o
             )
         )
     if not items:
-        items.append(dmc.Text("No flagged documents", size="sm", c="dimmed", p="xs"))
+        items.append(dmc.Text("No documents match filter", size="sm", c="dimmed", p="xs"))
     return items
 
 
