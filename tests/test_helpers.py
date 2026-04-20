@@ -356,20 +356,29 @@ class TestPerformNavigation:
         _, timing, _, _ = _perform_navigation(ta, None, 0, {}, None, None)
         assert timing["annotation_seconds_at_load"] == 0.0
 
-    def test_status_complete_when_no_required_widgets(self):
+    def test_arriving_doc_is_in_progress(self):
+        # Arriving at a doc marks it in_progress regardless of required widgets.
+        # Completion only happens when navigating *away*.
         ta = _make_ta(self._docs(), required_widgets=[])
         _, _, metadata, status = _perform_navigation(ta, None, 0, {}, None, None)
-        assert status == "complete"
+        assert status == "in_progress"
+        assert metadata["doc1"]["status"] == "in_progress"
+
+    def test_departing_doc_marked_complete_when_no_required_widgets(self):
+        # Navigating away from a visited doc with no required widgets marks it complete.
+        ta = _make_ta(self._docs(), required_widgets=[])
+        metadata_in = {"doc1": {"visited": True, "status": "in_progress", "annotation_seconds": 0.0}}
+        _, _, metadata, _ = _perform_navigation(ta, "doc1", 1, {}, None, metadata_in)
         assert metadata["doc1"]["status"] == "complete"
 
-    def test_status_not_started_when_doc_not_visited(self):
-        # Navigate away from current doc — new doc starts as not_started
-        # until it's marked visited (which _perform_navigation does)
-        # After nav, new doc is visited → status depends on required_widgets
-        ta = _make_ta(self._docs(), required_widgets=[])
-        _, _, metadata, status = _perform_navigation(ta, None, 0, {}, None, None)
-        # No required widgets → complete once visited
-        assert status == "complete"
+    def test_departing_doc_in_progress_when_required_unfilled(self):
+        # Navigating away with required fields empty leaves departing doc in_progress.
+        mock_widget = types.SimpleNamespace(field_path="required_field")
+        ta = _make_ta(self._docs(), required_widgets=[mock_widget])
+        metadata_in = {"doc1": {"visited": True, "status": "in_progress", "annotation_seconds": 0.0}}
+        # annotations_data=None means no annotation → _is_complete_eligible returns False
+        _, _, metadata, _ = _perform_navigation(ta, "doc1", 1, {}, None, metadata_in)
+        assert metadata["doc1"]["status"] == "in_progress"
 
     def test_timing_none_initializes_to_dict(self):
         ta = _make_ta(self._docs())
@@ -416,24 +425,20 @@ class TestBuildMenuItems:
     def test_empty_document_list(self):
         ta = _make_ta([])
         items = _build_menu_items(ta, {})
-        # No docs, flagged_only=False → still nothing; but the no-items guard
-        # only triggers when flagged_only is used and nothing passes
-        # With flagged_only=False and empty docs: items list is empty, then
-        # no-items check appends placeholder
-        assert len(items) == 1  # placeholder "No flagged documents"
+        assert len(items) == 1  # placeholder "No documents match filter"
 
     def test_flagged_only_returns_only_flagged(self):
         docs = [_doc("doc1"), _doc("doc2"), _doc("doc3")]
         ta = _make_ta(docs)
         meta = self._metadata(["doc1", "doc2", "doc3"], flagged=["doc2"])
-        items = _build_menu_items(ta, meta, flagged_only=True)
+        items = _build_menu_items(ta, meta, filter_data={"flagged": True, "statuses": ["not_started", "in_progress", "complete"]})
         assert len(items) == 1
 
     def test_flagged_only_with_no_flagged_returns_placeholder(self):
         docs = [_doc("doc1"), _doc("doc2")]
         ta = _make_ta(docs)
         meta = self._metadata(["doc1", "doc2"])
-        items = _build_menu_items(ta, meta, flagged_only=True)
+        items = _build_menu_items(ta, meta, filter_data={"flagged": True, "statuses": ["not_started", "in_progress", "complete"]})
         assert len(items) == 1
         # The placeholder is a dmc.Text, not a dmc.MenuItem
 
@@ -447,5 +452,5 @@ class TestBuildMenuItems:
         docs = [_doc("doc1"), _doc("doc2")]
         ta = _make_ta(docs)
         meta = self._metadata(["doc1", "doc2"], flagged=["doc1", "doc2"])
-        items = _build_menu_items(ta, meta, flagged_only=True)
+        items = _build_menu_items(ta, meta, filter_data={"flagged": True, "statuses": ["not_started", "in_progress", "complete"]})
         assert len(items) == 2

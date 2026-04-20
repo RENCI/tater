@@ -88,6 +88,32 @@ Object.assign(window.dash_clientside.tater, {
         return v !== config.target ? config.empty : window.dash_clientside.no_update;
     },
 
+    /**
+     * Update the session-level status count badges in the header.
+     * Returns [nsText, ipText, cText] for the NS / IP / C badges.
+     */
+    updateStatusBadges: function (metadataData, docListStore) {
+        var nu = window.dash_clientside.no_update;
+        if (!docListStore || !docListStore.total) { return [nu, nu, nu, nu]; }
+        var total = docListStore.total;
+        var complete = 0, inProgress = 0, notStarted = 0;
+        var docIds = Object.keys(docListStore.index);
+        for (var i = 0; i < docIds.length; i++) {
+            var meta = metadataData && metadataData[docIds[i]];
+            var status = meta ? (meta.status || "not_started") : "not_started";
+            if (status === "complete") { complete++; }
+            else if (status === "in_progress") { inProgress++; }
+            else { notStarted++; }
+        }
+        var allDone = complete === total;
+        return [
+            (notStarted / total) * 100,
+            (inProgress / total) * 100,
+            (complete  / total) * 100,
+            allDone ? { "visibility": "visible" } : { "visibility": "hidden" },
+        ];
+    },
+
     /** Show an element ({}) when v is truthy; hide it (display:none) otherwise. */
     showWhenTruthy: function (v) {
         return v ? {} : { "display": "none" };
@@ -101,6 +127,11 @@ Object.assign(window.dash_clientside.tater, {
     /** Open a component by returning true (e.g. a Drawer's opened prop). */
     openOnClick: function () {
         return true;
+    },
+
+    /** Close a component by returning false (e.g. a Modal's opened prop). */
+    closeOnClick: function () {
+        return false;
     },
 
 });

@@ -476,16 +476,23 @@ Object.assign(window.dash_clientside.tater, {
     // since all required information is preloaded in doc-list-store at layout time.
     updateNavInfo: function(docId, docListStore) {
         var nu = window.dash_clientside.no_update;
-        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu]; }
+        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu, nu, nu]; }
         var idx = docListStore.index[docId];
-        if (idx === undefined) { return [nu, nu, nu, nu, nu]; }
+        if (idx === undefined) { return [nu, nu, nu, nu, nu, nu, nu]; }
         var total = docListStore.total;
+        var isLast = idx === total - 1;
+
+        // Toggle containers via display:contents (visible, transparent to layout) or display:none.
+        // The buttons' own styles (border, flex) remain static in the layout — only the
+        // containers are toggled, so dmc.Button never receives a dynamic style object.
         return [
             (idx + 1) + " / " + total,
             docListStore.metadata[docId] || "",
             ((idx + 1) / total) * 100,
             idx === 0,
-            idx === total - 1
+            isLast,
+            isLast ? {"display": "none"} : {"display": "contents"},
+            isLast ? {"display": "contents"} : {"display": "none"},
         ];
     },
 
