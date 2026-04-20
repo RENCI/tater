@@ -94,7 +94,7 @@ Object.assign(window.dash_clientside.tater, {
      */
     updateStatusBadges: function (metadataData, docListStore) {
         var nu = window.dash_clientside.no_update;
-        if (!docListStore || !docListStore.total) { return [nu, nu, nu]; }
+        if (!docListStore || !docListStore.total) { return [nu, nu, nu, nu]; }
         var total = docListStore.total;
         var complete = 0, inProgress = 0, notStarted = 0;
         var docIds = Object.keys(docListStore.index);
@@ -127,6 +127,11 @@ Object.assign(window.dash_clientside.tater, {
     /** Open a component by returning true (e.g. a Drawer's opened prop). */
     openOnClick: function () {
         return true;
+    },
+
+    /** Close a component by returning false (e.g. a Modal's opened prop). */
+    closeOnClick: function () {
+        return false;
     },
 
 });

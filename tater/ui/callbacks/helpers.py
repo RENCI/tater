@@ -134,37 +134,49 @@ def _status_display(status: str) -> tuple[str, str]:
     return STATUS_LABELS.get(status, status), STATUS_COLORS.get(status, "gray")
 
 
-def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
-    """Compute and store the annotation status for a document.
+def _is_complete_eligible(tater_app: TaterApp, doc_id: str, annotations_data: dict | None) -> bool:
+    """Return True if the document meets the requirements to be marked complete.
 
+    No required widgets → always eligible. Otherwise all required fields must be filled.
+    """
+    required_widgets = tater_app._required_widgets
+    if not required_widgets:
+        return True
+    ann = _get_ann(annotations_data, doc_id)
+    if ann is None:
+        return False
+    for widget in required_widgets:
+        value = value_helpers.get_model_value(ann, widget.field_path)
+        if not _has_value(value):
+            return False
+    return True
+
+
+def _format_seconds(total_seconds: float) -> str:
+    """Format a duration in seconds as a human-readable string."""
+    total_seconds = int(total_seconds)
+    hours, rem = divmod(total_seconds, 3600)
+    mins, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {mins}m {secs}s"
+    if mins:
+        return f"{mins}m {secs}s"
+    return f"{secs}s"
+
+
+def update_status_for_doc(tater_app: TaterApp, doc_id: str, annotations_data: dict | None, metadata_data: dict) -> None:
+    """Set in-flight status (not_started / in_progress) for the arriving document.
+
+    Completion is only assigned by _perform_navigation (on departure) or handle_finish.
     Mutates ``metadata_data[doc_id]["status"]`` in-place.
     """
     if not doc_id or metadata_data is None:
         return
     meta = metadata_data.setdefault(doc_id, _default_meta())
-
     if not meta.get("visited", False):
         meta["status"] = "not_started"
         return
-
-    # Booleans always have a value (True/False), so they cannot meaningfully gate completion.
-    required_widgets = tater_app._required_widgets
-    if not required_widgets:
-        meta["status"] = "complete"
-        return
-
-    ann = _get_ann(annotations_data, doc_id)
-    if ann is None:
-        meta["status"] = "in_progress"
-        return
-
-    for widget in required_widgets:
-        value = value_helpers.get_model_value(ann, widget.field_path)
-        if not _has_value(value):
-            meta["status"] = "in_progress"
-            return
-
-    meta["status"] = "complete"
+    meta["status"] = "in_progress"
 
 
 # ---------------------------------------------------------------------------
@@ -236,8 +248,10 @@ def _perform_navigation(
         start = timing_data.get("doc_start_time") if timing_data else None
         if start:
             meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+        # Navigation away marks the departing doc complete if eligible, otherwise in_progress.
+        if meta.get("visited", False):
+            meta["status"] = "complete" if _is_complete_eligible(tater_app, current_doc_id, annotations_data) else "in_progress"
         metadata_data[current_doc_id] = meta
-        update_status_for_doc(tater_app, current_doc_id, annotations_data, metadata_data)
 
     doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""
 

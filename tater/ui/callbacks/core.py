@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 from dash import Input, Output, State, ALL, ctx, no_update, html, ClientsideFunction
 
+import dash_mantine_components as dmc
+
 from tater.ui.callbacks.helpers import (
     _get_ann,
     _get_meta,
@@ -16,6 +18,8 @@ from tater.ui.callbacks.helpers import (
     _perform_navigation,
     update_status_for_doc,
     _status_display,
+    _is_complete_eligible,
+    _format_seconds,
 )
 
 if TYPE_CHECKING:
@@ -57,6 +61,8 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         Output("document-progress", "value"),
         Output("btn-prev", "disabled"),
         Output("btn-next", "disabled"),
+        Output("btn-next-container", "style"),
+        Output("btn-finish-container", "style"),
         Input("current-doc-id", "data"),
         State("doc-list-store", "data"),
         prevent_initial_call=False,
@@ -199,6 +205,110 @@ def setup_callbacks(tater_app: TaterApp) -> None:
     def update_filter_store(flagged, statuses):
         return {"flagged": bool(flagged), "statuses": statuses or []}
 
+    # Finish button: accumulate time, mark current doc complete if eligible, open summary modal.
+    @app.callback(
+        Output("modal-finish", "opened"),
+        Output("modal-finish", "title"),
+        Output("finish-modal-content", "children"),
+        Output("btn-go-incomplete", "style"),
+        Output("metadata-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
+        Output("timing-store", "data", allow_duplicate=True),
+        Input("btn-finish", "n_clicks"),
+        State("current-doc-id", "data"),
+        State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
+        prevent_initial_call=True,
+    )
+    def handle_finish(n_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
+        if not n_clicks:
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        ta = _ta()
+        now = time.time()
+        metadata_data = dict(metadata_data or {})
+        timing_data = dict(timing_data or {})
+
+        # Accumulate time, pause timer, and mark departing doc complete if eligible.
+        if current_doc_id:
+            meta = dict(_get_meta(metadata_data, current_doc_id))
+            start = timing_data.get("doc_start_time")
+            if start:
+                meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
+            if meta.get("visited", False):
+                meta["status"] = "complete" if _is_complete_eligible(ta, current_doc_id, annotations_data) else "in_progress"
+            metadata_data[current_doc_id] = meta
+            timing_data["annotation_seconds_at_load"] = meta.get("annotation_seconds", 0.0)
+
+        # Pause the timer so it stops while the modal is open.
+        timing_data["doc_start_time"] = None
+        timing_data["paused"] = True
+        timing_data["last_save_time"] = now
+
+        # Compute session stats.
+        total = len(ta.documents)
+        complete_count = sum(
+            1 for d in ta.documents
+            if _get_meta(metadata_data, d.id).get("status") == "complete"
+        )
+        incomplete_count = total - complete_count
+        total_seconds = sum(
+            _get_meta(metadata_data, d.id).get("annotation_seconds", 0.0)
+            for d in ta.documents
+        )
+
+        all_done = incomplete_count == 0
+        title = "All Done!" if all_done else "Session Summary"
+        rows = [
+            dmc.Text(
+                f"{'All ' + str(total) if all_done else str(complete_count) + ' / ' + str(total)} document{'s' if total != 1 else ''} complete",
+                fw=500,
+                c="teal" if all_done else None,
+            ),
+            dmc.Text(f"Total annotation time: {_format_seconds(total_seconds)}", size="sm", c="dimmed"),
+        ]
+        if not all_done:
+            rows.insert(1, dmc.Text(
+                f"{incomplete_count} document{'s' if incomplete_count != 1 else ''} still incomplete",
+                size="sm", c="dimmed",
+            ))
+
+        go_style = {"display": "none"} if all_done else {}
+        status = metadata_data.get(current_doc_id, {}).get("status", "not_started") if current_doc_id else "not_started"
+        return True, title, dmc.Stack(rows, gap="xs"), go_style, metadata_data, status, timing_data
+
+    # "Go to first incomplete" — navigate and close modal.
+    @app.callback(
+        Output("current-doc-id", "data", allow_duplicate=True),
+        Output("timing-store", "data", allow_duplicate=True),
+        Output("metadata-store", "data", allow_duplicate=True),
+        Output("status-store", "data", allow_duplicate=True),
+        Output("modal-finish", "opened", allow_duplicate=True),
+        Input("btn-go-incomplete", "n_clicks"),
+        State("current-doc-id", "data"),
+        State("timing-store", "data"),
+        State("annotations-store", "data"),
+        State("metadata-store", "data"),
+        prevent_initial_call=True,
+    )
+    def go_to_first_incomplete(n_clicks, current_doc_id, timing_data, annotations_data, metadata_data):
+        if not n_clicks:
+            return no_update, no_update, no_update, no_update, no_update
+        ta = _ta()
+        for i, doc in enumerate(ta.documents):
+            if _get_meta(metadata_data, doc.id).get("status") != "complete":
+                nav = _perform_navigation(ta, current_doc_id, i, timing_data, annotations_data, metadata_data)
+                return *nav, False
+        return no_update, no_update, no_update, no_update, False
+
+    # Close finish modal.
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="closeOnClick"),
+        Output("modal-finish", "opened", allow_duplicate=True),
+        Input("btn-close-finish", "n_clicks"),
+        prevent_initial_call=True,
+    )
+
     # Load flag and notes from metadata when the document changes.
     @app.callback(
         Output("flag-document", "checked"),
@@ -232,9 +342,9 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         meta["flagged"] = checked
         metadata_data[doc_id] = meta
 
-        if timing_data is None:
-            timing_data = {}
-        timing_data["last_save_time"] = time.time()
+        # Return timing-store unchanged to trigger update_menu_items (flag icon refresh).
+        # last_save_time is intentionally not updated here — in single mode, auto_save
+        # handles it when metadata-store changes; in hosted mode nothing is saved to file.
         return timing_data, metadata_data
 
     # Handle document-notes changes
@@ -269,14 +379,16 @@ def setup_callbacks(tater_app: TaterApp) -> None:
         # Download annotations as JSON
         @app.callback(
             Output("download-annotations", "data"),
+            Output("timing-store", "data", allow_duplicate=True),
             Input("btn-download", "n_clicks"),
             State("annotations-store", "data"),
             State("metadata-store", "data"),
+            State("timing-store", "data"),
             prevent_initial_call=True,
         )
-        def download_annotations(n_clicks, annotations_data, metadata_data):
+        def download_annotations(n_clicks, annotations_data, metadata_data, timing_data):
             if not n_clicks:
-                return no_update
+                return no_update, no_update
             save_dict = {}
             all_ids = set(annotations_data or {}) | set(metadata_data or {})
             for d_id in all_ids:
@@ -284,7 +396,9 @@ def setup_callbacks(tater_app: TaterApp) -> None:
                     "annotations": (annotations_data or {}).get(d_id, {}),
                     "metadata": (metadata_data or {}).get(d_id, {}),
                 }
-            return {"content": json.dumps(save_dict, indent=2), "filename": "annotations.json"}
+            timing_data = dict(timing_data or {})
+            timing_data["last_save_time"] = time.time()
+            return {"content": json.dumps(save_dict, indent=2), "filename": "annotations.json"}, timing_data
 
         # Start over: open confirmation modal
         @app.callback(
@@ -477,7 +591,7 @@ def _update_save_status_impl(ta, timing_data):
     if timing_data and timing_data.get("last_save_time"):
         dt = datetime.fromtimestamp(timing_data["last_save_time"])
         return f"Last saved: {dt.strftime('%H:%M:%S')}", "dimmed"
-    return "Never saved", "dimmed"
+    return "Not saved", "dimmed"
 
 
 def _on_doc_change_impl(ta, doc_id, timing_data, annotations_data, metadata_data):

@@ -30,6 +30,7 @@ def _build_doc_list_store_data(tater_app: TaterApp) -> dict:
             d.id: " | ".join(f"{k}: {v}" for k, v in d.info.items()) if d.info else ""
             for d in docs
         },
+        "hosted": tater_app.is_hosted,
     }
 
 
@@ -130,6 +131,23 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     ),
                 ],
             ) if is_hosted else None,
+            dmc.Modal(
+                title="Session Summary",
+                id="modal-finish",
+                opened=False,
+                centered=True,
+                children=[
+                    html.Div(id="finish-modal-content"),
+                    dmc.Group(
+                        [
+                            dmc.Button("Go to first incomplete", id="btn-go-incomplete", variant="outline", size="sm", style={"display": "none"}),
+                            dmc.Button("Close", id="btn-close-finish", variant="default", size="sm"),
+                        ],
+                        justify="flex-end",
+                        mt="md",
+                    ),
+                ],
+            ),
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
@@ -298,11 +316,25 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
     # Right side of nav row: Next+Save (single mode) or Next+Download+StartOver (hosted)
     if is_hosted:
         right_nav = dmc.Group([
-            dmc.Button(
-                "Next", id="btn-next", variant="outline", size="sm",
-                fullWidth=True,
-                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                style={"flex": "1"},
+            html.Div(
+                dmc.Button(
+                    "Next", id="btn-next", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                    style={"flex": "1"},
+                ),
+                id="btn-next-container",
+                style={"display": "contents"},
+            ),
+            html.Div(
+                dmc.Button(
+                    "Finish", id="btn-finish", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:circle-check", width=16),
+                    style={"flex": "1"},
+                ),
+                id="btn-finish-container",
+                style={"display": "none"},
             ),
             dmc.Button(
                 DashIconify(icon="tabler:download", width=16),
@@ -315,11 +347,25 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
         save_right = None
     else:
         right_nav = dmc.Group([
-            dmc.Button(
-                "Next", id="btn-next", variant="outline", size="sm",
-                fullWidth=True,
-                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+            html.Div(
+                dmc.Button(
+                    "Next", id="btn-next", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                    style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+                ),
+                id="btn-next-container",
+                style={"display": "contents"},
+            ),
+            html.Div(
+                dmc.Button(
+                    "Finish", id="btn-finish", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:circle-check", width=16),
+                    style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+                ),
+                id="btn-finish-container",
+                style={"display": "none"},
             ),
             dmc.Button(
                 DashIconify(icon="tabler:device-floppy", width=16),
