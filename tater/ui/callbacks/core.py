@@ -263,7 +263,7 @@ def setup_callbacks(tater_app: TaterApp) -> None:
             dmc.Text(
                 f"{'All ' + str(total) if all_done else str(complete_count) + ' / ' + str(total)} document{'s' if total != 1 else ''} complete",
                 fw=500,
-                c="teal" if all_done else None,
+                **({"c": "teal"} if all_done else {}),
             ),
             dmc.Text(f"Total annotation time: {_format_seconds(total_seconds)}", size="sm", c="dimmed"),
         ]
