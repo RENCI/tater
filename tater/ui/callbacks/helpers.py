@@ -248,9 +248,9 @@ def _perform_navigation(
         start = timing_data.get("doc_start_time") if timing_data else None
         if start:
             meta["annotation_seconds"] = meta.get("annotation_seconds", 0.0) + (now - start)
-        # Navigation away marks the departing doc complete if eligible, otherwise in_progress.
-        if meta.get("visited", False):
-            meta["status"] = "complete" if _is_complete_eligible(tater_app, current_doc_id, annotations_data) else "in_progress"
+        # Departing this doc means the user was on it — always mark visited and assess completion.
+        meta["visited"] = True
+        meta["status"] = "complete" if _is_complete_eligible(tater_app, current_doc_id, annotations_data) else "in_progress"
         metadata_data[current_doc_id] = meta
 
     doc_id = tater_app.documents[new_index].id if new_index < len(tater_app.documents) else ""

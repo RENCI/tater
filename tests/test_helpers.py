@@ -365,11 +365,13 @@ class TestPerformNavigation:
         assert metadata["doc1"]["status"] == "in_progress"
 
     def test_departing_doc_marked_complete_when_no_required_widgets(self):
-        # Navigating away from a visited doc with no required widgets marks it complete.
+        # Navigating away marks the departing doc complete when no required widgets.
+        # visited flag on the departing doc doesn't matter — departure implies presence.
         ta = _make_ta(self._docs(), required_widgets=[])
-        metadata_in = {"doc1": {"visited": True, "status": "in_progress", "annotation_seconds": 0.0}}
-        _, _, metadata, _ = _perform_navigation(ta, "doc1", 1, {}, None, metadata_in)
-        assert metadata["doc1"]["status"] == "complete"
+        for visited in (True, False):
+            metadata_in = {"doc1": {"visited": visited, "status": "in_progress", "annotation_seconds": 0.0}}
+            _, _, metadata, _ = _perform_navigation(ta, "doc1", 1, {}, None, metadata_in)
+            assert metadata["doc1"]["status"] == "complete", f"expected complete when visited={visited}"
 
     def test_departing_doc_in_progress_when_required_unfilled(self):
         # Navigating away with required fields empty leaves departing doc in_progress.

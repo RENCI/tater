@@ -53,9 +53,10 @@ ingress:
   annotations:
     # cert-manager.io/cluster-issuer: letsencrypt
     cert-manager.io/cluster-issuer: zerossl
-    # TODO: restrict to RENCI/UNC ranges — email help@renci.org for tater.apps.renci.org exception first
-    # nginx.ingress.kubernetes.io/whitelist-source-range: "152.2.0.0/16,152.19.0.0/16,204.85.176.0/20,204.84.8.0/22,204.84.252.0/22,198.85.230.0/23,2606:f640::/32,2602:fcfb::/36,2600:2701:4000::/44,2610:28:3090::/48"
-    # nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
+    # Restrict to RENCI/UNC ranges first
+    #nginx.ingress.kubernetes.io/whitelist-source-range: "152.2.0.0/16,152.19.0.0/16,152.54.0.0/16,204.85.176.0/20,204.84.8.0/22,204.84.252.0/22,198.85.230.0/23,2606:f640::/32,2602:fcfb::/36,2600:2701:4000::/44,2610:28:3090::/48"
+    #nginx.ingress.kubernetes.io/whitelist-source-range: "152.54.0.0/16" # RENCI VPN
+    #nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0,::/0"
   hosts:
     - host: tater.apps.renci.org
       paths:

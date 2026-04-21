@@ -5,7 +5,7 @@ IMAGE    := $(REGISTRY)/$(APP):$(VERSION)
 
 NAMESPACE ?= clin-ann
 
-.PHONY: help build run stop push release pod-up pod-down pod-logs pod-logs-follow
+.PHONY: help build run stop push release pod-up pod-down pod-bounce pod-logs pod-logs-follow
 
 help:
 	@echo "build             Build the Docker image"
@@ -15,6 +15,7 @@ help:
 	@echo "release           Build and push (build + push)"
 	@echo "pod-up            Deploy to Kubernetes via Helm (NAMESPACE=$(NAMESPACE))"
 	@echo "pod-down          Uninstall Helm release"
+	@echo "pod-bounce        Uninstall then reinstall Helm release"
 	@echo "pod-logs          Print pod logs"
 	@echo "pod-logs-follow   Stream pod logs"
 
@@ -41,6 +42,8 @@ pod-up:
 
 pod-down:
 	helm uninstall $(APP) -n $(NAMESPACE)
+
+pod-bounce: pod-down pod-up
 
 pod-logs:
 	kubectl logs -n $(NAMESPACE) deploy/$(APP)
