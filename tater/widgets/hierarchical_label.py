@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
-from dash import dcc
+from dash import dcc, html
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 from tater.widgets.base import TaterWidget, _unwrap_optional, _resolve_field_info
 
@@ -201,6 +202,8 @@ class HierarchicalLabelWidget(TaterWidget):
 
     hierarchy: Union[Node, dict, list, str, Path, None] = None
     allow_non_leaf: bool = False
+    required: bool = False
+    auto_advance: bool = False  # not supported; present so tater_app field-set builders can access it uniformly
     root: Node = dc_field(init=False, repr=False)
     # Pre-serialized value injected by repeater._render_item_widgets so the
     # component renders with the correct value without waiting for a callback.
@@ -243,6 +246,81 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def register_callbacks(self, app: Any) -> None:
         pass
+
+    # ------------------------------------------------------------------
+    # Hierarchy browser helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _render_tree_html(root: "Node") -> Any:
+        """Build a nested html.Ul/Li tree from a Node for the browser modal."""
+
+        def _children_ul(node: "Node") -> html.Ul:
+            return html.Ul(
+                [_node(child) for child in node.children],
+                style={
+                    "listStyleType": "none",
+                    "paddingLeft": "1em",
+                    "margin": "2px 0 4px 0",
+                    "borderLeft": "2px solid var(--mantine-color-default-border)",
+                },
+            )
+
+        def _node(node: "Node") -> html.Li:
+            if node.is_leaf:
+                return html.Li(
+                    node.name,
+                    style={"padding": "1px 4px"},
+                )
+            return html.Li(
+                [
+                    html.Span(node.name, style={"fontWeight": 600}),
+                    _children_ul(node),
+                ],
+                style={"padding": "2px 0"},
+            )
+
+        top_nodes = root.children if root.name == "__root__" else [root]
+        return html.Div(
+            html.Ul(
+                [_node(n) for n in top_nodes],
+                style={"listStyleType": "none", "padding": 0, "margin": 0},
+            ),
+            style={
+                "maxHeight": "65vh",
+                "overflowY": "auto",
+                "fontSize": "var(--mantine-font-size-sm)",
+                "lineHeight": 1.7,
+            },
+        )
+
+    def _label_with_browser_btn(self, pipe_field: str) -> Any:
+        """Return a label group with an inline hierarchy-browser action icon."""
+        return dmc.Group(
+            [
+                self.label,
+                dmc.ActionIcon(
+                    DashIconify(icon="tabler:binary-tree-2", width=14),
+                    id={"type": "hl-browser-btn", "field": pipe_field},
+                    size="xs",
+                    variant="subtle",
+                    color="gray",
+                ),
+            ],
+            gap=4,
+            align="center",
+        )
+
+    def _browser_modal(self, pipe_field: str) -> dmc.Modal:
+        """Return a hidden Modal containing the full hierarchy tree."""
+        return dmc.Modal(
+            id={"type": "hl-browser-modal", "field": pipe_field},
+            title=self.label,
+            children=self._render_tree_html(self.root),
+            opened=False,
+            size="lg",
+            centered=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -297,13 +375,17 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                         placeholder="Search…",
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
-                        filter={"function": "hlFilter"},
+                        filter={"function": "hlFilter"},                        
+                        comboboxProps={"shadow": "md"},
                     ),
                     dcc.Store(id={"type": "hl-select-relay", "field": pipe_field}, data=None),
+                    self._browser_modal(pipe_field),
                 ],
                 gap="xs",
             ),
-            self.label,
+            self._label_with_browser_btn(pipe_field),
+            self.required,
+            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
         )
 
     def register_callbacks(self, app: Any) -> None:
@@ -385,12 +467,16 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
                         filter={"function": "hlFilter"},
+                        comboboxProps={"shadow": "md"},
                     ),
                     dcc.Store(id={"type": "hl-multi-relay", "field": pipe_field}, data=None),
+                    self._browser_modal(pipe_field),
                 ],
                 gap="xs",
             ),
-            self.label,
+            self._label_with_browser_btn(pipe_field),
+            self.required,
+            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
         )
 
     def register_callbacks(self, app: Any) -> None:
