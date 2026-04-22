@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        if (e.key === 'f') {
+        if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             e.preventDefault();
             const cb = document.getElementById('flag-document');
             if (cb) cb.click();
