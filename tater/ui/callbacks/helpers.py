@@ -11,6 +11,7 @@ from tater.ui import value_helpers
 from tater.ui.constants import STATUS_COLORS, STATUS_LABELS
 from tater.widgets.base import ContainerWidget, ControlWidget
 from tater.widgets.group import GroupWidget
+from tater.widgets.hierarchical_label import HierarchicalLabelWidget
 from tater.widgets.repeater import RepeaterWidget
 
 if TYPE_CHECKING:
@@ -73,7 +74,7 @@ def _collect_value_capture_widgets(widgets: list[TaterWidget]) -> list[TaterWidg
         elif isinstance(widget, GroupWidget):
             if hasattr(widget, "children") and widget.children:
                 captured.extend(_collect_value_capture_widgets(widget.children))
-        elif isinstance(widget, ControlWidget):
+        elif isinstance(widget, (ControlWidget, HierarchicalLabelWidget)):
             captured.append(widget)
     return captured
 
