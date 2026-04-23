@@ -408,7 +408,7 @@ def _build_widget_from_spec(
         raise KeyError(f"Unknown widget type {wtype!r}")
 
     # Post-construction: auto_advance, conditional_on
-    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean"):
+    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean", "hierarchical_label"):
         w.auto_advance = True
     condition = widget_spec.get("conditional_on")
     if condition is not None:

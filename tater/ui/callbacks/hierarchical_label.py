@@ -121,6 +121,15 @@ def setup_hl_select_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
+    # 4. Clientside: auto-advance when an hl-select field is in aa-fields-store
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="hlSelectAutoAdvance"),
+        Output("auto-advance-store", "data", allow_duplicate=True),
+        Input({"type": "hl-select-relay", "field": ALL}, "data"),
+        State("aa-fields-store", "data"),
+        prevent_initial_call=True,
+    )
+
 
 def setup_hl_browser_callback(tater_app: TaterApp) -> None:
     """Register a single shared MATCH callback to open hierarchy browser modals.

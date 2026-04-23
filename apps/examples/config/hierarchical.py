@@ -33,12 +33,14 @@ widgets = [
         label="Breed",
         description="Select a single breed or type.",
         hierarchy=ontology,
+        auto_advance=True,
     ),
     HierarchicalLabelMultiWidget(
         schema_field="breeds_multi",
         label="Breeds (Multi)",
         description="Select one or more breeds.",
         hierarchy=ontology,
+        auto_advance=True,
     ),
     DividerWidget(label="Any level"),
     HierarchicalLabelSelectWidget(
