@@ -71,13 +71,21 @@ def _load_json(path: Path) -> list[Document]:
     return documents
 
 
-def _load_tabular(path: Path, sep: str = ",", excel: bool = False) -> list[Document]:
+def _load_tabular(source, sep: str = ",", excel: bool = False) -> list[Document]:
+    """Parse a tabular document source into Documents.
+
+    Args:
+        source: File path (str/Path) **or** a file-like object (StringIO for
+            CSV/TSV, BytesIO for Excel).  pandas accepts both.
+        sep: Column separator for CSV/TSV (ignored when excel=True).
+        excel: If True, parse as Excel workbook (first sheet).
+    """
     import pandas as pd
 
     if excel:
-        df = pd.read_excel(path, sheet_name=0)
+        df = pd.read_excel(source, sheet_name=0)
     else:
-        df = pd.read_csv(path, sep=sep)
+        df = pd.read_csv(source, sep=sep)
 
     # Normalise column names to lowercase stripped strings.
     df.columns = [str(c).strip().lower() for c in df.columns]
