@@ -246,12 +246,30 @@ class HierarchicalLabelWidget(ControlWidget):
         pass
 
     def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
-        """Use the browser-button label group instead of the auto-advance tooltip."""
+        """Label group with browser button, plus auto-advance tooltip when enabled."""
         pipe_field = self.field_path.replace(".", "|")
+        label = self._label_with_browser_btn(pipe_field)
+        if self.auto_advance:
+            label = dmc.Group(
+                [
+                    label,
+                    dmc.Tooltip(
+                        DashIconify(
+                            icon="tabler:circle-open-arrow-right",
+                            width=13,
+                            color="var(--mantine-color-dimmed)",
+                        ),
+                        label="Auto-advances to next document",
+                        position="right",
+                        withArrow=True,
+                    ),
+                ],
+                gap=4,
+            )
         return TaterWidget._input_wrapper(
             self,
             children,
-            self._label_with_browser_btn(pipe_field),
+            label,
             self.required,
             {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
         )
@@ -425,6 +443,10 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
 
     search_show_siblings: bool = False
     search_show_children: bool = False
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.auto_advance = False  # auto-advance is not meaningful for multi-select
 
     def to_python_type(self) -> type:
         return list

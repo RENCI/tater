@@ -420,6 +420,23 @@ Object.assign(window.dash_clientside.tater, {
         return Object.assign({}, annotationsData, {[docId]: newAnn});
     },
 
+    // ---- hlSelectAutoAdvance: trigger auto-advance after a hl-select-relay write ----
+    // Fires after applyFieldOp has written the value to annotations-store.
+    // Increments auto-advance-store when the relay carried a non-null value and the
+    // field is in aaFields.  Uses a window-global counter (same pattern as captureValue)
+    // to avoid reading auto-advance-store as both Output and State.
+    hlSelectAutoAdvance: function(_allRelays, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+        var val = ctx.triggered[0].value;
+        if (!val || !val.field || val.value == null) { return nu; }
+        if (!Array.isArray(aaFields) || aaFields.indexOf(val.field) === -1) { return nu; }
+        var next = (window._taterAutoAdvanceCount || 0) + 1;
+        window._taterAutoAdvanceCount = next;
+        return next;
+    },
+
     // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----
     // Runs clientside so it reads the CURRENT browser-side annotations (including any
     // clientside span adds that haven't been reflected in server-side State yet).
