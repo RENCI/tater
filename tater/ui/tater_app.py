@@ -7,7 +7,7 @@ from tater.models.document import DocumentMetadata
 
 from dash import Dash
 from tater.ui import layout
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from tater.models import Document
 from tater.widgets.base import TaterWidget
@@ -95,34 +95,17 @@ class TaterApp:
 
     def load_documents(self, source: str) -> bool:
         """
-        Load documents from a JSON file.
+        Load documents from a file (JSON, CSV, TSV, or Excel).
 
         Args:
-            source: Path to documents JSON file
+            source: Path to documents file
 
         Returns:
             True if successful, False otherwise
         """
         try:
-            with open(source, 'r') as f:
-                data = json.load(f)
-            
-            if not isinstance(data, list):
-                print(f"Error: Invalid document format in {source}")
-                return False
-            doc_dicts = data
-            
-            # Parse into Document instances
-            documents = []
-            for idx, doc_dict in enumerate(doc_dicts):
-                try:
-                    doc = Document.from_dict(doc_dict, index=idx)
-                    documents.append(doc)
-                except ValidationError as e:
-                    print(f"Error validating document at index {idx}: {e}")
-                    return False
-            
-            self.documents = documents
+            from tater.loaders.document_loader import load_documents as _load
+            self.documents = _load(source)
             
             # Set default annotations path if not provided (skip in hosted mode)
             if self.annotations_path is None and not self.is_hosted:
