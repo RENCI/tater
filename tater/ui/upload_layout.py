@@ -152,10 +152,11 @@ def build_upload_layout() -> dmc.MantineProvider:
                 [
                     _upload_zone(
                         upload_id="upload-documents",
-                        label="Documents (JSON)",
-                        hint="A JSON array of document objects with at least an 'id' and 'text' field.",
+                        label="Documents (JSON, CSV, TSV, or Excel)",
+                        hint="Document records with at least a 'text' column/field. Supports .json, .csv, .tsv, .xlsx, .xls.",
                         icon="tabler:file-text",
                         status_id="documents-status",
+                        accept=".json,.csv,.tsv,.xlsx,.xls",
                     ),
                     html.Div(id="documents-feedback", style={"minHeight": "20px"}),
                 ],
@@ -293,7 +294,16 @@ def build_upload_layout() -> dmc.MantineProvider:
 def _upload_zone(
     upload_id: str, label: str, hint: str, icon: str,
     status_id: str | None = None, optional: bool = False,
+    accept: str | None = None,
 ) -> dmc.Stack:
+    upload_kwargs = dict(
+        id=upload_id,
+        multiple=False,
+        style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
+        style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
+    )
+    if accept is not None:
+        upload_kwargs["accept"] = accept
     upload = dcc.Upload(
         dmc.Paper(
             dmc.Stack(
@@ -310,10 +320,7 @@ def _upload_zone(
             radius="md",
             style={"cursor": "pointer", "borderStyle": "dashed"},
         ),
-        id=upload_id,
-        multiple=False,
-        style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)"},
-        style_active={"borderStyle": "solid", "borderColor": "var(--mantine-color-blue-6)", "borderRadius": 10},
+        **upload_kwargs,
     )
     upload_row = (
         html.Div(
@@ -495,11 +502,25 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
     def validate_documents(contents, filename):
         if not contents:
             return None, None
-        if not (filename or "").lower().endswith(".json"):
-            return None, _error_text(f"'{filename}' is not a JSON file. Please upload a .json documents file.")
-        result, error = _decode_json_upload(contents, filename)
-        if error:
-            return None, _error_text(error)
+        ext = Path(filename or "").suffix.lower()
+        if ext == ".json":
+            result, error = _decode_json_upload(contents, filename)
+            if error:
+                return None, _error_text(error)
+        elif ext in (".csv", ".tsv", ".xlsx", ".xls"):
+            try:
+                _header, encoded = contents.split(",", 1)
+                content_bytes = base64.b64decode(encoded)
+            except Exception:
+                return None, _error_text(f"Could not decode '{filename}'.")
+            result, error = _parse_tabular_upload(content_bytes, filename)
+            if error:
+                return None, _error_text(error)
+        else:
+            return None, _error_text(
+                f"'{filename}' is not a supported format. "
+                "Please upload a .json, .csv, .tsv, .xlsx, or .xls file."
+            )
         data, err = _validate_documents_data(result, filename)
         if err:
             return None, _error_text(err)
@@ -663,6 +684,36 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _parse_tabular_upload(content_bytes: bytes, filename: str) -> tuple[list | None, str | None]:
+    """Parse CSV/TSV/Excel bytes into a list of document dicts.
+
+    Uses the same column conventions as ``document_loader._load_tabular``:
+    ``id``, ``text``, ``name``, ``file_path`` are reserved; everything else
+    lands in an ``info`` dict.  Returns ``(docs_list, None)`` on success or
+    ``(None, error_message)`` on failure.
+    """
+    import io
+    from tater.loaders.document_loader import _load_tabular
+
+    ext = Path(filename).suffix.lower()
+    try:
+        if ext in (".xlsx", ".xls"):
+            source = io.BytesIO(content_bytes)
+            docs = _load_tabular(source, excel=True)
+        elif ext == ".tsv":
+            source = io.StringIO(content_bytes.decode("utf-8"))
+            docs = _load_tabular(source, sep="\t")
+        else:  # .csv
+            source = io.StringIO(content_bytes.decode("utf-8"))
+            docs = _load_tabular(source, sep=",")
+    except UnicodeDecodeError:
+        return None, f"Could not decode '{filename}'. Make sure it is UTF-8 encoded."
+    except Exception as e:
+        return None, f"Error parsing '{filename}': {e}"
+
+    return [d.model_dump(exclude_none=True) for d in docs], None
+
 
 def _decode_json_upload(contents: str, filename: str) -> tuple[dict | list | None, str | None]:
     """Decode a base64-encoded dcc.Upload content string and parse JSON."""
