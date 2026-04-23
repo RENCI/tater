@@ -10,7 +10,7 @@ from dash import dcc, html
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
-from tater.widgets.base import TaterWidget, _unwrap_optional, _resolve_field_info
+from tater.widgets.base import ControlWidget, TaterWidget, _unwrap_optional, _resolve_field_info
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
 # ---------------------------------------------------------------------------
 
 @dataclass(eq=False)
-class HierarchicalLabelWidget(TaterWidget):
+class HierarchicalLabelWidget(ControlWidget):
     """Base class for hierarchical label widgets.
 
     Holds the shared hierarchy/root/allow_non_leaf state used by both
@@ -202,8 +202,6 @@ class HierarchicalLabelWidget(TaterWidget):
 
     hierarchy: Union[Node, dict, list, str, Path, None] = None
     allow_non_leaf: bool = False
-    required: bool = False
-    auto_advance: bool = False  # not supported; present so tater_app field-set builders can access it uniformly
     root: Node = dc_field(init=False, repr=False)
     # Pre-serialized value injected by repeater._render_item_widgets so the
     # component renders with the correct value without waiting for a callback.
@@ -246,6 +244,17 @@ class HierarchicalLabelWidget(TaterWidget):
 
     def register_callbacks(self, app: Any) -> None:
         pass
+
+    def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
+        """Use the browser-button label group instead of the auto-advance tooltip."""
+        pipe_field = self.field_path.replace(".", "|")
+        return TaterWidget._input_wrapper(
+            self,
+            children,
+            self._label_with_browser_btn(pipe_field),
+            self.required,
+            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
+        )
 
     # ------------------------------------------------------------------
     # Hierarchy browser helpers
@@ -353,6 +362,10 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
         """Serialize a stored path list to the string value expected by dmc.Select."""
         return json.dumps(v, separators=(",", ":")) if v else None
 
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "hl-select", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -375,7 +388,7 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                         placeholder="Search…",
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
-                        filter={"function": "hlFilter"},                        
+                        filter={"function": "hlFilter"},
                         comboboxProps={"shadow": "md"},
                     ),
                     dcc.Store(id={"type": "hl-select-relay", "field": pipe_field}, data=None),
@@ -383,9 +396,6 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                 ],
                 gap="xs",
             ),
-            self._label_with_browser_btn(pipe_field),
-            self.required,
-            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
         )
 
     def register_callbacks(self, app: Any) -> None:
@@ -444,6 +454,10 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
         """Serialize a list of stored paths to the list of JSON strings expected by dmc.MultiSelect."""
         return [json.dumps(p, separators=(",", ":")) for p in v] if v else []
 
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "hl-multi", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -474,9 +488,6 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                 ],
                 gap="xs",
             ),
-            self._label_with_browser_btn(pipe_field),
-            self.required,
-            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
         )
 
     def register_callbacks(self, app: Any) -> None:

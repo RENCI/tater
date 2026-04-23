@@ -156,19 +156,14 @@ class RepeaterWidget(ContainerWidget):
                     if ann is not None:
                         v = value_helpers.get_model_value(ann, widget.field_path)
                         if v is not None:
-                            widget.default = v
+                            if isinstance(widget, HierarchicalLabelWidget):
+                                widget._preset_value = widget._serialize_value(v)
+                            else:
+                                widget.default = v
                     direct_defaults[widget.schema_field] = getattr(widget, "default", None)
                     if widget._condition is not None:
                         cf = widget._condition[0].split(".")[-1]
                         widget._initial_hidden = (direct_defaults.get(cf) != widget._condition[1])
-                elif isinstance(template, HierarchicalLabelWidget):
-                    ann = (annotations_data or {}).get(doc_id) if doc_id else None
-                    if ann is None and tater_app and doc_id:
-                        ann = tater_app.annotations.get(doc_id)
-                    if ann is not None:
-                        v = value_helpers.get_model_value(ann, widget.field_path)
-                        if v is not None:
-                            widget._preset_value = widget._serialize_value(v)
                 comp = widget.component()
 
             if widget._condition is not None:
@@ -365,20 +360,6 @@ class RepeaterWidget(ContainerWidget):
             nested_path = f"{outer_li}.{inner_index}"
             parent_path = f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
 
-            if isinstance(template, HierarchicalLabelWidget):
-                widget = copy.deepcopy(template)
-                widget._finalize_paths(parent_path=parent_path)
-                if doc_id:
-                    ann = (annotations_data or {}).get(doc_id)
-                    if ann is None and tater_app and doc_id in tater_app.annotations:
-                        ann = tater_app.annotations[doc_id]
-                    if ann is not None:
-                        v = value_helpers.get_model_value(ann, widget.field_path)
-                        if v is not None:
-                            widget._preset_value = widget._serialize_value(v)
-                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
-                continue
-
             if isinstance(template, GroupWidget):
                 widget = copy.deepcopy(template)
                 widget._finalize_paths(parent_path=parent_path)
@@ -404,7 +385,10 @@ class RepeaterWidget(ContainerWidget):
                 if ann is not None:
                     value = value_helpers.get_model_value(ann, widget.field_path)
                     if value is not None:
-                        widget.default = value
+                        if isinstance(widget, HierarchicalLabelWidget):
+                            widget._preset_value = widget._serialize_value(value)
+                        else:
+                            widget.default = value
 
             # Set repeater context for MATCH-based callbacks (2-level nesting).
             widget._set_repeater_context(nested_ld, nested_path)
