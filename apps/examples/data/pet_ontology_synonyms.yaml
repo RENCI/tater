@@ -138,7 +138,6 @@ Domestic Animals:
         - Tuxedo (pattern)
     Small Mammals:
         Rodents:
-            _synonyms: [Rodentia]
         - name: Syrian Hamster
           synonyms: [Golden Hamster]
         - name: Dwarf Hamster
@@ -167,7 +166,6 @@ Domestic Animals:
         - Sugar Glider
     Birds:
         Parrots and Hookbills:
-            _synonyms: [psittacines, hookbills]
         - name: Budgerigar (Parakeet)
           synonyms: [Budgie, Parakeet, shell parakeet]
         - name: Cockatiel
