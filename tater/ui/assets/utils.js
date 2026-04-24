@@ -194,7 +194,10 @@ window.dashMantineFunctions.hlFilter = function ({ options, search }) {
     const includedValues = new Set();
 
     dataOptions.forEach((option, i) => {
-        if (!option.label.toLowerCase().includes(_hlSearch)) return;
+        const nameMatch = option.label.toLowerCase().includes(_hlSearch);
+        const synonymMatch = Array.isArray(option.synonyms) &&
+            option.synonyms.some((s) => s.toLowerCase().includes(_hlSearch));
+        if (!nameMatch && !synonymMatch) return;
 
         const path = parsed[i];
 
@@ -306,6 +309,31 @@ window.dashMantineFunctions.hlRenderOption = function ({ option, checked }) {
         labelContent = label;
     }
 
+    // Build synonym suffix — show all synonyms that match the search term.
+    let synonymSuffix = null;
+    const matchedSynonyms = lower
+        ? (option.synonyms || []).filter((s) => s.toLowerCase().includes(lower))
+        : [];
+    if (matchedSynonyms.length > 0) {
+        const parts = ["- "];
+        matchedSynonyms.forEach((syn, i) => {
+            if (i > 0) parts.push(", ");
+            const idx = syn.toLowerCase().indexOf(lower);
+            parts.push(syn.slice(0, idx));
+            parts.push(React.createElement(
+                "mark",
+                { key: `sm${i}`, style: { background: "var(--mantine-color-yellow-3)", borderRadius: "3px", padding: "0 0" } },
+                syn.slice(idx, idx + lower.length)
+            ));
+            parts.push(syn.slice(idx + lower.length));
+        });
+        synonymSuffix = React.createElement(
+            "span",
+            { style: { fontSize: "var(--mantine-font-size-xs)", color: "var(--mantine-color-dimmed)", marginLeft: "4px" } },
+            ...parts
+        );
+    }
+
     return React.createElement(
         "span",
         {
@@ -319,6 +347,7 @@ window.dashMantineFunctions.hlRenderOption = function ({ option, checked }) {
             },
         },
         React.createElement("span", null, labelContent),
+        synonymSuffix,
         !isLeaf ? _chevronDown() : null,
         _checkIcon(checked),
     );

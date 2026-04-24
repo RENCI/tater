@@ -23,6 +23,7 @@ class Node:
 
     name: str
     children: list[Node] = dc_field(default_factory=list)
+    synonyms: list[str] = dc_field(default_factory=list)
 
     @property
     def is_leaf(self) -> bool:
@@ -59,13 +60,20 @@ def _build_tree(name: str, data: Any) -> Node:
         children = []
         for item in data:
             if isinstance(item, dict):
-                for k, v in item.items():
-                    children.append(_build_tree(k, v))
+                # Leaf-with-synonyms format: {"name": "...", "synonyms": [...]}
+                if "name" in item and set(item.keys()) <= {"name", "synonyms"}:
+                    children.append(Node(str(item["name"]), synonyms=list(item.get("synonyms", []))))
+                else:
+                    for k, v in item.items():
+                        children.append(_build_tree(k, v))
             else:
                 children.append(Node(str(item)))
         return Node(name, children)
     if isinstance(data, dict):
-        return Node(name, [_build_tree(k, v) for k, v in data.items()])
+        # Internal-node-synonyms format: _synonyms key alongside child keys
+        node_synonyms = list(data["_synonyms"]) if "_synonyms" in data else []
+        children = [_build_tree(k, v) for k, v in data.items() if k != "_synonyms"]
+        return Node(name, children, node_synonyms)
     return Node(str(data))
 
 
@@ -172,11 +180,11 @@ def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
         current_path = path + [node.name]
         value = json.dumps(current_path, separators=(",", ":"))
         if node.is_leaf:
-            items.append({"value": value, "label": node.name, "leaf": True})
+            items.append({"value": value, "label": node.name, "leaf": True, "synonyms": node.synonyms})
         else:
             # Non-leaf nodes always appear to provide hierarchy context.
             # Disabled when allow_non_leaf=False so they act as visual headers only.
-            item = {"value": value, "label": node.name, "leaf": False}
+            item = {"value": value, "label": node.name, "leaf": False, "synonyms": node.synonyms}
             if not allow_non_leaf:
                 item["disabled"] = True
             items.append(item)
@@ -293,15 +301,26 @@ class HierarchicalLabelWidget(ControlWidget):
                 },
             )
 
+        def _synonyms_span(node: "Node") -> html.Span:
+            return html.Span(
+                f"- {', '.join(node.synonyms)}",
+                style={
+                    "fontSize": "var(--mantine-font-size-xs)",
+                    "color": "var(--mantine-color-dimmed)",
+                    "marginLeft": "4px",
+                },
+            )
+
         def _node(node: "Node") -> html.Li:
             if node.is_leaf:
                 return html.Li(
-                    node.name,
+                    [node.name, _synonyms_span(node)] if node.synonyms else node.name,
                     style={"padding": "1px 4px"},
                 )
             return html.Li(
                 [
                     html.Span(node.name, style={"fontWeight": 600}),
+                    *([_synonyms_span(node)] if node.synonyms else []),
                     _children_ul(node),
                 ],
                 style={"padding": "2px 0"},

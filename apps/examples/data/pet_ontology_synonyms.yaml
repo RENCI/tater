@@ -1,0 +1,301 @@
+Domestic Animals:
+    Dogs:
+        _synonyms: [canine, dog, Canis lupus familiaris]
+        Sporting Group:
+        - name: Labrador Retriever
+          synonyms: [Lab, Labrador, Yellow Lab, Black Lab, Chocolate Lab]
+        - name: Golden Retriever
+          synonyms: [Golden, Gold Retriever]
+        - English Springer Spaniel
+        - name: Cocker Spaniel
+          synonyms: [American Cocker Spaniel]
+        - Brittany
+        - name: Irish Setter
+          synonyms: [Red Setter]
+        - Pointer
+        - Weimaraner
+        Hound Group:
+        - Beagle
+        - name: Bloodhound
+          synonyms: [St. Hubert Hound]
+        - name: Basset Hound
+          synonyms: [Basset]
+        - name: Dachshund
+          synonyms: [Dachsie, Wiener Dog, Sausage Dog]
+        - Greyhound
+        - Whippet
+        - Rhodesian Ridgeback
+        - Afghan Hound
+        Working Group:
+        - name: Siberian Husky
+          synonyms: [Husky, Sibe]
+        - name: Alaskan Malamute
+          synonyms: [Malamute, Mal]
+        - Bernese Mountain Dog
+        - Boxer
+        - Great Dane
+        - Mastiff
+        - Rottweiler
+        - Saint Bernard
+        - name: Doberman Pinscher
+          synonyms: [Doberman, Dobie]
+        Terrier Group:
+        - Airedale Terrier
+        - Bull Terrier
+        - Scottish Terrier
+        - name: West Highland White Terrier
+          synonyms: [Westie]
+        - name: Yorkshire Terrier
+          synonyms: [Yorkie]
+        - name: Jack Russell Terrier
+          synonyms: [Jack Russell, JRT, Parson Russell Terrier]
+        - name: Staffordshire Bull Terrier
+          synonyms: [Staffie, Staffy]
+        Toy Group:
+        - Chihuahua
+        - Pomeranian
+        - name: Pug
+          synonyms: [Mops]
+        - name: Shih Tzu
+          synonyms: [Chrysanthemum Dog]
+        - Maltese
+        - Toy Poodle
+        - Papillon
+        - Cavalier King Charles Spaniel
+        Non-Sporting Group:
+        - name: Bulldog
+          synonyms: [English Bulldog, British Bulldog]
+        - name: Poodle
+          synonyms: [Standard Poodle]
+        - Dalmatian
+        - name: French Bulldog
+          synonyms: [Frenchie]
+        - Boston Terrier
+        - Chow Chow
+        - Shar Pei
+        Herding Group:
+        - name: Australian Shepherd
+          synonyms: [Aussie]
+        - name: Border Collie
+          synonyms: [BC]
+        - name: German Shepherd
+          synonyms: [GSD, German Shepherd Dog, Alsatian]
+        - Collie
+        - name: Shetland Sheepdog
+          synonyms: [Sheltie]
+        - name: Belgian Malinois
+          synonyms: [Malinois, Mal]
+        - name: Old English Sheepdog
+          synonyms: [Bobtail, OES]
+        - name: Corgi
+          synonyms: [Pembroke Welsh Corgi, Cardigan Welsh Corgi]
+        Mixed Breeds:
+        - name: Labradoodle
+          synonyms: [Labrador Poodle mix]
+        - name: Goldendoodle
+          synonyms: [Golden Poodle mix]
+        - name: Cockapoo
+          synonyms: [Cockerpoo, Cockadoodle]
+        - Puggle
+        - Mixed breed unknown lineage
+    Cats:
+        _synonyms: [feline, cat, Felis catus]
+        Long-haired Breeds:
+        - Persian
+        - name: Maine Coon
+          synonyms: [American Longhair, Maine Cat]
+        - Ragdoll
+        - Norwegian Forest Cat
+        - name: Himalayan
+          synonyms: [Himmie, Colorpoint Persian]
+        - Birman
+        - Turkish Angora
+        Short-haired Breeds:
+        - name: Siamese
+          synonyms: [Meezer, Thai cat]
+        - British Shorthair
+        - American Shorthair
+        - Abyssinian
+        - name: Bengal
+          synonyms: [Bengal cat, leopard cat hybrid]
+        - name: Russian Blue
+          synonyms: [Archangel Blue, Archangel Cat]
+        - Burmese
+        - Bombay
+        - Exotic Shorthair
+        Hairless and Rex Breeds:
+        - name: Sphynx
+          synonyms: [hairless cat, Canadian Hairless]
+        - Devon Rex
+        - Cornish Rex
+        Domestic Mixed:
+        - name: Domestic Shorthair
+          synonyms: [DSH, house cat, moggy, moggie]
+        - name: Domestic Longhair
+          synonyms: [DLH]
+        - Tabby (pattern)
+        - Calico (pattern)
+        - Tuxedo (pattern)
+    Small Mammals:
+        Rodents:
+        - name: Syrian Hamster
+          synonyms: [Golden Hamster]
+        - name: Dwarf Hamster
+          synonyms: [Russian Hamster, Campbell's Hamster, Roborovski Hamster]
+        - name: Guinea Pig
+          synonyms: [Cavy, Cavia porcellus]
+        - Gerbil
+        - Mouse
+        - name: Rat (domestic)
+          synonyms: [fancy rat, lab rat, domestic rat]
+        - Chinchilla
+        - Degu
+        Rabbits:
+        - Holland Lop
+        - Netherland Dwarf
+        - name: Mini Rex
+          synonyms: [Rex rabbit]
+        - Flemish Giant
+        - Lionhead
+        - Angora
+        - Mixed breed rabbit
+        Other Small Mammals:
+        - name: Ferret
+          synonyms: [Mustela putorius furo, fitchet]
+        - Hedgehog
+        - Sugar Glider
+    Birds:
+        Parrots and Hookbills:
+        - name: Budgerigar (Parakeet)
+          synonyms: [Budgie, Parakeet, shell parakeet]
+        - name: Cockatiel
+          synonyms: [Quarrion, Weiro]
+        - Lovebird
+        - Conure
+        - name: African Grey Parrot
+          synonyms: [African Grey, Congo Grey]
+        - name: Amazon Parrot
+          synonyms: [Amazon]
+        - Macaw
+        - Cockatoo
+        Finches and Canaries:
+        - Zebra Finch
+        - Society Finch
+        - Canary
+        - Gouldian Finch
+        Doves and Pigeons:
+        - Diamond Dove
+        - Ringneck Dove
+        - Pigeon (domestic)
+        Other Pet Birds:
+        - name: Quaker Parrot
+          synonyms: [Monk Parakeet]
+        - Lorikeet
+        - Eclectus
+    Reptiles and Amphibians:
+        Lizards:
+        - name: Bearded Dragon
+          synonyms: [Beardie, Pogona, central bearded dragon]
+        - name: Leopard Gecko
+          synonyms: [Leo gecko]
+        - Crested Gecko
+        - Blue-tongued Skink
+        - Iguana
+        - Chameleon
+        - Anole
+        Snakes:
+        - name: Ball Python
+          synonyms: [Royal Python, Python regius]
+        - name: Corn Snake
+          synonyms: [Red Rat Snake]
+        - King Snake
+        - Milk Snake
+        - Boa Constrictor
+        - Garter Snake
+        Turtles and Tortoises:
+        - name: Red-eared Slider
+          synonyms: [RES, red-eared terrapin]
+        - Box Turtle
+        - name: Russian Tortoise
+          synonyms: [Horsfield's Tortoise]
+        - name: Sulcata Tortoise
+          synonyms: [African Spurred Tortoise]
+        - Painted Turtle
+        Amphibians:
+        - name: Axolotl
+          synonyms: [Mexican walking fish, Ambystoma mexicanum]
+        - Fire-bellied Newt
+        - Tree Frog
+        - name: Pacman Frog
+          synonyms: [South American horned frog, ornate horned frog]
+        - African Dwarf Frog
+    Fish:
+        Freshwater Fish:
+            Tropical Community:
+            - name: Guppy
+              synonyms: [millionfish, rainbow fish]
+            - Platy
+            - Molly
+            - name: Tetra (Neon, Cardinal)
+              synonyms: [Neon Tetra, Cardinal Tetra]
+            - Danio
+            - Rasbora
+            - name: Corydoras Catfish
+              synonyms: [Cory Cat, Corydoras]
+            Goldfish and Koi:
+            - name: Common Goldfish
+              synonyms: [Carassius auratus]
+            - name: Fancy Goldfish
+              synonyms: [Oranda, Ryukin, Telescope, Ranchu]
+            - Koi
+            - Shubunkin
+            Cichlids:
+            - Angelfish
+            - Discus
+            - Oscar
+            - African Cichlid
+            Bettas and Gouramis:
+            - name: Betta (Siamese Fighting Fish)
+              synonyms: [Betta, Siamese fighting fish, betta fish]
+            - Dwarf Gourami
+            - Pearl Gourami
+            Other Freshwater:
+            - name: Plecostomus
+              synonyms: [Pleco, suckermouth catfish]
+            - Rainbow Shark
+            - Loach
+        Saltwater Fish:
+        - name: Clownfish
+          synonyms: [Anemonefish, Nemo fish]
+        - name: Tang
+          synonyms: [Surgeonfish]
+        - Damselfish
+        - Goby
+        - Blenny
+        - Angelfish (marine)
+        - Wrasse
+Exotic and Specialty Pets:
+    Farm Animals (miniature):
+    - name: Miniature Pig
+      synonyms: [mini pig, teacup pig, pot-bellied pig, micro pig]
+    - name: Miniature Goat
+      synonyms: [pygmy goat, dwarf goat]
+    - name: Miniature Horse
+      synonyms: [mini horse, miniature equine]
+    - Miniature Donkey
+    - Chicken (bantam)
+    Invertebrates:
+        Arachnids:
+        - name: Tarantula
+          synonyms: [T, bird-eating spider]
+        - name: Emperor Scorpion
+          synonyms: [Pandinus imperator]
+        Insects:
+        - name: Madagascar Hissing Cockroach
+          synonyms: [hissing cockroach, hisser, Gromphadorhina portentosa]
+        - name: Stick Insect
+          synonyms: [walking stick, phasmid]
+        - Mantis
+        Crustaceans:
+        - name: Hermit Crab
+          synonyms: [hermit, land hermit crab]

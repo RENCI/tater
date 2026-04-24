@@ -24,7 +24,7 @@ instructions = """## Usage
 - The "any level" variants allow selecting intermediate nodes (e.g. a species group)
 """
 
-ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
+ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology_synonyms.yaml")
 
 widgets = [
     DividerWidget(label="Leaf nodes only"),
@@ -33,14 +33,12 @@ widgets = [
         label="Breed",
         description="Select a single breed or type.",
         hierarchy=ontology,
-        auto_advance=True,
     ),
     HierarchicalLabelMultiWidget(
         schema_field="breeds_multi",
         label="Breeds (Multi)",
         description="Select one or more breeds.",
         hierarchy=ontology,
-        auto_advance=True,
     ),
     DividerWidget(label="Any level"),
     HierarchicalLabelSelectWidget(
