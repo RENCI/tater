@@ -547,8 +547,8 @@ def _setup_timing_callbacks(tater_app: TaterApp, _ta=None) -> None:
             return no_update
 
         _LABELS = {
-            "extra": "In saved file, not in current schema (will be ignored):",
-            "missing": "In current schema, not in saved file (will use default):",
+            "extra": "In saved file, not in current schema — will be removed on save:",
+            "missing": "In current schema, not in saved file — will initialize to default:",
         }
 
         sections = []
