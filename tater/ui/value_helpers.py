@@ -4,7 +4,7 @@ from __future__ import annotations
 import typing
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
@@ -113,8 +113,8 @@ def create_list_item(navigation_stack: list) -> Any:
             if isinstance(item_type, type) and issubclass(item_type, BaseModel):
                 try:
                     return item_type()
-                except Exception:
-                    return {}
+                except ValidationError:
+                    return item_type.model_construct()
     return {}  # Fallback to dict
 
 
