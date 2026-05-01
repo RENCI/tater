@@ -93,6 +93,35 @@ class TestWidgetClassMap:
     def test_accordion_present(self):
         assert "accordion" in WIDGET_CLASS
 
+    def test_all_values_are_tater_widget_subclasses(self):
+        """Every entry in WIDGET_CLASS must be a TaterWidget subclass."""
+        import tater.loaders.model_loader as _ml
+        for key, cls in WIDGET_CLASS.items():
+            assert isinstance(cls, type) and issubclass(cls, _ml.TaterWidget), (
+                f"WIDGET_CLASS['{key}'] = {cls!r} is not a TaterWidget subclass"
+            )
+
+    def test_all_imported_widget_classes_are_registered(self):
+        """Every concrete TaterWidget subclass imported in model_loader must appear
+        in WIDGET_CLASS, except GroupWidget (intentionally omitted — no JSON type string)."""
+        import inspect
+        import tater.loaders.model_loader as _ml
+        from tater.widgets.group import GroupWidget
+
+        imported = {
+            obj for obj in vars(_ml).values()
+            if isinstance(obj, type)
+            and issubclass(obj, _ml.TaterWidget)
+            and obj is not _ml.TaterWidget
+        }
+        intentionally_omitted = {GroupWidget}
+        registered = set(WIDGET_CLASS.values())
+        unregistered = imported - registered - intentionally_omitted
+        assert not unregistered, (
+            f"Widget classes imported in model_loader but missing from WIDGET_CLASS: "
+            f"{sorted(c.__name__ for c in unregistered)}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # widgets_from_model — flat model auto-gen
