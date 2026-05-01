@@ -59,7 +59,7 @@ def load_documents(source: str | Path) -> list[Document]:
 # ---------------------------------------------------------------------------
 
 def _load_json(path: Path) -> list[Document]:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise ValueError(f"Documents JSON must be an array, got {type(data).__name__}")

@@ -151,7 +151,7 @@ def load_hierarchy_from_yaml(path: Union[str, Path]) -> Node:
         - Item 4
     """
     import yaml  # soft dependency
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return build_tree(data)
 
