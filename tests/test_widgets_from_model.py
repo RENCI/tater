@@ -13,6 +13,7 @@ from tater.widgets.number_input import NumberInputWidget
 from tater.widgets.span import SpanAnnotationWidget
 from tater.widgets.group import GroupWidget
 from tater.widgets.repeater import ListableWidget
+from tater.widgets.divider import DividerWidget
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +195,121 @@ class TestWidgetsFromModelNested:
         pets_widget = next(w for w in widgets if w.schema_field == "pets")
         assert isinstance(pets_widget, ListableWidget)
         assert len(pets_widget.item_widgets) == len(PetItem.model_fields)
+
+
+# ---------------------------------------------------------------------------
+# widgets_from_model — dot-path overrides (nested children)
+# ---------------------------------------------------------------------------
+
+class TestWidgetsFromModelDotPathOverrides:
+    def test_dot_path_overrides_group_child(self):
+        """A dot-path override replaces just the named child, auto-generating the rest."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        override = RadioGroupWidget("pet.kind", label="Kind (radio)")
+        widgets = widgets_from_model(NestedModel, overrides=[override])
+        pet_widget = next(w for w in widgets if w.schema_field == "pet")
+        assert isinstance(pet_widget, GroupWidget)
+        kind_child = next(w for w in pet_widget.children if w.schema_field == "kind")
+        assert isinstance(kind_child, RadioGroupWidget)
+
+    def test_dot_path_override_corrects_schema_field(self):
+        """Placed child has schema_field equal to the leaf name, not the full dot-path."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        override = RadioGroupWidget("pet.kind", label="Kind (radio)")
+        widgets = widgets_from_model(NestedModel, overrides=[override])
+        pet_widget = next(w for w in widgets if w.schema_field == "pet")
+        kind_child = next(w for w in pet_widget.children if w.schema_field == "kind")
+        assert kind_child.schema_field == "kind"
+
+    def test_dot_path_override_leaves_other_children_auto_generated(self):
+        """Non-overridden children of the group are still auto-generated."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        override = RadioGroupWidget("pet.kind", label="Kind (radio)")
+        widgets = widgets_from_model(NestedModel, overrides=[override])
+        pet_widget = next(w for w in widgets if w.schema_field == "pet")
+        indoor_child = next(w for w in pet_widget.children if w.schema_field == "indoor")
+        assert isinstance(indoor_child, CheckboxWidget)
+
+    def test_dot_path_override_for_repeater_item(self):
+        """A dot-path override applies inside a ListableWidget's item_widgets."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        override = RadioGroupWidget("pets.kind", label="Kind (radio)")
+        widgets = widgets_from_model(NestedModel, overrides=[override])
+        pets_widget = next(w for w in widgets if w.schema_field == "pets")
+        assert isinstance(pets_widget, ListableWidget)
+        kind_item = next(w for w in pets_widget.item_widgets if w.schema_field == "kind")
+        assert isinstance(kind_item, RadioGroupWidget)
+
+    def test_top_level_override_still_replaces_whole_group(self):
+        """A top-level override for a group field replaces the whole GroupWidget."""
+        override = GroupWidget("pet", label="Custom Pet", children=[
+            CheckboxWidget("indoor", label="Indoor?"),
+        ])
+        widgets = widgets_from_model(NestedModel, overrides=[override])
+        pet_widget = next(w for w in widgets if w.schema_field == "pet")
+        assert isinstance(pet_widget, GroupWidget)
+        assert len(pet_widget.children) == 1
+
+    def test_dot_path_override_does_not_mutate_original_widget(self):
+        """Placing a dot-path override does not change the original widget's schema_field."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        override = RadioGroupWidget("pet.kind", label="Kind (radio)")
+        widgets_from_model(NestedModel, overrides=[override])
+        assert override.schema_field == "pet.kind"
+
+
+# ---------------------------------------------------------------------------
+# widgets_from_model — dividers
+# ---------------------------------------------------------------------------
+
+class TestWidgetsFromModelDividers:
+    def test_divider_inserted_before_named_field(self):
+        widgets = widgets_from_model(FlatModel, overrides=[DividerWidget(label="Section", before="name")])
+        names = [w.schema_field for w in widgets]
+        assert names.index("") < names.index("name")
+
+    def test_divider_label_preserved(self):
+        widgets = widgets_from_model(FlatModel, overrides=[DividerWidget(label="My Section", before="name")])
+        div = next(w for w in widgets if isinstance(w, DividerWidget))
+        assert div.label == "My Section"
+
+    def test_multiple_dividers(self):
+        widgets = widgets_from_model(FlatModel, overrides=[
+            DividerWidget(label="A", before="name"),
+            DividerWidget(label="B", before="score"),
+        ])
+        schema_fields = [w.schema_field for w in widgets]
+        dividers = [w for w in widgets if isinstance(w, DividerWidget)]
+        assert len(dividers) == 2
+        assert schema_fields.index("") < schema_fields.index("name")
+
+    def test_divider_before_nested_field(self):
+        """A dot-path before inserts the divider inside the group."""
+        widgets = widgets_from_model(NestedModel, overrides=[
+            DividerWidget(label="Indoor Section", before="pet.indoor"),
+        ])
+        pet_widget = next(w for w in widgets if w.schema_field == "pet")
+        assert isinstance(pet_widget, GroupWidget)
+        child_fields = [w.schema_field for w in pet_widget.children]
+        div_index = child_fields.index("")
+        indoor_index = child_fields.index("indoor")
+        assert div_index < indoor_index
+
+    def test_divider_before_unknown_field_raises(self):
+        with pytest.raises(ValueError, match="before='nonexistent'"):
+            widgets_from_model(FlatModel, overrides=[DividerWidget(label="X", before="nonexistent")])
+
+    def test_divider_coexists_with_field_override(self):
+        """Divider and field override can be used together."""
+        from tater.widgets.radio_group import RadioGroupWidget
+        widgets = widgets_from_model(FlatModel, overrides=[
+            DividerWidget(label="Mood Section", before="mood"),
+            RadioGroupWidget("mood", label="Mood (radio)"),
+        ])
+        schema_fields = [w.schema_field for w in widgets]
+        assert schema_fields.index("") < schema_fields.index("mood")
+        mood_widget = next(w for w in widgets if w.schema_field == "mood")
+        assert isinstance(mood_widget, RadioGroupWidget)
 
 
 # ---------------------------------------------------------------------------
