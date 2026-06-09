@@ -93,25 +93,47 @@ class TaterApp:
         self._save_error: str | None = None
         self._schema_warnings: dict[str, list[str]] = {}
 
-    def load_documents(self, source: str) -> bool:
-        """
-        Load documents from a file (JSON, CSV, TSV, or Excel).
+    def load_documents(self, source) -> bool:
+        """Load documents from a file path, a list of dicts, or a DataFrame.
 
         Args:
-            source: Path to documents file
+            source: Path to a documents file (JSON, CSV, TSV, or Excel),
+                a ``list[dict]`` with at least a ``text`` key per item, or a
+                ``pandas.DataFrame`` with a ``text`` column.  When passing
+                in-memory data no default annotations path is set — provide
+                ``annotations_path`` explicitly if you want auto-save.
 
         Returns:
-            True if successful, False otherwise
+            True if successful, False otherwise.
         """
         try:
-            from tater.loaders.document_loader import load_documents as _load
-            self.documents = _load(source)
-            
-            # Set default annotations path if not provided (skip in hosted mode)
-            if self.annotations_path is None and not self.is_hosted:
-                doc_path = Path(source)
-                self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
-            
+            from tater.models.document import Document
+
+            # --- in-memory paths ---
+            try:
+                import pandas as pd
+                _is_df = isinstance(source, pd.DataFrame)
+            except ImportError:
+                _is_df = False
+
+            if _is_df:
+                source = source.to_dict("records")
+
+            if isinstance(source, list):
+                self.documents = [
+                    Document.from_dict(item, index=idx)
+                    for idx, item in enumerate(source)
+                ]
+                label = f"{len(self.documents)} documents (in-memory)"
+            else:
+                # --- file path ---
+                from tater.loaders.document_loader import load_documents as _load
+                self.documents = _load(source)
+                if self.annotations_path is None and not self.is_hosted:
+                    doc_path = Path(source)
+                    self.annotations_path = str(doc_path.parent / f"{doc_path.stem}_annotations.json")
+                label = f"{len(self.documents)} documents from {source}"
+
             # Load existing annotations if file exists (skipped when restore_annotations=False)
             if self.restore_annotations:
                 self._load_annotations_from_file()
@@ -123,7 +145,7 @@ class TaterApp:
                 if doc.id not in self.metadata:
                     self.metadata[doc.id] = DocumentMetadata()
 
-            print(f"Loaded {len(self.documents)} documents from {source}")
+            print(f"Loaded {label}")
             return True
         except Exception as e:
             print(f"Error loading documents: {e}")
@@ -421,6 +443,36 @@ class TaterApp:
         """Set a value in a nested dict/list structure using dot notation."""
         value_helpers.set_dict_value(obj, path, value)
 
-    def run(self, debug: bool = False, port: int = 8050, host: str = "127.0.0.1") -> None:
-        """Start the Dash development server."""
-        self.app.run(debug=debug, port=port, host=host)
+    def run(
+        self,
+        debug: bool = False,
+        port: int = 8050,
+        host: str = "127.0.0.1",
+        jupyter_mode: Optional[str] = None,
+    ) -> None:
+        """Start the Dash server.
+
+        Args:
+            jupyter_mode: Dash Jupyter rendering mode — "inline" (iframe in cell
+                output), "tab" (new browser tab), or "jupyterlab" (side panel).
+                None runs the standard blocking dev server.
+        """
+        kwargs: dict = dict(debug=debug, port=port, host=host)
+        if jupyter_mode is not None:
+            kwargs["jupyter_mode"] = jupyter_mode
+        self.app.run(**kwargs)
+
+    def get_annotations(self) -> dict:
+        """Return current annotations as {doc_id: annotation_dict}.
+
+        Reads from the annotations file when available (reflects the latest
+        auto-saved state). Falls back to the in-memory snapshot loaded at
+        startup when no file path is configured.
+        """
+        if self.annotations_path:
+            path = Path(self.annotations_path)
+            if path.exists():
+                with open(path) as f:
+                    data = json.load(f)
+                return {doc_id: doc_data.get("annotations", {}) for doc_id, doc_data in data.items()}
+        return {doc_id: ann.model_dump() for doc_id, ann in self.annotations.items()}
