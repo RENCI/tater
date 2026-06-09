@@ -4,7 +4,7 @@ from __future__ import annotations
 import typing
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 
 def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
@@ -58,12 +58,12 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
                         elif typing.get_origin(inner) is list:
                             setattr(current, key, [])
                         else:
-                            raise ValueError(f"Cannot create field {key}")
+                            raise ValueError(f"Cannot create field '{key}' in {type(current).__name__} (path: '{path}')")
                         next_value = getattr(current, key)
                     else:
-                        raise ValueError(f"Field {key} not in model")
+                        raise ValueError(f"Field '{key}' not in {type(current).__name__} (path: '{path}')")
                 else:
-                    raise ValueError("Cannot navigate through non-model")
+                    raise ValueError(f"Cannot navigate through {type(current).__name__} at '{'.'.join(keys[:i+1])}' (path: '{path}')")
             current = next_value
 
     # Now set the final value
@@ -73,7 +73,7 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
         # Setting a list element
         index = int(final_key)
         if not isinstance(current, list):
-            raise ValueError("Cannot index non-list")
+            raise ValueError(f"Cannot index non-list at '{final_key}' (path: '{path}')")
         while len(current) <= index:
             current.append(None)
         current[index] = value
@@ -84,7 +84,7 @@ def set_model_value(model: BaseModel | dict, path: str, value: Any) -> None:
         elif isinstance(current, dict):
             current[final_key] = value
         else:
-            raise ValueError(f"Cannot set attribute on {type(current)}")
+            raise ValueError(f"Cannot set attribute on {type(current).__name__} at '{final_key}' (path: '{path}')")
 
 
 def create_list_item(navigation_stack: list) -> Any:
@@ -113,8 +113,8 @@ def create_list_item(navigation_stack: list) -> Any:
             if isinstance(item_type, type) and issubclass(item_type, BaseModel):
                 try:
                     return item_type()
-                except Exception:
-                    return {}
+                except ValidationError:
+                    return item_type.model_construct()
     return {}  # Fallback to dict
 
 

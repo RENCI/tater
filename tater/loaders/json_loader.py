@@ -467,7 +467,7 @@ def load_schema(path: str | Path) -> dict:
         ``description``, ``instructions``.
     """
     path = Path(path)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     schema_model, widgets = parse_schema(data, base_dir=path.parent)
     return {

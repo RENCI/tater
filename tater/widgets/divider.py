@@ -1,6 +1,6 @@
 """DividerWidget — a labeled section break with no schema field."""
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 import dash_mantine_components as dmc
 
@@ -12,15 +12,17 @@ class DividerWidget(ContainerWidget):
     """A labeled horizontal divider for visually separating widget sections.
 
     Has no schema field — does not contribute to the annotation model.
-    Place it in the widget list between other widgets to create named sections.
 
-    Usage::
+    In a manual widget list, place it between other widgets to create named sections.
+    When using ``widgets_from_model``, set ``before`` to the field name (or dot-path)
+    it should precede and include it in the ``overrides`` list::
 
-        DividerWidget(label="Clinical Findings")
-        DividerWidget(label="Demographics", description="Patient background info")
+        DividerWidget(label="Clinical Findings", before="diagnosis")
+        DividerWidget(label="Demographics", before="pet.age")
     """
 
     schema_field: str = ""
+    before: Optional[str] = field(kw_only=True, default=None)
 
     @property
     def renders_own_label(self) -> bool:
