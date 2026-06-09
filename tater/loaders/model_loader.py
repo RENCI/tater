@@ -1,6 +1,7 @@
 """Widget class registry and model-driven widget auto-generation."""
 from __future__ import annotations
 
+import copy
 import types as _builtin_types
 import typing
 from typing import Any, Literal, Union
@@ -31,6 +32,72 @@ from tater.widgets.hierarchical_label import (
     HierarchicalLabelMultiWidget,
 )
 from tater.models.span import SpanAnnotation
+
+
+def _scope_overrides(overrides: dict | None, prefix: str) -> dict | None:
+    """Return overrides scoped to `prefix` — keys starting with `prefix.` with the prefix stripped."""
+    if not overrides:
+        return None
+    scoped = {k[len(prefix) + 1:]: v for k, v in overrides.items() if k.startswith(prefix + ".")}
+    return scoped or None
+
+
+def _scope_dividers(dividers: list | None, prefix: str) -> list | None:
+    """Return dividers scoped to `prefix` — those whose `before` starts with `prefix.`, with prefix stripped."""
+    if not dividers:
+        return None
+    scoped = []
+    for d in dividers:
+        if d.before and d.before.startswith(prefix + "."):
+            d2 = copy.copy(d)
+            d2.before = d.before[len(prefix) + 1:]
+            scoped.append(d2)
+    return scoped or None
+
+
+def _gen_children(fields: Any, overrides: dict | None, dividers: list | None = None) -> list[TaterWidget]:
+    """Generate child widgets for model fields, applying direct and scoped overrides and dividers.
+
+    `overrides` is a flat dict keyed by field name (or dot-path relative to this level).
+    A direct match replaces the whole widget; a dot-path match penetrates into sub-models.
+    If an override widget's schema_field differs from the target field name (because the
+    user specified a dot-path), it is shallow-copied and corrected before placement.
+
+    `dividers` is a list of DividerWidgets with `before` set to a field name at this level
+    (or a dot-path for deeper levels). Each is inserted immediately before its target field.
+    """
+    placed: set[int] = set()
+    result = []
+    for name, fi in fields.items():
+        if dividers:
+            for i, d in enumerate(dividers):
+                if d.before == name:
+                    result.append(d)
+                    placed.add(i)
+        if overrides and name in overrides:
+            w = overrides[name]
+            if w.schema_field != name:
+                w = copy.copy(w)
+                w.schema_field = name
+            result.append(w)
+        else:
+            w = _widget_from_field_type(
+                name, fi.annotation,
+                _scope_overrides(overrides, name),
+                _scope_dividers(dividers, name),
+            )
+            if w is not None:
+                result.append(w)
+    if dividers:
+        unplaced = [d for i, d in enumerate(dividers) if i not in placed and d.before is not None
+                    and "." not in d.before]
+        if unplaced:
+            fields_str = ", ".join(f"'{f}'" for f in fields)
+            raise ValueError(
+                f"DividerWidget(before={unplaced[0].before!r}) — field not found. "
+                f"Available fields: {fields_str}"
+            )
+    return result
 
 
 def _humanize(field_id: str) -> str:
@@ -101,8 +168,12 @@ DEFAULT_WIDGET: dict[str, type[TaterWidget]] = {
 }
 
 
-def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | None:
+def _widget_from_field_type(field_name: str, field_type: Any, overrides: dict | None = None, dividers: list | None = None) -> TaterWidget | None:
     """Build a default widget from a Pydantic field's type hint.
+
+    `overrides` is a scoped dict (keys relative to this field's level) used when
+    recursing into sub-models and repeater item types.  `dividers` is a list of
+    DividerWidgets with scoped `before` paths, threaded into group/repeater children.
 
     Returns ``None`` for unrecognized types.
     """
@@ -118,7 +189,7 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
     if is_union:
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
-            return _widget_from_field_type(field_name, non_none[0])
+            return _widget_from_field_type(field_name, non_none[0], overrides, dividers)
         return None
 
     # Literal["a", "b"] → choice default
@@ -142,13 +213,7 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
 
         # list[SubModel] → ListableWidget
         if isinstance(item_type, type) and issubclass(item_type, BaseModel):
-            item_widgets = [
-                w for w in (
-                    _widget_from_field_type(n, fi.annotation)
-                    for n, fi in item_type.model_fields.items()
-                ) if w is not None
-            ]
-            return ListableWidget(field_name, label=label, item_widgets=item_widgets)
+            return ListableWidget(field_name, label=label, item_widgets=_gen_children(item_type.model_fields, overrides, dividers))
 
         return None
 
@@ -164,13 +229,7 @@ def _widget_from_field_type(field_name: str, field_type: Any) -> TaterWidget | N
 
     # SubModel → GroupWidget
     if isinstance(field_type, type) and issubclass(field_type, BaseModel):
-        child_widgets = [
-            w for w in (
-                _widget_from_field_type(n, fi.annotation)
-                for n, fi in field_type.model_fields.items()
-            ) if w is not None
-        ]
-        return GroupWidget(field_name, label=label, children=child_widgets)
+        return GroupWidget(field_name, label=label, children=_gen_children(field_type.model_fields, overrides, dividers))
 
     return None
 
@@ -199,13 +258,6 @@ def widgets_from_model(
         A list of ``TaterWidget`` instances ready to pass to
         ``set_annotation_widgets``, in model field order.
     """
-    override_map = {w.schema_field: w for w in (overrides or [])}
-    result = []
-    for name, fi in model.model_fields.items():
-        if name in override_map:
-            result.append(override_map[name])
-        else:
-            w = _widget_from_field_type(name, fi.annotation)
-            if w is not None:
-                result.append(w)
-    return result
+    dividers = [w for w in (overrides or []) if isinstance(w, DividerWidget)]
+    override_map = {w.schema_field: w for w in (overrides or []) if not isinstance(w, DividerWidget)}
+    return _gen_children(model.model_fields, override_map, dividers or None)

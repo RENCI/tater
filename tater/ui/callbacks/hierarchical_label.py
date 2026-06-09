@@ -121,6 +121,35 @@ def setup_hl_select_callbacks(tater_app: TaterApp) -> None:
         prevent_initial_call=True,
     )
 
+    # 4. Clientside: auto-advance when an hl-select field is in aa-fields-store
+    app.clientside_callback(
+        ClientsideFunction(namespace="tater", function_name="hlSelectAutoAdvance"),
+        Output("auto-advance-store", "data", allow_duplicate=True),
+        Input({"type": "hl-select-relay", "field": ALL}, "data"),
+        State("aa-fields-store", "data"),
+        prevent_initial_call=True,
+    )
+
+
+def setup_hl_browser_callback(tater_app: TaterApp) -> None:
+    """Register a single shared MATCH callback to open hierarchy browser modals.
+
+    Handles both HierarchicalLabelSelectWidget and HierarchicalLabelMultiWidget
+    since both use the same ``hl-browser-btn`` / ``hl-browser-modal`` ID types.
+    Closing is handled natively by dmc.Modal (X button / click-outside).
+    """
+    app = tater_app.app
+
+    @app.callback(
+        Output({"type": "hl-browser-modal", "field": MATCH}, "opened"),
+        Input({"type": "hl-browser-btn", "field": MATCH}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def open_browser_modal(n_clicks):
+        if not n_clicks:
+            return no_update
+        return True
+
 
 def setup_hl_multi_callbacks(tater_app: TaterApp) -> None:
     """Register MATCH callbacks for all HierarchicalLabelMultiWidget instances."""

@@ -6,10 +6,11 @@ import json
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
-from dash import dcc
+from dash import dcc, html
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
-from tater.widgets.base import TaterWidget, _unwrap_optional, _resolve_field_info
+from tater.widgets.base import ControlWidget, TaterWidget, _unwrap_optional, _resolve_field_info
 
 
 # ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ class Node:
 
     name: str
     children: list[Node] = dc_field(default_factory=list)
+    synonyms: list[str] = dc_field(default_factory=list)
 
     @property
     def is_leaf(self) -> bool:
@@ -58,13 +60,20 @@ def _build_tree(name: str, data: Any) -> Node:
         children = []
         for item in data:
             if isinstance(item, dict):
-                for k, v in item.items():
-                    children.append(_build_tree(k, v))
+                # Leaf-with-synonyms format: {"name": "...", "synonyms": [...]}
+                if "name" in item and set(item.keys()) <= {"name", "synonyms"}:
+                    children.append(Node(str(item["name"]), synonyms=list(item.get("synonyms", []))))
+                else:
+                    for k, v in item.items():
+                        children.append(_build_tree(k, v))
             else:
                 children.append(Node(str(item)))
         return Node(name, children)
     if isinstance(data, dict):
-        return Node(name, [_build_tree(k, v) for k, v in data.items()])
+        # Internal-node-synonyms format: _synonyms key alongside child keys
+        node_synonyms = list(data["_synonyms"]) if "_synonyms" in data else []
+        children = [_build_tree(k, v) for k, v in data.items() if k != "_synonyms"]
+        return Node(name, children, node_synonyms)
     return Node(str(data))
 
 
@@ -142,7 +151,7 @@ def load_hierarchy_from_yaml(path: Union[str, Path]) -> Node:
         - Item 4
     """
     import yaml  # soft dependency
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return build_tree(data)
 
@@ -171,11 +180,11 @@ def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
         current_path = path + [node.name]
         value = json.dumps(current_path, separators=(",", ":"))
         if node.is_leaf:
-            items.append({"value": value, "label": node.name, "leaf": True})
+            items.append({"value": value, "label": node.name, "leaf": True, "synonyms": node.synonyms})
         else:
             # Non-leaf nodes always appear to provide hierarchy context.
             # Disabled when allow_non_leaf=False so they act as visual headers only.
-            item = {"value": value, "label": node.name, "leaf": False}
+            item = {"value": value, "label": node.name, "leaf": False, "synonyms": node.synonyms}
             if not allow_non_leaf:
                 item["disabled"] = True
             items.append(item)
@@ -192,7 +201,7 @@ def _build_dropdown_data(root: Node, allow_non_leaf: bool = False) -> list:
 # ---------------------------------------------------------------------------
 
 @dataclass(eq=False)
-class HierarchicalLabelWidget(TaterWidget):
+class HierarchicalLabelWidget(ControlWidget):
     """Base class for hierarchical label widgets.
 
     Holds the shared hierarchy/root/allow_non_leaf state used by both
@@ -244,6 +253,121 @@ class HierarchicalLabelWidget(TaterWidget):
     def register_callbacks(self, app: Any) -> None:
         pass
 
+    def _input_wrapper(self, children: Any) -> dmc.InputWrapper:
+        """Label group with browser button, plus auto-advance tooltip when enabled."""
+        pipe_field = self.field_path.replace(".", "|")
+        label = self._label_with_browser_btn(pipe_field)
+        if self.auto_advance:
+            label = dmc.Group(
+                [
+                    label,
+                    dmc.Tooltip(
+                        DashIconify(
+                            icon="tabler:circle-open-arrow-right",
+                            width=13,
+                            color="var(--mantine-color-dimmed)",
+                        ),
+                        label="Auto-advances to next document",
+                        position="right",
+                        withArrow=True,
+                    ),
+                ],
+                gap=4,
+            )
+        return TaterWidget._input_wrapper(
+            self,
+            children,
+            label,
+            self.required,
+            {"style": {"display": "inline-flex", "alignItems": "center", "gap": "4px"}},
+        )
+
+    # ------------------------------------------------------------------
+    # Hierarchy browser helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _render_tree_html(root: "Node") -> Any:
+        """Build a nested html.Ul/Li tree from a Node for the browser modal."""
+
+        def _children_ul(node: "Node") -> html.Ul:
+            return html.Ul(
+                [_node(child) for child in node.children],
+                style={
+                    "listStyleType": "none",
+                    "paddingLeft": "1em",
+                    "margin": "2px 0 4px 0",
+                    "borderLeft": "2px solid var(--mantine-color-default-border)",
+                },
+            )
+
+        def _synonyms_span(node: "Node") -> html.Span:
+            return html.Span(
+                f"- {', '.join(node.synonyms)}",
+                style={
+                    "fontSize": "var(--mantine-font-size-xs)",
+                    "color": "var(--mantine-color-dimmed)",
+                    "marginLeft": "4px",
+                },
+            )
+
+        def _node(node: "Node") -> html.Li:
+            if node.is_leaf:
+                return html.Li(
+                    [node.name, _synonyms_span(node)] if node.synonyms else node.name,
+                    style={"padding": "1px 4px"},
+                )
+            return html.Li(
+                [
+                    html.Span(node.name, style={"fontWeight": 600}),
+                    *([_synonyms_span(node)] if node.synonyms else []),
+                    _children_ul(node),
+                ],
+                style={"padding": "2px 0"},
+            )
+
+        top_nodes = root.children if root.name == "__root__" else [root]
+        return html.Div(
+            html.Ul(
+                [_node(n) for n in top_nodes],
+                style={"listStyleType": "none", "padding": 0, "margin": 0},
+            ),
+            style={
+                "maxHeight": "65vh",
+                "overflowY": "auto",
+                "fontSize": "var(--mantine-font-size-sm)",
+                "lineHeight": 1.7,
+            },
+        )
+
+    def _label_with_browser_btn(self, pipe_field: str) -> Any:
+        """Return a label group with an inline hierarchy-browser action icon."""
+        return dmc.Group(
+            [
+                self.label,
+                dmc.ActionIcon(
+                    DashIconify(icon="tabler:binary-tree-2", width=14),
+                    id={"type": "hl-browser-btn", "field": pipe_field},
+                    size="xs",
+                    variant="subtle",
+                    color="gray",
+                ),
+            ],
+            gap=4,
+            align="center",
+        )
+
+    def _browser_modal(self, pipe_field: str) -> dmc.Modal:
+        """Return a hidden Modal containing the full hierarchy tree."""
+        return dmc.Modal(
+            id={"type": "hl-browser-modal", "field": pipe_field},
+            title=self.label,
+            children=self._render_tree_html(self.root),
+            opened=False,
+            size="lg",
+            centered=True,
+        )
+
 
 # ---------------------------------------------------------------------------
 # HierarchicalLabelSelectWidget  (single-select dropdown)
@@ -275,6 +399,10 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
         """Serialize a stored path list to the string value expected by dmc.Select."""
         return json.dumps(v, separators=(",", ":")) if v else None
 
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "hl-select", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -298,12 +426,13 @@ class HierarchicalLabelSelectWidget(HierarchicalLabelWidget):
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
                         filter={"function": "hlFilter"},
+                        comboboxProps={"shadow": "md"},
                     ),
                     dcc.Store(id={"type": "hl-select-relay", "field": pipe_field}, data=None),
+                    self._browser_modal(pipe_field),
                 ],
                 gap="xs",
             ),
-            self.label,
         )
 
     def register_callbacks(self, app: Any) -> None:
@@ -334,6 +463,10 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
     search_show_siblings: bool = False
     search_show_children: bool = False
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.auto_advance = False  # auto-advance is not meaningful for multi-select
+
     def to_python_type(self) -> type:
         return list
 
@@ -362,6 +495,10 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
         """Serialize a list of stored paths to the list of JSON strings expected by dmc.MultiSelect."""
         return [json.dumps(p, separators=(",", ":")) for p in v] if v else []
 
+    @property
+    def schema_id(self) -> dict:
+        return {"type": "hl-multi", "ld": self._repeater_ld, "path": self._repeater_path, "tf": self._item_relative_tf}
+
     def component(self) -> Any:
         pipe_field = self.field_path.replace(".", "|")
         data = _build_dropdown_data(self.root, self.allow_non_leaf)
@@ -385,12 +522,13 @@ class HierarchicalLabelMultiWidget(HierarchicalLabelWidget):
                         size="sm",
                         renderOption={"function": "hlRenderOption"},
                         filter={"function": "hlFilter"},
+                        comboboxProps={"shadow": "md"},
                     ),
                     dcc.Store(id={"type": "hl-multi-relay", "field": pipe_field}, data=None),
+                    self._browser_modal(pipe_field),
                 ],
                 gap="xs",
             ),
-            self.label,
         )
 
     def register_callbacks(self, app: Any) -> None:

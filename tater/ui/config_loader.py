@@ -50,6 +50,7 @@ def load_config_module(path: str) -> dict[str, Any]:
         raise ImportError(f"Cannot load config file: {path}")
 
     module = importlib.util.module_from_spec(spec)
+    # exec_module is safe, as it config_loader is CLI-only and the caller owns the file
     spec.loader.exec_module(module)  # type: ignore[union-attr]
 
     schema_model = getattr(module, "Schema", None)

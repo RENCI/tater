@@ -42,13 +42,13 @@ class TestUpdateSaveStatus:
     def test_never_saved_when_no_timing(self):
         ta = _make_ta()
         text, color = _update_save_status_impl(ta, None)
-        assert text == "Never saved"
+        assert text == "Not saved"
         assert color == "dimmed"
 
     def test_never_saved_when_timing_has_no_last_save_time(self):
         ta = _make_ta()
         text, color = _update_save_status_impl(ta, {"doc_start_time": time.time()})
-        assert text == "Never saved"
+        assert text == "Not saved"
         assert color == "dimmed"
 
     def test_last_saved_shows_formatted_time(self):

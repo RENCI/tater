@@ -420,6 +420,23 @@ Object.assign(window.dash_clientside.tater, {
         return Object.assign({}, annotationsData, {[docId]: newAnn});
     },
 
+    // ---- hlSelectAutoAdvance: trigger auto-advance after a hl-select-relay write ----
+    // Fires after applyFieldOp has written the value to annotations-store.
+    // Increments auto-advance-store when the relay carried a non-null value and the
+    // field is in aaFields.  Uses a window-global counter (same pattern as captureValue)
+    // to avoid reading auto-advance-store as both Output and State.
+    hlSelectAutoAdvance: function(_allRelays, aaFields) {
+        var nu = window.dash_clientside.no_update;
+        var ctx = window.dash_clientside.callback_context;
+        if (!ctx || !ctx.triggered || !ctx.triggered.length) { return nu; }
+        var val = ctx.triggered[0].value;
+        if (!val || !val.field || val.value == null) { return nu; }
+        if (!Array.isArray(aaFields) || aaFields.indexOf(val.field) === -1) { return nu; }
+        var next = (window._taterAutoAdvanceCount || 0) + 1;
+        window._taterAutoAdvanceCount = next;
+        return next;
+    },
+
     // ---- applyRepeaterOp: apply add/delete descriptor to annotations-store ----
     // Runs clientside so it reads the CURRENT browser-side annotations (including any
     // clientside span adds that haven't been reflected in server-side State yet).
@@ -476,16 +493,23 @@ Object.assign(window.dash_clientside.tater, {
     // since all required information is preloaded in doc-list-store at layout time.
     updateNavInfo: function(docId, docListStore) {
         var nu = window.dash_clientside.no_update;
-        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu]; }
+        if (!docId || !docListStore) { return [nu, nu, nu, nu, nu, nu, nu]; }
         var idx = docListStore.index[docId];
-        if (idx === undefined) { return [nu, nu, nu, nu, nu]; }
+        if (idx === undefined) { return [nu, nu, nu, nu, nu, nu, nu]; }
         var total = docListStore.total;
+        var isLast = idx === total - 1;
+
+        // Toggle containers via display:contents (visible, transparent to layout) or display:none.
+        // The buttons' own styles (border, flex) remain static in the layout — only the
+        // containers are toggled, so dmc.Button never receives a dynamic style object.
         return [
             (idx + 1) + " / " + total,
             docListStore.metadata[docId] || "",
             ((idx + 1) / total) * 100,
             idx === 0,
-            idx === total - 1
+            isLast,
+            isLast ? {"display": "none"} : {"display": "contents"},
+            isLast ? {"display": "contents"} : {"display": "none"},
         ];
     },
 

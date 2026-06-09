@@ -7,7 +7,12 @@
     "ontology": "pet_ontology.yaml"
   },
   "data_schema": [
-    {"widget": {"type": "divider", "label": "Leaf nodes only"}},
+    {
+      "widget": {
+        "type": "divider", 
+        "label": "Leaf nodes only"
+      }
+    },
     {
       "id": "breed",
       "type": "hierarchical_label",
@@ -30,7 +35,11 @@
         "search_show_children": false
       }
     },
-    {"widget": {"type": "divider", "label": "Any level"}},
+    {"widget": {
+      "type": "divider", 
+      "label": "Any level"
+      }
+    },
     {
       "id": "breed_any",
       "type": "hierarchical_label",

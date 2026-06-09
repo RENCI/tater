@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from tater.ui.tater_app import TaterApp
-from tater.ui.callbacks import update_status_for_doc, _has_value
+from tater.ui.callbacks import update_status_for_doc, _has_value, _is_complete_eligible
 from tater.widgets import (
     RadioGroupWidget, TextInputWidget, CheckboxWidget, SelectWidget,
     GroupWidget,
@@ -98,59 +98,25 @@ class TestUpdateStatusForDoc:
         update_status_for_doc(app, "d1", annotations_data, metadata_data)
         assert metadata_data["d1"]["status"] == "not_started"
 
-    def test_no_required_widgets_is_complete(self, tmp_path):
+    def test_visited_is_in_progress(self, tmp_path):
+        # update_status_for_doc only sets not_started or in_progress.
+        # Completion is deferred to navigation (_perform_navigation / handle_finish).
         app = make_app(Simple, [RadioGroupWidget("label")], ["d1"], tmp_path)
         annotations_data, metadata_data = make_stores(app)
         metadata_data["d1"]["visited"] = True
         update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "complete"
-
-    def test_required_filled_is_complete(self, tmp_path):
-        app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
-        annotations_data, metadata_data = make_stores(app)
-        metadata_data["d1"]["visited"] = True
-        annotations_data["d1"]["label"] = "pos"
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "complete"
+        assert metadata_data["d1"]["status"] == "in_progress"
 
     def test_required_empty_is_in_progress(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
         annotations_data, metadata_data = make_stores(app)
         metadata_data["d1"]["visited"] = True
-        # label stays None
         update_status_for_doc(app, "d1", annotations_data, metadata_data)
         assert metadata_data["d1"]["status"] == "in_progress"
-
-    def test_all_required_must_be_filled(self, tmp_path):
-        widgets = [
-            RadioGroupWidget("label", required=True),
-            TextInputWidget("notes", required=True),
-        ]
-        app = make_app(Simple, widgets, ["d1"], tmp_path)
-        annotations_data, metadata_data = make_stores(app)
-        metadata_data["d1"]["visited"] = True
-        annotations_data["d1"]["label"] = "pos"
-        # notes still None
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "in_progress"
-
-        annotations_data["d1"]["notes"] = "some text"
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "complete"
-
-    def test_boolean_required_does_not_gate_completion(self, tmp_path):
-        # required=True on a bool widget should not block complete status
-        app = make_app(BoolOnly, [CheckboxWidget("reviewed", required=True)], ["d1"], tmp_path)
-        annotations_data, metadata_data = make_stores(app)
-        metadata_data["d1"]["visited"] = True
-        # reviewed stays None (unchecked = False in practice, but type is bool)
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "complete"
 
     def test_no_doc_id_is_noop(self, tmp_path):
         app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
         annotations_data, metadata_data = make_stores(app)
-        # Should not raise
         update_status_for_doc(app, "", annotations_data, metadata_data)
         update_status_for_doc(app, None, annotations_data, metadata_data)
 
@@ -160,25 +126,55 @@ class TestUpdateStatusForDoc:
         annotations_data, metadata_data = make_stores(app)
         metadata_data["d1"]["visited"] = True
         metadata_data["d2"]["visited"] = True
-        annotations_data["d1"]["label"] = "pos"
-        # d2 label stays None
 
         update_status_for_doc(app, "d1", annotations_data, metadata_data)
         update_status_for_doc(app, "d2", annotations_data, metadata_data)
 
-        assert metadata_data["d1"]["status"] == "complete"
+        assert metadata_data["d1"]["status"] == "in_progress"
         assert metadata_data["d2"]["status"] == "in_progress"
+
+
+# ---------------------------------------------------------------------------
+# _is_complete_eligible
+# ---------------------------------------------------------------------------
+
+class TestIsCompleteEligible:
+    def test_no_required_widgets_always_eligible(self, tmp_path):
+        app = make_app(Simple, [RadioGroupWidget("label")], ["d1"], tmp_path)
+        annotations_data, _ = make_stores(app)
+        assert _is_complete_eligible(app, "d1", annotations_data) is True
+
+    def test_required_filled_is_eligible(self, tmp_path):
+        app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
+        annotations_data, _ = make_stores(app)
+        annotations_data["d1"]["label"] = "pos"
+        assert _is_complete_eligible(app, "d1", annotations_data) is True
+
+    def test_required_empty_is_not_eligible(self, tmp_path):
+        app = make_app(Simple, [RadioGroupWidget("label", required=True)], ["d1"], tmp_path)
+        annotations_data, _ = make_stores(app)
+        assert _is_complete_eligible(app, "d1", annotations_data) is False
+
+    def test_all_required_must_be_filled(self, tmp_path):
+        widgets = [RadioGroupWidget("label", required=True), TextInputWidget("notes", required=True)]
+        app = make_app(Simple, widgets, ["d1"], tmp_path)
+        annotations_data, _ = make_stores(app)
+        annotations_data["d1"]["label"] = "pos"
+        assert _is_complete_eligible(app, "d1", annotations_data) is False
+        annotations_data["d1"]["notes"] = "some text"
+        assert _is_complete_eligible(app, "d1", annotations_data) is True
+
+    def test_boolean_required_does_not_gate_completion(self, tmp_path):
+        # Boolean widgets are excluded from _required_widgets so they never gate completion.
+        app = make_app(BoolOnly, [CheckboxWidget("reviewed", required=True)], ["d1"], tmp_path)
+        annotations_data, _ = make_stores(app)
+        assert _is_complete_eligible(app, "d1", annotations_data) is True
 
     def test_required_in_group_widget(self, tmp_path):
         sub_widget = SelectWidget("value", required=True)
         group = GroupWidget("sub", label="Sub", children=[sub_widget])
         app = make_app(WithGroup, [group], ["d1"], tmp_path)
-        annotations_data, metadata_data = make_stores(app)
-        metadata_data["d1"]["visited"] = True
-
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "in_progress"
-
+        annotations_data, _ = make_stores(app)
+        assert _is_complete_eligible(app, "d1", annotations_data) is False
         annotations_data["d1"]["sub"] = {"value": "a"}
-        update_status_for_doc(app, "d1", annotations_data, metadata_data)
-        assert metadata_data["d1"]["status"] == "complete"
+        assert _is_complete_eligible(app, "d1", annotations_data) is True

@@ -40,24 +40,52 @@ _NESTED_STORE_TYPE  = "nested-repeater-store"
 _NESTED_ITEMS_TYPE  = "nested-repeater-items"
 
 
-def _apply_conditional_initial_styles(group_or_children: Any) -> None:
-    """Set ``_initial_hidden`` on conditional ControlWidget children based on sibling defaults.
+def _build_tf_defaults(item_widgets: list, ann: Any, item_base_path: str, group_prefix: str = "") -> dict:
+    """Build a flat ``{item_relative_tf: value}`` map for all ControlWidgets in the item tree.
 
-    Called after ``_load_defaults_from_annotation`` so each controlling widget already
-    has its ``default`` set from the annotation (or schema default if no annotation).
-    Works recursively into nested GroupWidgets.
+    Reads annotation values for existing items; falls back to schema defaults (widget.default)
+    for fields absent from the annotation (e.g. newly-added items or missing fields).
+    Called once at the start of ``_render_item_widgets`` so that conditional-visibility
+    initial-state checks can span across groups without per-group flat dicts.
+    """
+    from tater.widgets.group import GroupWidget
+    from tater.ui import value_helpers
+    result = {}
+    for w in item_widgets:
+        if isinstance(w, GroupWidget):
+            prefix = f"{group_prefix}|{w.schema_field}" if group_prefix else w.schema_field
+            result.update(_build_tf_defaults(
+                w.children, ann, f"{item_base_path}.{w.schema_field}", prefix
+            ))
+        elif isinstance(w, ControlWidget):
+            tf = f"{group_prefix}|{w.schema_field}" if group_prefix else w.schema_field
+            ann_value = (
+                value_helpers.get_model_value(ann, f"{item_base_path}.{w.schema_field}")
+                if ann is not None else None
+            )
+            result[tf] = ann_value if ann_value is not None else getattr(w, "default", None)
+    return result
+
+
+def _apply_conditional_initial_styles(group_or_children: Any, tf_defaults: dict) -> None:
+    """Set ``_initial_hidden`` on conditional ControlWidget children using the item-wide
+    ``tf_defaults`` map built by ``_build_tf_defaults``.
+
+    Using a pre-built map (rather than a per-level defaults dict) means conditions that
+    reference fields in sibling groups or at different nesting depths resolve correctly.
+    The same ``tf_defaults`` dict is passed through all recursive GroupWidget calls.
     """
     from tater.widgets.group import GroupWidget
     children = group_or_children.children if hasattr(group_or_children, "children") else group_or_children
-    defaults = {w.schema_field: getattr(w, "default", None) for w in children}
     for w in children:
         if w._condition is not None:
-            controlling_schema_field = w._condition[0].split(".")[-1]
-            target_value = w._condition[1]
-            current_value = defaults.get(controlling_schema_field)
-            w._initial_hidden = (current_value != target_value)
+            ctrl_tf = w._condition[0].replace(".", "|")
+            self_tf = getattr(w, "_item_relative_tf", w.field_path.replace(".", "|"))
+            if "|" not in ctrl_tf and "|" in self_tf:
+                ctrl_tf = self_tf.rsplit("|", 1)[0] + "|" + ctrl_tf
+            w._initial_hidden = (tf_defaults.get(ctrl_tf) != w._condition[1])
         if isinstance(w, GroupWidget):
-            _apply_conditional_initial_styles(w)
+            _apply_conditional_initial_styles(w, tf_defaults)
 
 
 def _load_defaults_from_annotation(widget: Any, tater_app: Any, doc_id: str, annotations_data: dict | None = None) -> None:
@@ -114,8 +142,13 @@ class RepeaterWidget(ContainerWidget):
         from tater.ui import value_helpers
         rendered = []
         pipe_ld = self.field_path.replace(".", "|")
-        # Track defaults of direct ControlWidget children for conditional visibility.
-        direct_defaults: dict[str, Any] = {}
+        # Pre-build a flat {item_relative_tf: value} map spanning the full item widget
+        # tree (groups and direct children).  Used for conditional-visibility initial
+        # state so that conditions referencing fields in sibling groups resolve correctly.
+        ann = (annotations_data or {}).get(doc_id) if doc_id else None
+        if ann is None and tater_app and doc_id:
+            ann = tater_app.annotations.get(doc_id)
+        tf_defaults = _build_tf_defaults(self.item_widgets, ann, f"{self.field_path}.{index}")
         for template in self.item_widgets:
             widget = copy.deepcopy(template)
             widget._finalize_paths(parent_path=f"{self.field_path}.{index}")
@@ -125,7 +158,7 @@ class RepeaterWidget(ContainerWidget):
             if isinstance(template, GroupWidget):
                 widget._set_repeater_context(pipe_ld, str(index))
                 _load_defaults_from_annotation(widget, tater_app, doc_id, annotations_data)
-                _apply_conditional_initial_styles(widget)
+                _apply_conditional_initial_styles(widget, tf_defaults)
                 rendered.append(widget.render_field(mt="sm"))
                 continue
 
@@ -150,25 +183,16 @@ class RepeaterWidget(ContainerWidget):
                 # warnings when the same component ID is reused across docs).
                 if isinstance(template, ControlWidget):
                     widget._set_repeater_context(pipe_ld, str(index))
-                    ann = (annotations_data or {}).get(doc_id) if doc_id else None
-                    if ann is None and tater_app and doc_id:
-                        ann = tater_app.annotations.get(doc_id)
                     if ann is not None:
                         v = value_helpers.get_model_value(ann, widget.field_path)
                         if v is not None:
-                            widget.default = v
-                    direct_defaults[widget.schema_field] = getattr(widget, "default", None)
+                            if isinstance(widget, HierarchicalLabelWidget):
+                                widget._preset_value = widget._serialize_value(v)
+                            else:
+                                widget.default = v
                     if widget._condition is not None:
-                        cf = widget._condition[0].split(".")[-1]
-                        widget._initial_hidden = (direct_defaults.get(cf) != widget._condition[1])
-                elif isinstance(template, HierarchicalLabelWidget):
-                    ann = (annotations_data or {}).get(doc_id) if doc_id else None
-                    if ann is None and tater_app and doc_id:
-                        ann = tater_app.annotations.get(doc_id)
-                    if ann is not None:
-                        v = value_helpers.get_model_value(ann, widget.field_path)
-                        if v is not None:
-                            widget._preset_value = widget._serialize_value(v)
+                        ctrl_tf = widget._condition[0].replace(".", "|")
+                        widget._initial_hidden = (tf_defaults.get(ctrl_tf) != widget._condition[1])
                 comp = widget.component()
 
             if widget._condition is not None:
@@ -365,20 +389,6 @@ class RepeaterWidget(ContainerWidget):
             nested_path = f"{outer_li}.{inner_index}"
             parent_path = f"{outer_list_field}.{outer_li}.{item_field}.{inner_index}"
 
-            if isinstance(template, HierarchicalLabelWidget):
-                widget = copy.deepcopy(template)
-                widget._finalize_paths(parent_path=parent_path)
-                if doc_id:
-                    ann = (annotations_data or {}).get(doc_id)
-                    if ann is None and tater_app and doc_id in tater_app.annotations:
-                        ann = tater_app.annotations[doc_id]
-                    if ann is not None:
-                        v = value_helpers.get_model_value(ann, widget.field_path)
-                        if v is not None:
-                            widget._preset_value = widget._serialize_value(v)
-                rendered.append(dmc.Stack([widget.component()], gap="xs", mt="sm"))
-                continue
-
             if isinstance(template, GroupWidget):
                 widget = copy.deepcopy(template)
                 widget._finalize_paths(parent_path=parent_path)
@@ -404,7 +414,10 @@ class RepeaterWidget(ContainerWidget):
                 if ann is not None:
                     value = value_helpers.get_model_value(ann, widget.field_path)
                     if value is not None:
-                        widget.default = value
+                        if isinstance(widget, HierarchicalLabelWidget):
+                            widget._preset_value = widget._serialize_value(value)
+                        else:
+                            widget.default = value
 
             # Set repeater context for MATCH-based callbacks (2-level nesting).
             widget._set_repeater_context(nested_ld, nested_path)

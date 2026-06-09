@@ -66,7 +66,10 @@ def _lighten_hex(color: str, factor: float = 0.4) -> str:
     c = color.lstrip("#")
     if len(c) != 6:
         return color
-    r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    try:
+        r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+    except ValueError:
+        return color
     r = round(r + (255 - r) * factor)
     g = round(g + (255 - g) * factor)
     b = round(b + (255 - b) * factor)

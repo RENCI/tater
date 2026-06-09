@@ -402,7 +402,9 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 
 ## Document format
 
-JSON file listing documents to annotate. Document text can be provided inline or via a file path (exactly one is required):
+Documents can be provided as **JSON**, **CSV**, **TSV**, or **Excel** (`.xlsx`/`.xls`).
+
+### JSON
 
 ```json
 [
@@ -413,7 +415,28 @@ JSON file listing documents to annotate. Document text can be provided inline or
 ]
 ```
 
-Each document may have:
+### CSV / TSV / Excel
+
+Tabular formats use a header row with column names. Reserved columns:
+
+| Column | Description |
+|--------|-------------|
+| `text` | Inline document text |
+| `id` | Unique document ID (auto-generated if absent) |
+| `name` | Display name |
+| `file_path` | Path to document file (**not supported in hosted mode**) |
+
+Any other column is added to the document's `info` dict. Empty cells are omitted.
+
+```
+id,text,date,patient_id
+doc_001,"Patient presented with...",2024-01-15,P001
+doc_002,"Follow-up visit...",2024-01-16,P002
+```
+
+### Common fields
+
+Regardless of format, each document may have:
 - `text` — inline document text (use this or `file_path`, not both)
 - `file_path` — path to a `.txt` file; resolved relative to the documents file (use this or `text`, not both; **not supported in hosted mode**)
 - `id` — unique string ID (auto-generated as `doc_000`, `doc_001`, … if omitted)
@@ -447,7 +470,7 @@ tater --hosted [options]
 |------|-------------|
 | `--config PATH` | Python config file (one of `--config` / `--schema` required in single mode) |
 | `--schema PATH` | JSON schema file (one of `--config` / `--schema` required in single mode) |
-| `--documents PATH` | Documents JSON file (required in single mode) |
+| `--documents PATH` | Documents file — JSON, CSV, TSV, or Excel (required in single mode) |
 | `--annotations PATH` | Annotations output file (default: `<documents>_annotations.json`) |
 | `--no-restore` | Skip loading existing annotations on startup |
 | `--hosted` | Run in hosted mode (upload page at `/`, annotation UI at `/annotate`) |
@@ -467,7 +490,7 @@ tater --hosted --host 0.0.0.0 --port 8050
 
 **Flow — upload your own files:**
 1. User visits `/` → upload page, "Upload files" tab
-2. Upload schema JSON and documents JSON; status icons confirm each file is valid
+2. Upload schema JSON and documents (JSON, CSV, TSV, or Excel); status icons confirm each file is valid
 3. If the schema references external hierarchy files, per-file upload zones appear automatically
 4. Optionally upload an existing annotations JSON to resume from a previous session
 5. Click **Start Annotating** → redirected to `/annotate`

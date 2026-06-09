@@ -399,7 +399,7 @@ def _build_widget_from_spec(
         allow_non_leaf = widget_spec.get("allow_non_leaf", False)
         search_show_siblings = widget_spec.get("search_show_siblings", False)
         search_show_children = widget_spec.get("search_show_children", False)
-        w = WIDGET_CLASS[wtype](fid, label=label, description=description, hierarchy=hierarchy, allow_non_leaf=allow_non_leaf, search_show_siblings=search_show_siblings, search_show_children=search_show_children)
+        w = WIDGET_CLASS[wtype](fid, label=label, description=description, required=required, hierarchy=hierarchy, allow_non_leaf=allow_non_leaf, search_show_siblings=search_show_siblings, search_show_children=search_show_children)
 
     elif wtype == "divider":
         w = DividerWidget(label=label, description=description)
@@ -408,7 +408,7 @@ def _build_widget_from_spec(
         raise KeyError(f"Unknown widget type {wtype!r}")
 
     # Post-construction: auto_advance, conditional_on
-    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean"):
+    if widget_spec.get("auto_advance") and ftype in ("choice", "boolean", "hierarchical_label"):
         w.auto_advance = True
     condition = widget_spec.get("conditional_on")
     if condition is not None:
@@ -467,7 +467,7 @@ def load_schema(path: str | Path) -> dict:
         ``description``, ``instructions``.
     """
     path = Path(path)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     schema_model, widgets = parse_schema(data, base_dir=path.parent)
     return {

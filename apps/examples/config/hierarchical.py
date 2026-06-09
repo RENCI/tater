@@ -24,7 +24,7 @@ instructions = """## Usage
 - The "any level" variants allow selecting intermediate nodes (e.g. a species group)
 """
 
-ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology.yaml")
+ontology = load_hierarchy_from_yaml("apps/examples/data/pet_ontology_synonyms.yaml")
 
 widgets = [
     DividerWidget(label="Leaf nodes only"),

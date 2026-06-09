@@ -17,10 +17,12 @@ tater/                  # Library package
   __init__.py           # Public API: SpanAnnotation, SpanAnnotationWidget,
                         #   EntityType, load_schema, parse_schema, widgets_from_model
   models/               # Pydantic data models (Document, SpanAnnotation)
-  loaders/              # Schema loaders
+  loaders/              # Schema and document loaders
     model_loader.py     # WIDGET_CLASS, DEFAULT_WIDGET, widgets_from_model,
                         #   _widget_from_field_type, _humanize
     json_loader.py      # JSON schema → (Pydantic model, partial widget list)
+    document_loader.py  # load_documents(path) — dispatches on extension;
+                        #   _load_tabular accepts Path or file-like (StringIO/BytesIO)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
     upload_layout.py    # Hosted-mode upload page layout + callbacks
   examples/             # Built-in example sets for hosted mode "Browse examples" tab
@@ -99,16 +101,21 @@ CLI flags: `--documents` (required in single mode), `--config` or `--schema` (on
 via Flask session cookies and a server-side `_session_cache` dict.
 
 **Upload page:** two tabs — "Upload files" and "Browse examples".
-- *Upload files*: schema JSON + documents JSON + optional existing annotations JSON. If the
-  schema has file-path `hierarchies` references, per-file ontology upload zones appear
-  automatically. Each zone has a status icon (grey outline → filled blue check on success).
+- *Upload files*: schema JSON + documents (JSON, CSV, TSV, or Excel) + optional existing
+  annotations JSON. If the schema has file-path `hierarchies` references, per-file ontology
+  upload zones appear automatically. Each zone has a status icon (grey outline → filled blue
+  check on success). Tabular documents are parsed via `_parse_tabular_upload` (in
+  `upload_layout.py`), which decodes the base64 upload contents, creates a StringIO/BytesIO
+  buffer, calls `document_loader._load_tabular`, and normalises results to a list of dicts
+  before storing in `documents-store`.
 - *Browse examples*: clickable cards for built-in example sets in `tater/examples/`. Clicking
   a card immediately creates a session and redirects — no submit button needed.
 
 **Session flow (upload tab):** user uploads schema + documents (+ optional ontology files +
-optional annotations) → files written to `tempfile.mkdtemp` → paths stored in
-`flask.session["tater_session"]` → redirect to `/annotate` → `serve_layout()` reads the
-session, retrieves or builds the `TaterApp`, returns the annotation layout.
+optional annotations) → tabular documents normalised to list-of-dicts and written to temp as
+`documents.json` → paths stored in `flask.session["tater_session"]` → redirect to `/annotate`
+→ `serve_layout()` reads the session, retrieves or builds the `TaterApp`, returns the
+annotation layout.
 
 **Session flow (examples tab):** user clicks a card → `load_example` callback reads the
 example's files directly from `tater/examples/<name>/`, resolves hierarchy paths to the same

@@ -120,13 +120,14 @@ class TestCreateListItem:
         result = create_list_item(nav_stack)
         assert isinstance(result, Pet)
 
-    def test_returns_dict_for_evidence_field(self):
-        # SpanAnnotation has required fields so can't be auto-instantiated; falls back to {}
+    def test_returns_model_construct_for_evidence_field(self):
+        # SpanAnnotation has required fields; model_construct() returns an instance with unset fields
+        from tater.models.span import SpanAnnotation
         s = Schema()
         finding = Finding()
         nav_stack = [(s, "findings"), (finding, "evidence")]
         result = create_list_item(nav_stack)
-        assert result == {}
+        assert isinstance(result, SpanAnnotation)
 
     def test_returns_dict_for_empty_stack(self):
         result = create_list_item([])

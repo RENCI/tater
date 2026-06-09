@@ -18,7 +18,8 @@ class SelectWidget(ChoiceWidget):
             searchable=True,
             label=self._label_with_tooltip(),
             description=self.description,
-            withAsterisk=self.required,
+            withAsterisk=self.required,            
+            comboboxProps={"shadow": "md"},
         )
 
     def to_python_type(self) -> type:

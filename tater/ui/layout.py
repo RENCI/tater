@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from dash import html, dcc
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
+from tater.ui.constants import STATUS_COLORS, STATUS_LABELS
 
 if TYPE_CHECKING:
     from tater.ui.tater_app import TaterApp
@@ -29,6 +30,7 @@ def _build_doc_list_store_data(tater_app: TaterApp) -> dict:
             d.id: " | ".join(f"{k}: {v}" for k, v in d.info.items()) if d.info else ""
             for d in docs
         },
+        "hosted": tater_app.is_hosted,
     }
 
 
@@ -76,7 +78,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 shadow="sm",
             )
         ], span={"base": 12, "md": 5}),
-    ], gutter="xl")
+    ], gutter="xl", align="flex-start")
 
     app_shell = dmc.AppShell(
         [
@@ -85,9 +87,12 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 dmc.Container([
                     dmc.Stack([
                         dmc.Text(tater_app.description, size="sm", c="dimmed", ta="center") if tater_app.description else None,
-                        dmc.Text(id="document-metadata", size="sm", c="dimmed"),
+                        dmc.Group([
+                            dmc.Text(id="document-title", fw=500, size="sm"),
+                            dmc.Badge(id="status-badge", variant="light", size="sm"),
+                        ], gap="xs"),
                         content_grid,
-                    ], gap="lg"),
+                    ], gap="xs"),
                 ], size="xl", pt="xs", px="xs", fluid=True),
             ),
             _build_app_footer(is_hosted=is_hosted),
@@ -126,6 +131,23 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                     ),
                 ],
             ) if is_hosted else None,
+            dmc.Modal(
+                title="Session Summary",
+                id="modal-finish",
+                opened=False,
+                centered=True,
+                children=[
+                    html.Div(id="finish-modal-content"),
+                    dmc.Group(
+                        [
+                            dmc.Button("Go to first incomplete", id="btn-go-incomplete", variant="outline", size="sm", style={"display": "none"}),
+                            dmc.Button("Close", id="btn-close-finish", variant="default", size="sm"),
+                        ],
+                        justify="flex-end",
+                        mt="md",
+                    ),
+                ],
+            ),
             dcc.Store(id="current-doc-id", data=tater_app.documents[0].id if tater_app.documents else ""),
             dcc.Store(id="timing-store", data={"last_save_time": None, "doc_start_time": None, "session_start_time": None, "annotation_seconds_at_load": 0.0}),
             dcc.Store(id="status-store", data="not_started"),
@@ -142,6 +164,7 @@ def build_layout(tater_app: TaterApp) -> dmc.MantineProvider:
                 for doc_id, meta in tater_app.metadata.items()
             }),
             dcc.Interval(id="clock-interval", interval=1000, n_intervals=0),
+            dcc.Store(id="filter-store", data={"flagged": False, "statuses": list(STATUS_LABELS.keys())}),
             doc_list_store,
             *span_stores,
             app_shell,
@@ -195,7 +218,10 @@ def _build_document_viewer() -> dmc.Paper:
 def _build_document_controls() -> dmc.Stack:
     """Build the flag/notes control stack."""
     return dmc.Stack([
-        dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+        dmc.Group([
+            dmc.Checkbox(id="flag-document", label="Flag document", checked=False),
+            dmc.Text(id="document-metadata", size="sm", c="dimmed"),
+        ], justify="space-between", wrap="nowrap"),
         dmc.Textarea(
             id="document-notes",
             label="Notes",
@@ -220,9 +246,24 @@ def _build_app_header(tater_app: TaterApp, has_instructions: bool, is_hosted: bo
     )
 
     left = dmc.Group([
-        dmc.Text(id="document-title", fw=500, size="sm"),
-        dmc.Badge(id="status-badge", variant="light", size="sm"),
-    ], style={"flex": "1", "columnGap": "var(--mantine-spacing-sm)", "rowGap": "2px"})
+        dmc.ProgressRoot(
+            [
+                dmc.ProgressSection(value=0, id="prog-c",  color=f"var(--mantine-color-{STATUS_COLORS['complete']}-light-color)"),
+                dmc.ProgressSection(value=0, id="prog-ip", color=f"var(--mantine-color-{STATUS_COLORS['in_progress']}-light-color)"),
+                dmc.ProgressSection(value=0, id="prog-ns", color=f"var(--mantine-color-{STATUS_COLORS['not_started']}-light)"),
+            ],
+            size="sm",
+            radius="sm",
+            style={"flex": "1"},
+        ),
+        DashIconify(
+            id="icon-all-complete",
+            icon="tabler:circle-check",
+            width=20,
+            color=f"var(--mantine-color-{STATUS_COLORS['complete']}-filled)",
+            style={"visibility": "hidden", "flexShrink": 0},
+        ),
+    ], gap="xs", style={"flex": "1"}, wrap="nowrap")
 
     center = dmc.Group(
         [dmc.Title(tater_app.title, order=3, lineClamp=1)],
@@ -275,11 +316,25 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
     # Right side of nav row: Next+Save (single mode) or Next+Download+StartOver (hosted)
     if is_hosted:
         right_nav = dmc.Group([
-            dmc.Button(
-                "Next", id="btn-next", variant="outline", size="sm",
-                fullWidth=True,
-                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                style={"flex": "1"},
+            html.Div(
+                dmc.Button(
+                    "Next", id="btn-next", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                    style={"flex": "1"},
+                ),
+                id="btn-next-container",
+                style={"display": "contents"},
+            ),
+            html.Div(
+                dmc.Button(
+                    "Finish", id="btn-finish", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:circle-check", width=16),
+                    style={"flex": "1"},
+                ),
+                id="btn-finish-container",
+                style={"display": "none"},
             ),
             dmc.Button(
                 DashIconify(icon="tabler:download", width=16),
@@ -292,11 +347,25 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
         save_right = None
     else:
         right_nav = dmc.Group([
-            dmc.Button(
-                "Next", id="btn-next", variant="outline", size="sm",
-                fullWidth=True,
-                rightSection=DashIconify(icon="tabler:arrow-right", width=16),
-                style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+            html.Div(
+                dmc.Button(
+                    "Next", id="btn-next", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:arrow-right", width=16),
+                    style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+                ),
+                id="btn-next-container",
+                style={"display": "contents"},
+            ),
+            html.Div(
+                dmc.Button(
+                    "Finish", id="btn-finish", variant="outline", size="sm",
+                    fullWidth=True,
+                    rightSection=DashIconify(icon="tabler:circle-check", width=16),
+                    style={"borderRight": "none", "borderRadius": "var(--mantine-radius-sm) 0 0 var(--mantine-radius-sm)", "flex": "1"},
+                ),
+                id="btn-finish-container",
+                style={"display": "none"},
             ),
             dmc.Button(
                 DashIconify(icon="tabler:device-floppy", width=16),
@@ -339,13 +408,39 @@ def _build_app_footer(is_hosted: bool = False) -> dmc.AppShellFooter:
                                 ),
                                 dmc.MenuDropdown(id="document-menu-dropdown", children=[]),
                             ], position="top-start", withArrow=True, withinPortal=True, width="target", zIndex=600),
-                            dmc.Button(
-                                DashIconify(icon="tabler:flag", width=16),
-                                id="filter-flagged",
-                                size="sm",
-                                variant="outline",
-                                px="xs",
-                                style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                            dmc.Popover(
+                                [
+                                    dmc.PopoverTarget(
+                                        dmc.Button(
+                                            DashIconify(icon="tabler:filter", width=16),
+                                            id="filter-btn",
+                                            size="sm",
+                                            variant="outline",
+                                            px="xs",
+                                            style={"borderRadius": "0 var(--mantine-radius-sm) var(--mantine-radius-sm) 0"},
+                                        ),
+                                    ),
+                                    dmc.PopoverDropdown(
+                                        dmc.Stack([
+                                            dmc.Text("Status", size="xs", c="dimmed"),
+                                            dmc.CheckboxGroup(
+                                                id="filter-status",
+                                                value=list(STATUS_LABELS.keys()),
+                                                children=dmc.Stack([
+                                                    dmc.Checkbox(value=k, label=v)
+                                                    for k, v in STATUS_LABELS.items()
+                                                ], gap="xs"),
+                                            ),
+                                            dmc.Divider(),
+                                            dmc.Checkbox(id="filter-flagged-check", label="Flagged only", checked=False),
+                                        ], gap="sm", p="xs"),
+                                    ),
+                                ],
+                                position="top-end",
+                                withArrow=True,
+                                withinPortal=True,
+                                keepMounted=True,
+                                zIndex=600,
                             ),
                         ], gap=0, wrap="nowrap", style={"flex": "1"}),
                         # Right nav group
