@@ -480,6 +480,86 @@ tater --hosted [options]
 
 Environment variables: `TATER_APP_PORT`, `TATER_APP_HOST`, `TATER_APP_DEBUG`, `TATER_SECRET_KEY`.
 
+## Jupyter notebooks
+
+Tater can run inline in a Jupyter notebook using `tater.annotate()`.
+
+### Installation
+
+Install the notebook extras:
+
+```bash
+pip install -e ".[notebook]"
+```
+
+After installing, activate the `nbstripout` git filter once per clone to keep notebooks clean in git (strips outputs and execution counts on commit):
+
+```bash
+nbstripout --install --attributes .gitattributes --extra-keys "metadata.kernelspec metadata.language_info"
+```
+
+### Quick start
+
+```python
+from typing import Literal, Optional
+from pydantic import BaseModel
+import tater
+
+class DocumentReview(BaseModel):
+    sentiment: Optional[Literal["positive", "negative", "neutral"]] = None
+    confidence: Optional[Literal["high", "medium", "low"]] = None
+    notes: Optional[str] = None
+
+app = tater.annotate(
+    model=DocumentReview,
+    documents="data/documents.json",
+    title="Document Review",
+    jupyter_mode="inline",
+    port=8050,
+)
+```
+
+The annotation UI renders below the cell. Change `jupyter_mode` to `"tab"` to open in a new browser tab instead.
+
+**Retrieving results** — run this in a later cell after annotating:
+
+```python
+results = app.get_annotations()
+# {'doc_000': {'sentiment': 'positive', 'confidence': 'high', 'notes': ''}, ...}
+```
+
+**Auto-save**: when `documents` is a file path, annotations are saved automatically to `<documents>_annotations.json`. For in-memory documents (list of dicts or DataFrame), pass `annotations_path` explicitly:
+
+```python
+docs = [
+    {"id": "doc_1", "text": "The product exceeded my expectations."},
+    {"id": "doc_2", "text": "Delivery was slow and packaging was damaged."},
+]
+app = tater.annotate(model=DocumentReview, documents=docs, annotations_path="my_annotations.json", jupyter_mode="inline")
+```
+
+### Manual widget configuration
+
+Use `TaterApp` directly for custom widgets, span annotation, or hierarchical labels:
+
+```python
+from tater import TaterApp
+from tater.widgets import SegmentedControlWidget, TextAreaWidget
+
+widgets = [
+    SegmentedControlWidget("sentiment", label="Sentiment"),
+    SegmentedControlWidget("confidence", label="Confidence"),
+    TextAreaWidget("notes", label="Notes"),
+]
+
+app = TaterApp(schema_model=DocumentReview, title="Document Review")
+app.load_documents("data/documents.json")
+app.set_annotation_widgets(widgets)
+app.run(jupyter_mode="inline", port=8050)
+```
+
+A working example notebook is at [apps/examples/notebooks/simple_annotation.ipynb](apps/examples/notebooks/simple_annotation.ipynb).
+
 ## Hosted mode
 
 Hosted mode lets multiple users upload their own schema and documents and annotate independently — no server-side annotation state is kept between sessions.
