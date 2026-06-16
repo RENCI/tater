@@ -22,6 +22,7 @@ build-backend = "hatchling.build"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov"]
+notebook = ["ipykernel>=6.0", "nbstripout>=0.7"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["tater"]
