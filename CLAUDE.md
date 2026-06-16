@@ -15,7 +15,8 @@ DMC LLM-friendly documentation can be found [here](https://www.dash-mantine-comp
 ```
 tater/                  # Library package
   __init__.py           # Public API: SpanAnnotation, SpanAnnotationWidget,
-                        #   EntityType, load_schema, parse_schema, widgets_from_model
+                        #   EntityType, load_schema, parse_schema, widgets_from_model,
+                        #   annotate (Jupyter one-liner — wraps TaterApp.run with jupyter_mode)
   models/               # Pydantic data models (Document, SpanAnnotation)
   loaders/              # Schema and document loaders
     model_loader.py     # WIDGET_CLASS, DEFAULT_WIDGET, widgets_from_model,
@@ -40,6 +41,7 @@ apps/
     config/             # Python config-file examples (simple, hooks, span, span_in_list, …)
     schema/             # JSON schema-file examples
     data/               # Sample documents and ontologies (e.g. pet_ontology.yaml)
+    notebooks/          # Jupyter notebook examples (simple_annotation.ipynb)
 spec/                   # Design documents (see below)
 ```
 
@@ -62,6 +64,11 @@ tater --hosted [--port 8050] [--host 0.0.0.0]
 CLI flags: `--documents` (required in single mode), `--config` or `--schema` (one required in single mode),
 `--annotations`, `--no-restore`, `--port`, `--host`, `--debug`, `--hosted`
 (also via `TATER_APP_PORT` / `TATER_APP_HOST` / `TATER_APP_DEBUG` env vars).
+
+Notebook examples (`apps/examples/notebooks/`) use `tater.annotate()` with `jupyter_mode="inline"`
+or `"tab"`. Install notebook extras with `pip install -e ".[notebook]"`. Run `nbstripout --install`
+once per clone to keep notebooks clean in git (`.gitattributes` configures the filter; it strips
+outputs, execution counts, and kernel metadata on `git add`).
 
 ## Architecture
 
