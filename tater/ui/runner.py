@@ -110,14 +110,16 @@ def run_hosted(args) -> None:
             if tater_app is not None:
                 _session_cache[session_id] = tater_app
 
+    show_disclaimer = args.show_disclaimer
+
     # Register upload-page callbacks, passing the pre-build hook.
-    register_upload_callbacks(app, on_session_ready=_on_session_ready)
+    register_upload_callbacks(app, on_session_ready=_on_session_ready, show_disclaimer=show_disclaimer)
 
     def serve_layout():
         """Return the appropriate layout based on the current Flask session."""
         session_info = flask.session.get("tater_session")
         if not session_info:
-            return build_upload_layout()
+            return build_upload_layout(show_disclaimer=show_disclaimer)
         session_id = session_info.get("session_id", "")
         # Retrieve the pre-built TaterApp (built in _on_session_ready).
         tater_app = _session_cache.get(session_id)
