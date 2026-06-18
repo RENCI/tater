@@ -40,6 +40,11 @@ def parse_args() -> Namespace:
         help="Skip loading existing annotations on startup",
     )
     parser.add_argument(
+        "--show-disclaimer",
+        action="store_true",
+        help="Show a sensitive data disclaimer modal on the upload page (hosted mode only)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         default=os.getenv("TATER_APP_DEBUG", "").lower() in ("true", "1", "yes"),

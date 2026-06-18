@@ -127,7 +127,7 @@ def _status_icon(complete: bool, optional: bool = False, size: int = 52) -> dmc.
 # Layout
 # ---------------------------------------------------------------------------
 
-def build_upload_layout() -> dmc.MantineProvider:
+def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
     """Return the upload page root component."""
     examples = _get_builtin_examples()
 
@@ -223,6 +223,31 @@ def build_upload_layout() -> dmc.MantineProvider:
         defaultColorScheme="auto",
         children=[
             dcc.Location(id="upload-location", refresh=True),
+            *(
+                [dmc.Modal(
+                    id="disclaimer-modal",
+                    opened=True,
+                    closeOnClickOutside=False,
+                    closeOnEscape=False,
+                    withCloseButton=False,
+                    title=dmc.Group(
+                        [
+                            DashIconify(icon="tabler:alert-triangle", width=20, color="orange"),
+                            dmc.Text("Sensitive Data Warning", fw=600),
+                        ],
+                        gap="xs",
+                    ),
+                    children=[
+                        dmc.Text(
+                            "Do not upload sensitive data, such as protected health information (PHI). "
+                            "This version of the app is not deployed in an environment approved for sensitive information.",
+                            size="sm",
+                        ),
+                        dmc.Button("I understand", id="disclaimer-accept-btn", mt="md", fullWidth=True),
+                    ],
+                )]
+                if show_disclaimer else []
+            ),
             dmc.Box(
                 dmc.Group(
                     [
@@ -363,7 +388,7 @@ def _compact_upload_zone(upload_id) -> dcc.Upload:
 # Callbacks
 # ---------------------------------------------------------------------------
 
-def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
+def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer: bool = False) -> None:
     """Register all upload-page callbacks on the given Dash app.
 
     Args:
@@ -372,7 +397,18 @@ def register_upload_callbacks(app: Dash, on_session_ready=None) -> None:
             session is written to flask.session.  Use this hook to pre-build
             the per-session TaterApp so that annotation callbacks are registered
             before the browser fetches ``/_dash-dependencies``.
+        show_disclaimer: Whether the sensitive data disclaimer modal is shown.
+            Must match the value passed to ``build_upload_layout``.
     """
+
+    if show_disclaimer:
+        @app.callback(
+            Output("disclaimer-modal", "opened"),
+            Input("disclaimer-accept-btn", "n_clicks"),
+            prevent_initial_call=True,
+        )
+        def close_disclaimer(_):
+            return False
 
     # Validate schema upload
     @app.callback(
