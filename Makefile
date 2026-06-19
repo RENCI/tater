@@ -1,7 +1,7 @@
 -include .env
 
 APP     := tater
-VERSION := $(shell grep '^appVersion:' k8s/chart/Chart.yaml | awk -F'"' '{print $$2}')
+VERSION := $(shell grep '^version' pyproject.toml | awk -F'"' '{print $$2}')
 IMAGE   := $(REGISTRY)/$(APP):$(VERSION)
 
 .PHONY: help build run stop push release pod-up pod-down pod-bounce pod-logs pod-logs-follow \
@@ -53,7 +53,8 @@ az-deploy:
 az-logs:
 	az containerapp logs show \
 		--name $(AZ_APP_NAME) \
-		--resource-group $(AZ_RESOURCE_GROUP)
+		--resource-group $(AZ_RESOURCE_GROUP) \
+		--tail 50
 
 az-logs-follow:
 	az containerapp logs show \
@@ -64,7 +65,8 @@ az-logs-follow:
 # Kubernetes / Helm
 
 pod-up:
-	helm upgrade --install $(APP) ./k8s/chart -n $(K8S_NAMESPACE)
+	helm upgrade --install $(APP) ./k8s/chart -n $(K8S_NAMESPACE) \
+		--set appVersion=$(VERSION)
 
 pod-down:
 	helm uninstall $(APP) -n $(K8S_NAMESPACE)

@@ -38,4 +38,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE $TATER_APP_PORT
 
 # run tater in hosted mode
-CMD ["sh", "-c", "exec tater --hosted --host 0.0.0.0 --port $TATER_APP_PORT"]
+CMD ["sh", "-c", "exec tater --hosted --show-disclaimer --host 0.0.0.0 --port $TATER_APP_PORT"]
