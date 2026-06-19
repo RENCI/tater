@@ -5,7 +5,7 @@ VERSION := $(shell grep '^appVersion:' k8s/chart/Chart.yaml | awk -F'"' '{print 
 IMAGE   := $(REGISTRY)/$(APP):$(VERSION)
 
 .PHONY: help build run stop push release pod-up pod-down pod-bounce pod-logs pod-logs-follow \
-        az-login az-deploy az-release az-logs az-logs-follow
+        az-login az-deploy az-logs az-logs-follow
 
 help:
 	@echo "build               Build the Docker image"
@@ -20,7 +20,6 @@ help:
 	@echo "pod-logs-follow     Stream pod logs"
 	@echo "az-login            Log in to Azure"
 	@echo "az-deploy           Update Container App image to current VERSION"
-	@echo "az-release          Build, push, and deploy to Azure (release + az-deploy)"
 	@echo "az-logs             Print Container App logs"
 	@echo "az-logs-follow      Stream Container App logs"
 
@@ -50,8 +49,6 @@ az-deploy:
 		--name $(AZ_APP_NAME) \
 		--resource-group $(AZ_RESOURCE_GROUP) \
 		--image $(IMAGE)
-
-az-release: release az-deploy
 
 az-logs:
 	az containerapp logs show \
