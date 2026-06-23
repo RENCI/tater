@@ -137,6 +137,13 @@ def build_schema_builder_modal() -> dmc.Modal:
                         leftSection=DashIconify(icon="tabler:check", width=16),
                     ),
                     dmc.Button(
+                        "Download JSON",
+                        id="schema-builder-download-btn",
+                        disabled=True,
+                        variant="light",
+                        leftSection=DashIconify(icon="tabler:download", width=16),
+                    ),
+                    dmc.Button(
                         "Cancel",
                         id="schema-builder-cancel-btn",
                         variant="subtle",
@@ -146,6 +153,7 @@ def build_schema_builder_modal() -> dmc.Modal:
                 justify="flex-end",
                 mt="md",
             ),
+            dcc.Download(id="schema-builder-download"),
         ],
     )
 
@@ -257,13 +265,28 @@ def register_schema_builder_callbacks(app: Dash) -> None:
     @app.callback(
         Output("schema-builder-store", "data"),
         Output("schema-builder-apply-btn", "disabled"),
+        Output("schema-builder-download-btn", "disabled"),
         Input("schema-builder-fields", "data"),
         Input("schema-builder-title", "value"),
     )
     def generate_schema(fields, title):
         if not fields or not any(f["type"] != "divider" for f in fields):
-            return None, True
-        return _fields_to_schema(fields, title or ""), False
+            return None, True, True
+        return _fields_to_schema(fields, title or ""), False, False
+
+    @app.callback(
+        Output("schema-builder-download", "data"),
+        Input("schema-builder-download-btn", "n_clicks"),
+        State("schema-builder-store", "data"),
+        State("schema-builder-title", "value"),
+        prevent_initial_call=True,
+    )
+    def download_schema(_, schema_data, title):
+        if not schema_data:
+            return no_update
+        import json
+        filename = re.sub(r"[^a-z0-9]+", "_", (title or "schema").strip().lower()).strip("_") or "schema"
+        return dcc.send_string(json.dumps(schema_data, indent=2), filename=f"{filename}.json")
 
 
 # ---------------------------------------------------------------------------
