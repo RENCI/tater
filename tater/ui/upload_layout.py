@@ -22,6 +22,12 @@ from dash import ALL, MATCH, Dash, Input, Output, State, ctx, dcc, html, no_upda
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
+from tater.ui.schema_builder import (
+    SCHEMA_BUILDER_STORES,
+    build_schema_builder_modal,
+    register_schema_builder_callbacks,
+)
+
 
 # ---------------------------------------------------------------------------
 # Built-in examples
@@ -135,12 +141,74 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
         [
             dmc.Stack(
                 [
-                    _upload_zone(
-                        upload_id="upload-schema",
-                        label="Schema (JSON)",
-                        hint="A tater JSON schema file describing the annotation fields.",
-                        icon="tabler:file-code",
-                        status_id="schema-status",
+                    dmc.Text("Schema (JSON)", fw=500, size="sm"),
+                    html.Div(
+                        [
+                            html.Div(
+                                dcc.Upload(
+                                    dmc.Paper(
+                                        dmc.Stack(
+                                            [
+                                                DashIconify(icon="tabler:file-code", width=32, color="gray"),
+                                                dmc.Text("Drag and drop or click to select", size="sm", c="dimmed"),
+                                                dmc.Text(
+                                                    "A tater JSON schema file describing the annotation fields.",
+                                                    size="xs", c="dimmed", ta="center",
+                                                ),
+                                            ],
+                                            align="center",
+                                            gap="xs",
+                                        ),
+                                        p="md",
+                                        withBorder=True,
+                                        radius="md",
+                                        style={"cursor": "pointer", "borderStyle": "dashed", "height": "100%", "boxSizing": "border-box"},
+                                    ),
+                                    id="upload-schema",
+                                    multiple=False,
+                                    style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)", "display": "block", "height": "100%"},
+                                    style_active={
+                                        "borderStyle": "solid",
+                                        "borderColor": "var(--mantine-color-blue-6)",
+                                        "borderRadius": 10,
+                                    },
+                                ),
+                                style={"flex": "1", "minWidth": 0, "alignSelf": "stretch"},
+                            ),
+                            dmc.Text("or", size="sm", c="dimmed", style={"flexShrink": 0, "alignSelf": "center"}),
+                            html.Div(
+                                html.Div(
+                                    dmc.Paper(
+                                        dmc.Stack(
+                                            [
+                                                DashIconify(icon="tabler:adjustments-horizontal", width=32, color="gray"),
+                                                dmc.Text("Build schema", size="sm", c="dimmed"),
+                                                dmc.Text(
+                                                    "Interactively define fields in a form.",
+                                                    size="xs", c="dimmed", ta="center",
+                                                ),
+                                            ],
+                                            align="center",
+                                            gap="xs",
+                                        ),
+                                        p="md",
+                                        withBorder=True,
+                                        radius="md",
+                                        style={"cursor": "pointer", "height": "100%", "boxSizing": "border-box"},
+                                    ),
+                                    id="schema-builder-open-btn",
+                                    n_clicks=0,
+                                    style={"height": "100%"},
+                                ),
+                                style={"flex": "1", "minWidth": 0, "alignSelf": "stretch"},
+                            ),
+                            html.Div(
+                                id="schema-status",
+                                children=_status_icon(False),
+                                style={"alignSelf": "center", "flexShrink": 0},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "stretch", "gap": "12px"},
                     ),
                     html.Div(id="schema-feedback", style={"minHeight": "20px"}),
                     # Ontology section — rendered dynamically when schema has file refs
@@ -223,6 +291,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
         defaultColorScheme="auto",
         children=[
             dcc.Location(id="upload-location", refresh=True),
+            build_schema_builder_modal(),
             *(
                 [dmc.Modal(
                     id="disclaimer-modal",
@@ -288,7 +357,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                                                 value="examples",
                                                 leftSection=DashIconify(icon="tabler:layout-grid", width=16),
                                             ),
-                                        ],
+                                                ],
                                     ),
                                     dmc.TabsPanel(upload_tab, value="upload", p="xl", pt="md"),
                                     dmc.TabsPanel(examples_tab, value="examples", p="xl", pt="md"),
@@ -305,6 +374,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                         dcc.Store(id="annotations-upload-store", data=None),
                         dcc.Store(id="pending-hierarchies", data={}),
                         dcc.Store(id="hierarchy-files-store", data={}),
+                        *SCHEMA_BUILDER_STORES,
                     ],
                     gap="md",
                     align="stretch",
@@ -413,7 +483,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     # Validate schema upload
     @app.callback(
         Output("schema-store", "data"),
-        Output("schema-feedback", "children"),
+        Output("schema-feedback", "children", allow_duplicate=True),
         Output("pending-hierarchies", "data"),
         Output("hierarchy-files-store", "data", allow_duplicate=True),
         Input("upload-schema", "contents"),
@@ -586,12 +656,13 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     @app.callback(
         Output("btn-start", "disabled"),
         Input("schema-store", "data"),
+        Input("schema-builder-store", "data"),
         Input("documents-store", "data"),
         Input("pending-hierarchies", "data"),
         Input("hierarchy-files-store", "data"),
     )
-    def toggle_start(schema_data, documents_data, pending, hierarchy_files):
-        if not schema_data or not documents_data:
+    def toggle_start(schema_data, builder_schema_data, documents_data, pending, hierarchy_files):
+        if not (schema_data or builder_schema_data) or not documents_data:
             return True
         if pending and set(pending.keys()) != set((hierarchy_files or {}).keys()):
             return True
@@ -606,9 +677,23 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
         return _status_icon(data is not None, size=28)
 
     # Update upload zone status icons
-    @app.callback(Output("schema-status", "children"), Input("schema-store", "data"))
-    def schema_status(data):
-        return _status_icon(data is not None)
+    @app.callback(
+        Output("schema-status", "children"),
+        Output("schema-feedback", "children", allow_duplicate=True),
+        Input("schema-store", "data"),
+        Input("schema-builder-store", "data"),
+        prevent_initial_call=True,
+    )
+    def schema_status(schema_data, builder_data):
+        complete = schema_data is not None or builder_data is not None
+        if builder_data and not schema_data:
+            n = sum(1 for f in builder_data.get("data_schema", []) if f.get("id"))
+            title = builder_data.get("title", "")
+            label = f"✓ Built schema — {n} field(s)" + (f": {title}" if title else "")
+            feedback = _success_text(label)
+        else:
+            feedback = no_update
+        return _status_icon(complete), feedback
 
     @app.callback(Output("documents-status", "children"), Input("documents-store", "data"))
     def documents_status(data):
@@ -624,14 +709,16 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
         Output("submit-feedback", "children"),
         Input("btn-start", "n_clicks"),
         State("schema-store", "data"),
+        State("schema-builder-store", "data"),
         State("documents-store", "data"),
         State("hierarchy-files-store", "data"),
         State("annotations-upload-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_submit(n_clicks, schema_data, documents_data, hierarchy_files, annotations_data):
+    def handle_submit(n_clicks, schema_data, builder_schema_data, documents_data, hierarchy_files, annotations_data):
         if not n_clicks:
             return no_update, no_update
+        schema_data = schema_data or builder_schema_data
         if not schema_data or not documents_data:
             return no_update, _error_text("Please upload both files before starting.")
 
@@ -715,6 +802,8 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error loading example '{example_name}': {e}")
+
+    register_schema_builder_callbacks(app)
 
 
 # ---------------------------------------------------------------------------
