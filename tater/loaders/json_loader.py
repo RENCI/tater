@@ -244,6 +244,9 @@ def _build_pydantic_field(
         return fid, (list[SpanAnnotation], Field(default_factory=list))
 
     if ftype == "hierarchical_label":
+        widget_spec = spec.get("widget") or {}
+        if widget_spec.get("type") == "hierarchical_label_multi":
+            return fid, (Optional[List[List[str]]], None)
         return fid, (Optional[List[str]], None)
 
     if ftype == "hierarchical_label_multi":

@@ -13,14 +13,18 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import secrets
-import tempfile
 from pathlib import Path
 
 from dash import ALL, MATCH, Dash, Input, Output, State, ctx, dcc, html, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
+
+from tater.ui.schema_builder import (
+    SCHEMA_BUILDER_STORES,
+    build_schema_builder_modal,
+    register_schema_builder_callbacks,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -135,12 +139,74 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
         [
             dmc.Stack(
                 [
-                    _upload_zone(
-                        upload_id="upload-schema",
-                        label="Schema (JSON)",
-                        hint="A tater JSON schema file describing the annotation fields.",
-                        icon="tabler:file-code",
-                        status_id="schema-status",
+                    dmc.Text("Schema (JSON)", fw=500, size="sm"),
+                    html.Div(
+                        [
+                            html.Div(
+                                dcc.Upload(
+                                    dmc.Paper(
+                                        dmc.Stack(
+                                            [
+                                                DashIconify(icon="tabler:file-code", width=32, color="gray"),
+                                                dmc.Text("Drag and drop or click to select", size="sm", c="dimmed"),
+                                                dmc.Text(
+                                                    "A tater JSON schema file describing the annotation fields.",
+                                                    size="xs", c="dimmed", ta="center",
+                                                ),
+                                            ],
+                                            align="center",
+                                            gap="xs",
+                                        ),
+                                        p="md",
+                                        withBorder=True,
+                                        radius="md",
+                                        style={"cursor": "pointer", "borderStyle": "dashed", "height": "100%", "boxSizing": "border-box"},
+                                    ),
+                                    id="upload-schema",
+                                    multiple=False,
+                                    style={"borderStyle": "solid", "borderColor": "rgba(0, 0, 0, 0)", "display": "block", "height": "100%"},
+                                    style_active={
+                                        "borderStyle": "solid",
+                                        "borderColor": "var(--mantine-color-blue-6)",
+                                        "borderRadius": 10,
+                                    },
+                                ),
+                                style={"flex": "1", "minWidth": 0, "alignSelf": "stretch"},
+                            ),
+                            dmc.Text("or", size="sm", c="dimmed", style={"flexShrink": 0, "alignSelf": "center"}),
+                            html.Div(
+                                html.Div(
+                                    dmc.Paper(
+                                        dmc.Stack(
+                                            [
+                                                DashIconify(icon="tabler:adjustments-horizontal", width=32, color="gray"),
+                                                dmc.Text("Build schema", size="sm", c="dimmed"),
+                                                dmc.Text(
+                                                    "Interactively define fields in a form.",
+                                                    size="xs", c="dimmed", ta="center",
+                                                ),
+                                            ],
+                                            align="center",
+                                            gap="xs",
+                                        ),
+                                        p="md",
+                                        withBorder=True,
+                                        radius="md",
+                                        style={"cursor": "pointer", "height": "100%", "boxSizing": "border-box"},
+                                    ),
+                                    id="schema-builder-open-btn",
+                                    n_clicks=0,
+                                    style={"height": "100%"},
+                                ),
+                                style={"flex": "1", "minWidth": 0, "alignSelf": "stretch"},
+                            ),
+                            html.Div(
+                                id="schema-status",
+                                children=_status_icon(False),
+                                style={"alignSelf": "center", "flexShrink": 0},
+                            ),
+                        ],
+                        style={"display": "flex", "alignItems": "stretch", "gap": "12px"},
                     ),
                     html.Div(id="schema-feedback", style={"minHeight": "20px"}),
                     # Ontology section — rendered dynamically when schema has file refs
@@ -223,6 +289,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
         defaultColorScheme="auto",
         children=[
             dcc.Location(id="upload-location", refresh=True),
+            build_schema_builder_modal(),
             *(
                 [dmc.Modal(
                     id="disclaimer-modal",
@@ -288,7 +355,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                                                 value="examples",
                                                 leftSection=DashIconify(icon="tabler:layout-grid", width=16),
                                             ),
-                                        ],
+                                                ],
                                     ),
                                     dmc.TabsPanel(upload_tab, value="upload", p="xl", pt="md"),
                                     dmc.TabsPanel(examples_tab, value="examples", p="xl", pt="md"),
@@ -305,6 +372,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                         dcc.Store(id="annotations-upload-store", data=None),
                         dcc.Store(id="pending-hierarchies", data={}),
                         dcc.Store(id="hierarchy-files-store", data={}),
+                        *SCHEMA_BUILDER_STORES,
                     ],
                     gap="md",
                     align="stretch",
@@ -413,7 +481,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     # Validate schema upload
     @app.callback(
         Output("schema-store", "data"),
-        Output("schema-feedback", "children"),
+        Output("schema-feedback", "children", allow_duplicate=True),
         Output("pending-hierarchies", "data"),
         Output("hierarchy-files-store", "data", allow_duplicate=True),
         Input("upload-schema", "contents"),
@@ -586,12 +654,13 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     @app.callback(
         Output("btn-start", "disabled"),
         Input("schema-store", "data"),
+        Input("schema-builder-store", "data"),
         Input("documents-store", "data"),
         Input("pending-hierarchies", "data"),
         Input("hierarchy-files-store", "data"),
     )
-    def toggle_start(schema_data, documents_data, pending, hierarchy_files):
-        if not schema_data or not documents_data:
+    def toggle_start(schema_data, builder_schema_data, documents_data, pending, hierarchy_files):
+        if not (schema_data or builder_schema_data) or not documents_data:
             return True
         if pending and set(pending.keys()) != set((hierarchy_files or {}).keys()):
             return True
@@ -606,9 +675,23 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
         return _status_icon(data is not None, size=28)
 
     # Update upload zone status icons
-    @app.callback(Output("schema-status", "children"), Input("schema-store", "data"))
-    def schema_status(data):
-        return _status_icon(data is not None)
+    @app.callback(
+        Output("schema-status", "children"),
+        Output("schema-feedback", "children", allow_duplicate=True),
+        Input("schema-store", "data"),
+        Input("schema-builder-store", "data"),
+        prevent_initial_call=True,
+    )
+    def schema_status(schema_data, builder_data):
+        complete = schema_data is not None or builder_data is not None
+        if builder_data and not schema_data:
+            n = sum(1 for f in builder_data.get("data_schema", []) if f.get("id"))
+            title = builder_data.get("title", "")
+            label = f"✓ Built schema — {n} field(s)" + (f": {title}" if title else "")
+            feedback = _success_text(label)
+        else:
+            feedback = no_update
+        return _status_icon(complete), feedback
 
     @app.callback(Output("documents-status", "children"), Input("documents-store", "data"))
     def documents_status(data):
@@ -618,58 +701,42 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     def annotations_status(data):
         return _status_icon(data is not None, optional=True)
 
-    # Handle submit: write temp files, store paths in flask.session, redirect
+    # Handle submit: pass data directly to session, redirect
     @app.callback(
         Output("upload-location", "href", allow_duplicate=True),
         Output("submit-feedback", "children"),
         Input("btn-start", "n_clicks"),
         State("schema-store", "data"),
+        State("schema-builder-store", "data"),
         State("documents-store", "data"),
         State("hierarchy-files-store", "data"),
         State("annotations-upload-store", "data"),
         prevent_initial_call=True,
     )
-    def handle_submit(n_clicks, schema_data, documents_data, hierarchy_files, annotations_data):
+    def handle_submit(n_clicks, schema_data, builder_schema_data, documents_data, hierarchy_files, annotations_data):
         if not n_clicks:
             return no_update, no_update
+        schema_data = schema_data or builder_schema_data
         if not schema_data or not documents_data:
             return no_update, _error_text("Please upload both files before starting.")
-
         try:
             import flask
-            tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
-
-            # Write hierarchy files and rewrite schema paths to absolute temp paths
-            for ref_name, file_info in (hierarchy_files or {}).items():
-                hierarchy_path = os.path.join(tmp_dir, file_info["filename"])
-                Path(hierarchy_path).write_text(file_info["content"])
-                schema_data["hierarchies"][ref_name] = hierarchy_path
-
-            schema_path = os.path.join(tmp_dir, "schema.json")
-            docs_path = os.path.join(tmp_dir, "documents.json")
-            Path(schema_path).write_text(json.dumps(schema_data))
-            Path(docs_path).write_text(json.dumps(documents_data))
-
             session_id = secrets.token_hex(16)
             session_info = {
                 "session_id": session_id,
-                "schema_path": schema_path,
-                "docs_path": docs_path,
+                "schema_data": schema_data,
+                "docs_data": documents_data,
+                "hierarchy_files": hierarchy_files or {},
+                "annotations_data": annotations_data,
             }
-
-            if annotations_data:
-                annotations_path = os.path.join(tmp_dir, "annotations.json")
-                Path(annotations_path).write_text(json.dumps(annotations_data))
-                session_info["annotations_path"] = annotations_path
-
-            flask.session["tater_session"] = session_info
+            flask.session["tater_session"] = {"session_id": session_id}
             if on_session_ready is not None:
                 on_session_ready(session_info)
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error starting session: {e}")
 
-    # Handle example card click: write example files to temp dir, redirect
+    # Handle example card click: load data from package dir, redirect
     @app.callback(
         Output("upload-location", "href", allow_duplicate=True),
         Output("example-feedback", "children"),
@@ -688,33 +755,23 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
             schema_data = json.loads((example_dir / "schema.json").read_text())
             docs_data = json.loads((example_dir / "documents.json").read_text())
 
-            tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
-
-            # Resolve hierarchy file references relative to the example folder
-            for ref_name, source in list(schema_data.get("hierarchies", {}).items()):
-                if isinstance(source, str):
-                    src_path = example_dir / source
-                    dst_path = os.path.join(tmp_dir, src_path.name)
-                    Path(dst_path).write_text(src_path.read_text())
-                    schema_data["hierarchies"][ref_name] = dst_path
-
-            schema_path = os.path.join(tmp_dir, "schema.json")
-            docs_path = os.path.join(tmp_dir, "documents.json")
-            Path(schema_path).write_text(json.dumps(schema_data))
-            Path(docs_path).write_text(json.dumps(docs_data))
-
             session_id = secrets.token_hex(16)
             session_info = {
                 "session_id": session_id,
-                "schema_path": schema_path,
-                "docs_path": docs_path,
+                "schema_data": schema_data,
+                "docs_data": docs_data,
+                # Pass example dir so parse_schema can resolve relative
+                # hierarchy file paths directly from the package directory.
+                "base_dir": str(example_dir),
             }
-            flask.session["tater_session"] = session_info
+            flask.session["tater_session"] = {"session_id": session_id}
             if on_session_ready is not None:
                 on_session_ready(session_info)
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error loading example '{example_name}': {e}")
+
+    register_schema_builder_callbacks(app)
 
 
 # ---------------------------------------------------------------------------
