@@ -11,6 +11,7 @@ from dash_iconify import DashIconify
 SCHEMA_BUILDER_STORES = [
     dcc.Store(id="schema-builder-fields", data=[]),
     dcc.Store(id="schema-builder-store", data=None),
+    dcc.Store(id="schema-builder-edit-index", data=None),
 ]
 
 _FIELD_TYPES = [
@@ -72,7 +73,6 @@ _TYPE_COLORS = {
     "divider": "gray",
 }
 
-# Options textarea config per field type (for types that share the options section)
 _OPTIONS_CONFIG = {
     "choice": {
         "label": "Options",
@@ -97,15 +97,16 @@ _HIDE = {"display": "none"}
 
 def build_schema_builder_modal() -> dmc.Modal:
     """Return the schema builder modal component."""
-    form = dmc.Stack(
-        [
-            dmc.TextInput(
-                id="schema-builder-title",
-                label="Schema title",
-                placeholder="e.g. Document Review",
-                description="Displayed at the top of the annotation UI.",
+    _form_panel = html.Div(
+        id="schema-builder-form-panel",
+        style=_HIDE,
+        children=[
+            dmc.Divider(
+                id="schema-builder-form-divider",
+                label="Add field",
+                labelPosition="left",
+                mt="xs",
             ),
-            dmc.Divider(label="Add a field", labelPosition="left"),
             dmc.SimpleGrid(
                 [
                     dmc.Select(
@@ -123,7 +124,6 @@ def build_schema_builder_modal() -> dmc.Modal:
                 ],
                 cols=2,
             ),
-            # Widget type selector — hidden for types with only one variant
             html.Div(
                 dmc.Select(
                     id="schema-builder-widget-type",
@@ -138,8 +138,8 @@ def build_schema_builder_modal() -> dmc.Modal:
                 id="schema-builder-field-required",
                 label="Required",
                 checked=False,
+                mt="sm",
             ),
-            # Options/entity-types section — choice, multi_choice, span_annotation
             html.Div(
                 dmc.Textarea(
                     id="schema-builder-options",
@@ -151,7 +151,6 @@ def build_schema_builder_modal() -> dmc.Modal:
                 ),
                 id="schema-builder-options-section",
             ),
-            # Numeric section — numeric and range_slider
             html.Div(
                 dmc.SimpleGrid(
                     [
@@ -164,7 +163,6 @@ def build_schema_builder_modal() -> dmc.Modal:
                 id="schema-builder-numeric-section",
                 style=_HIDE,
             ),
-            # Text section — text only
             html.Div(
                 dmc.TextInput(
                     id="schema-builder-placeholder",
@@ -174,16 +172,26 @@ def build_schema_builder_modal() -> dmc.Modal:
                 id="schema-builder-text-section",
                 style=_HIDE,
             ),
-            dmc.Button(
-                "Add field",
-                id="schema-builder-add-btn",
-                leftSection=DashIconify(icon="tabler:plus", width=16),
+            dmc.Group(
+                [
+                    dmc.Button(
+                        "Add field",
+                        id="schema-builder-save-btn",
+                        leftSection=DashIconify(icon="tabler:check", width=16),
+                        size="sm",
+                    ),
+                    dmc.Button(
+                        "Cancel",
+                        id="schema-builder-cancel-form-btn",
+                        variant="subtle",
+                        color="gray",
+                        size="sm",
+                    ),
+                ],
+                mt="xs",
             ),
             html.Div(id="schema-builder-add-feedback"),
-            dmc.Divider(label="Fields", labelPosition="left"),
-            html.Div(id="schema-builder-field-list"),
         ],
-        gap="sm",
     )
 
     return dmc.Modal(
@@ -197,8 +205,30 @@ def build_schema_builder_modal() -> dmc.Modal:
         ),
         opened=False,
         size="lg",
+        closeOnEscape=True,
         children=[
-            form,
+            dmc.Stack(
+                [
+                    dmc.TextInput(
+                        id="schema-builder-title",
+                        label="Schema title",
+                        placeholder="e.g. Document Review",
+                        description="Displayed at the top of the annotation UI.",
+                    ),
+                    dmc.Divider(),
+                    html.Div(id="schema-builder-field-list"),
+                    dmc.Button(
+                        "Add field",
+                        id="schema-builder-add-btn",
+                        leftSection=DashIconify(icon="tabler:plus", width=16),
+                        variant="light",
+                        size="sm",
+                    ),
+                    _form_panel,
+                ],
+                gap="sm",
+            ),
+            dmc.Divider(mt="sm"),
             dmc.Group(
                 [
                     dmc.Button(
@@ -242,44 +272,135 @@ def register_schema_builder_callbacks(app: Dash) -> None:
     def toggle_modal(_open, _apply, _cancel):
         return ctx.triggered_id == "schema-builder-open-btn"
 
-    @app.callback(
-        Output("schema-builder-options-section", "style"),
-        Output("schema-builder-numeric-section", "style"),
-        Output("schema-builder-text-section", "style"),
-        Output("schema-builder-widget-type-section", "style"),
-        Output("schema-builder-widget-type", "data"),
-        Output("schema-builder-widget-type", "value"),
-        Output("schema-builder-options", "label"),
-        Output("schema-builder-options", "description"),
-        Output("schema-builder-options", "placeholder"),
-        Input("schema-builder-field-type", "value"),
-    )
-    def show_type_options(field_type):
-        opts = _WIDGET_OPTIONS.get(field_type, [])
-        cfg = _OPTIONS_CONFIG.get(field_type, _OPTIONS_CONFIG["choice"])
-        return (
-            _SHOW if field_type in ("choice", "multi_choice", "span_annotation") else _HIDE,
-            _SHOW if field_type in ("numeric", "range_slider") else _HIDE,
-            _SHOW if field_type == "text" else _HIDE,
-            _SHOW if len(opts) > 1 else _HIDE,
-            opts,
-            opts[0]["value"] if opts else None,
-            cfg["label"],
-            cfg["description"],
-            cfg["placeholder"],
-        )
+    # ---------- Form panel show/hide ----------
 
     @app.callback(
-        Output("schema-builder-fields", "data", allow_duplicate=True),
+        Output("schema-builder-form-panel", "style"),
+        Output("schema-builder-form-divider", "label"),
+        Output("schema-builder-save-btn", "children"),
+        Input("schema-builder-edit-index", "data"),
+    )
+    def toggle_form_panel(edit_index):
+        if edit_index is None:
+            return _HIDE, "Add field", "Add field"
+        if edit_index == -1:
+            return _SHOW, "Add field", "Add field"
+        return _SHOW, "Edit field", "Save changes"
+
+    # ---------- Open form (add or edit) ----------
+
+    @app.callback(
+        Output("schema-builder-edit-index", "data", allow_duplicate=True),
+        Output("schema-builder-field-type", "value"),
         Output("schema-builder-field-label", "value"),
+        Output("schema-builder-widget-type", "value", allow_duplicate=True),
         Output("schema-builder-options", "value"),
         Output("schema-builder-min", "value"),
         Output("schema-builder-max", "value"),
         Output("schema-builder-step", "value"),
         Output("schema-builder-placeholder", "value"),
         Output("schema-builder-field-required", "checked"),
-        Output("schema-builder-add-feedback", "children"),
+        Output("schema-builder-add-feedback", "children", allow_duplicate=True),
         Input("schema-builder-add-btn", "n_clicks"),
+        Input({"type": "schema-field-edit", "index": ALL}, "n_clicks"),
+        State("schema-builder-fields", "data"),
+        prevent_initial_call=True,
+    )
+    def open_form(_add, _edits, fields):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return (no_update,) * 11
+        triggered = ctx.triggered_id
+
+        if triggered == "schema-builder-add-btn":
+            return -1, "choice", "", "segmented_control", "", None, None, None, "", False, ""
+
+        index = triggered["index"]
+        fields = fields or []
+        if index < 0 or index >= len(fields):
+            return (no_update,) * 11
+        field = fields[index]
+        ftype = field["type"]
+        wtype = field.get("widget_type") or _DEFAULT_WIDGET_TYPE.get(ftype, ftype)
+
+        options_val = ""
+        if ftype in ("choice", "multi_choice"):
+            options_val = ", ".join(field.get("options", []))
+        elif ftype == "span_annotation":
+            options_val = ", ".join(field.get("entity_types", []))
+
+        return (
+            index,
+            ftype,
+            field.get("label", ""),
+            wtype,
+            options_val,
+            field.get("min_value"),
+            field.get("max_value"),
+            field.get("step"),
+            field.get("placeholder", "") if ftype == "text" else "",
+            bool(field.get("required", False)),
+            "",
+        )
+
+    @app.callback(
+        Output("schema-builder-edit-index", "data", allow_duplicate=True),
+        Input("schema-builder-cancel-form-btn", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def cancel_form(_):
+        return None
+
+    # ---------- Section visibility / widget options ----------
+
+    @app.callback(
+        Output("schema-builder-options-section", "style"),
+        Output("schema-builder-numeric-section", "style"),
+        Output("schema-builder-text-section", "style"),
+        Output("schema-builder-widget-type-section", "style"),
+        Output("schema-builder-widget-type", "data"),
+        Output("schema-builder-widget-type", "value", allow_duplicate=True),
+        Output("schema-builder-options", "label"),
+        Output("schema-builder-options", "description"),
+        Output("schema-builder-options", "placeholder"),
+        Input("schema-builder-field-type", "value"),
+        State("schema-builder-edit-index", "data"),
+        State("schema-builder-fields", "data"),
+        prevent_initial_call=True,
+    )
+    def show_type_options(field_type, edit_index, fields):
+        opts = _WIDGET_OPTIONS.get(field_type, [])
+        cfg = _OPTIONS_CONFIG.get(field_type, _OPTIONS_CONFIG["choice"])
+
+        # Preserve existing widget_type when editing a field whose type matches.
+        # open_form sets field-type → this fires after with the new edit-index in State.
+        wtype_value = opts[0]["value"] if opts else None
+        if edit_index is not None and edit_index >= 0 and fields and edit_index < len(fields):
+            field = fields[edit_index]
+            if field.get("type") == field_type:
+                existing = field.get("widget_type")
+                if existing in {o["value"] for o in opts}:
+                    wtype_value = existing
+
+        return (
+            _SHOW if field_type in ("choice", "multi_choice", "span_annotation") else _HIDE,
+            _SHOW if field_type in ("numeric", "range_slider") else _HIDE,
+            _SHOW if field_type == "text" else _HIDE,
+            _SHOW if len(opts) > 1 else _HIDE,
+            opts,
+            wtype_value,
+            cfg["label"],
+            cfg["description"],
+            cfg["placeholder"],
+        )
+
+    # ---------- Save (add or update) ----------
+
+    @app.callback(
+        Output("schema-builder-fields", "data", allow_duplicate=True),
+        Output("schema-builder-edit-index", "data", allow_duplicate=True),
+        Output("schema-builder-add-feedback", "children", allow_duplicate=True),
+        Input("schema-builder-save-btn", "n_clicks"),
+        State("schema-builder-edit-index", "data"),
         State("schema-builder-field-type", "value"),
         State("schema-builder-widget-type", "value"),
         State("schema-builder-field-label", "value"),
@@ -292,28 +413,34 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         State("schema-builder-fields", "data"),
         prevent_initial_call=True,
     )
-    def add_field(_, field_type, widget_type, label, required, options_text, min_val, max_val, step, placeholder, fields):
-        _nu = (no_update,) * 8
-
-        label = (label or "").strip()
+    def save_field(_, edit_index, field_type, widget_type, label, required,
+                   options_text, min_val, max_val, step, placeholder, fields):
         fields = list(fields or [])
+        label = (label or "").strip()
+        adding = edit_index == -1
 
         if field_type == "divider":
-            fields.append({"type": "divider", "label": label})
-            return fields, "", "", None, None, None, "", False, _ok(f"Added divider.")
+            field = {"type": "divider", "label": label}
+            if adding:
+                fields.append(field)
+            else:
+                fields[edit_index] = field
+            return fields, None, _ok("Divider saved." if not adding else "Added divider.")
 
         if not label:
-            return (*_nu, _err("Label is required."))
+            return no_update, no_update, _err("Label is required.")
 
-        field_id = _label_to_id(label)
-        if field_id in {f.get("id") for f in fields if f.get("id")}:
-            return (*_nu, _err(f"A field with id '{field_id}' already exists."))
+        new_id = _label_to_id(label)
+        old_id = fields[edit_index].get("id", "") if not adding and edit_index < len(fields) else ""
+        existing_ids = {f.get("id") for f in fields if f.get("id")} - ({old_id} if old_id else set())
+        if new_id in existing_ids:
+            return no_update, no_update, _err(f"A field with id '{new_id}' already exists.")
 
         wtype = widget_type or _DEFAULT_WIDGET_TYPE.get(field_type, field_type)
         field: dict = {
             "type": field_type,
             "widget_type": wtype,
-            "id": field_id,
+            "id": new_id,
             "label": label,
             "required": bool(required),
         }
@@ -321,48 +448,93 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         if field_type in ("choice", "multi_choice"):
             options = [o.strip() for o in (options_text or "").split(",") if o.strip()]
             if len(options) < 2:
-                return (*_nu, _err("At least 2 options required."))
+                return no_update, no_update, _err("At least 2 options required.")
             field["options"] = options
-
         elif field_type == "span_annotation":
-            entity_types = [e.strip() for e in (options_text or "").split(",") if e.strip()]
-            field["entity_types"] = entity_types
-
+            field["entity_types"] = [e.strip() for e in (options_text or "").split(",") if e.strip()]
         elif field_type in ("numeric", "range_slider"):
             for k, v in [("min_value", min_val), ("max_value", max_val), ("step", step)]:
                 if v is not None:
                     field[k] = v
-
         elif field_type == "text":
             if (placeholder or "").strip():
                 field["placeholder"] = placeholder.strip()
 
-        fields.append(field)
-        return fields, "", "", None, None, None, "", False, _ok(f"Added '{label}'.")
+        if adding:
+            fields.append(field)
+            return fields, None, _ok(f"Added '{label}'.")
+        else:
+            fields[edit_index] = field
+            return fields, None, _ok(f"Updated '{label}'.")
 
-    @app.callback(
-        Output("schema-builder-field-list", "children"),
-        Input("schema-builder-fields", "data"),
-    )
-    def render_field_list(fields):
-        if not fields:
-            return dmc.Text("No fields added yet.", size="sm", c="dimmed")
-        return [_field_row(f, i) for i, f in enumerate(fields)]
+    # ---------- Move up/down ----------
 
     @app.callback(
         Output("schema-builder-fields", "data", allow_duplicate=True),
-        Input({"type": "schema-field-delete", "index": ALL}, "n_clicks"),
+        Output("schema-builder-edit-index", "data", allow_duplicate=True),
+        Input({"type": "schema-field-up", "index": ALL}, "n_clicks"),
+        Input({"type": "schema-field-down", "index": ALL}, "n_clicks"),
         State("schema-builder-fields", "data"),
+        State("schema-builder-edit-index", "data"),
         prevent_initial_call=True,
     )
-    def delete_field(n_clicks_list, fields):
+    def move_field(_up, _down, fields, edit_index):
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return no_update
+            return no_update, no_update
+        triggered = ctx.triggered_id
+        index = triggered["index"]
+        going_up = triggered["type"] == "schema-field-up"
+        new_pos = index - 1 if going_up else index + 1
+        fields = list(fields or [])
+        if new_pos < 0 or new_pos >= len(fields):
+            return no_update, no_update
+        fields[index], fields[new_pos] = fields[new_pos], fields[index]
+        # Track the edited field's new position
+        new_edit = edit_index
+        if edit_index == index:
+            new_edit = new_pos
+        elif edit_index == new_pos:
+            new_edit = index
+        return fields, new_edit
+
+    # ---------- Delete ----------
+
+    @app.callback(
+        Output("schema-builder-fields", "data", allow_duplicate=True),
+        Output("schema-builder-edit-index", "data", allow_duplicate=True),
+        Input({"type": "schema-field-delete", "index": ALL}, "n_clicks"),
+        State("schema-builder-fields", "data"),
+        State("schema-builder-edit-index", "data"),
+        prevent_initial_call=True,
+    )
+    def delete_field(_clicks, fields, edit_index):
+        if not ctx.triggered or not ctx.triggered[0].get("value"):
+            return no_update, no_update
         index = ctx.triggered_id["index"]
         fields = list(fields or [])
         if 0 <= index < len(fields):
             fields.pop(index)
-        return fields
+        new_edit = edit_index
+        if edit_index == index:
+            new_edit = None
+        elif edit_index is not None and edit_index > index:
+            new_edit = edit_index - 1
+        return fields, new_edit
+
+    # ---------- Field list render ----------
+
+    @app.callback(
+        Output("schema-builder-field-list", "children"),
+        Input("schema-builder-fields", "data"),
+        Input("schema-builder-edit-index", "data"),
+    )
+    def render_field_list(fields, edit_index):
+        if not fields:
+            return dmc.Text("No fields added yet.", size="sm", c="dimmed", ta="center", py="xs")
+        n = len(fields)
+        return [_field_row(f, i, n, i == edit_index) for i, f in enumerate(fields)]
+
+    # ---------- Schema generation ----------
 
     @app.callback(
         Output("schema-builder-store", "data"),
@@ -432,7 +604,7 @@ def _fields_to_schema(fields: list, title: str) -> dict:
     }
 
 
-def _field_row(field: dict, index: int) -> dmc.Paper:
+def _field_row(field: dict, index: int, n: int, is_editing: bool) -> dmc.Paper:
     ftype = field["type"]
     wtype = field.get("widget_type", "")
     default_wtype = _DEFAULT_WIDGET_TYPE.get(ftype, "")
@@ -447,23 +619,66 @@ def _field_row(field: dict, index: int) -> dmc.Paper:
         preview = ", ".join(opts[:4]) + ("…" if len(opts) > 4 else "")
     elif ftype == "span_annotation":
         et = field.get("entity_types", [])
-        preview = ", ".join(et[:4]) + ("…" if len(et) > 4 else "") if et else "unlabeled"
+        preview = (", ".join(et[:4]) + ("…" if len(et) > 4 else "")) if et else "unlabeled"
 
-    right = dmc.Group(badges + ([dmc.Text(preview, size="xs", c="dimmed")] if preview else []), gap="xs")
+    left = dmc.Group(
+        [
+            dmc.Group(
+                [
+                    dmc.ActionIcon(
+                        DashIconify(icon="tabler:arrow-up", width=12),
+                        id={"type": "schema-field-up", "index": index},
+                        n_clicks=0,
+                        variant="subtle",
+                        size="xs",
+                        disabled=index == 0,
+                    ),
+                    dmc.ActionIcon(
+                        DashIconify(icon="tabler:arrow-down", width=12),
+                        id={"type": "schema-field-down", "index": index},
+                        n_clicks=0,
+                        variant="subtle",
+                        size="xs",
+                        disabled=index == n - 1,
+                    ),
+                ],
+                gap=2,
+            ),
+            dmc.Text(field["label"] or "(divider)", size="sm", fw=500),
+            *badges,
+            *([dmc.Text(preview, size="xs", c="dimmed")] if preview else []),
+        ],
+        gap="xs",
+        wrap="nowrap",
+    )
+
+    right = dmc.Group(
+        [
+            dmc.ActionIcon(
+                DashIconify(icon="tabler:pencil", width=14),
+                id={"type": "schema-field-edit", "index": index},
+                n_clicks=0,
+                color="blue",
+                variant="filled" if is_editing else "subtle",
+                size="sm",
+            ),
+            dmc.ActionIcon(
+                DashIconify(icon="tabler:trash", width=14),
+                id={"type": "schema-field-delete", "index": index},
+                n_clicks=0,
+                color="red",
+                variant="subtle",
+                size="sm",
+            ),
+        ],
+        gap="xs",
+    )
+
+    paper_style = {"borderColor": "var(--mantine-color-blue-6)"} if is_editing else {}
 
     return dmc.Paper(
         dmc.Group(
-            [
-                dmc.Group([dmc.Text(field["label"] or "(divider)", size="sm", fw=500), right], gap="xs"),
-                dmc.ActionIcon(
-                    DashIconify(icon="tabler:trash", width=14),
-                    id={"type": "schema-field-delete", "index": index},
-                    n_clicks=0,
-                    color="red",
-                    variant="subtle",
-                    size="sm",
-                ),
-            ],
+            [left, right],
             justify="space-between",
             wrap="nowrap",
         ),
@@ -471,6 +686,7 @@ def _field_row(field: dict, index: int) -> dmc.Paper:
         withBorder=True,
         radius="sm",
         mb="xs",
+        style=paper_style,
     )
 
 
