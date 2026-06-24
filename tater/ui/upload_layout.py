@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import secrets
-import tempfile
 from pathlib import Path
 
 from dash import ALL, MATCH, Dash, Input, Output, State, ctx, dcc, html, no_update
@@ -703,7 +701,7 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
     def annotations_status(data):
         return _status_icon(data is not None, optional=True)
 
-    # Handle submit: write temp files, store paths in flask.session, redirect
+    # Handle submit: pass data directly to session, redirect
     @app.callback(
         Output("upload-location", "href", allow_duplicate=True),
         Output("submit-feedback", "children"),
@@ -721,42 +719,24 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
         schema_data = schema_data or builder_schema_data
         if not schema_data or not documents_data:
             return no_update, _error_text("Please upload both files before starting.")
-
         try:
             import flask
-            tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
-
-            # Write hierarchy files and rewrite schema paths to absolute temp paths
-            for ref_name, file_info in (hierarchy_files or {}).items():
-                hierarchy_path = os.path.join(tmp_dir, file_info["filename"])
-                Path(hierarchy_path).write_text(file_info["content"])
-                schema_data["hierarchies"][ref_name] = hierarchy_path
-
-            schema_path = os.path.join(tmp_dir, "schema.json")
-            docs_path = os.path.join(tmp_dir, "documents.json")
-            Path(schema_path).write_text(json.dumps(schema_data))
-            Path(docs_path).write_text(json.dumps(documents_data))
-
             session_id = secrets.token_hex(16)
             session_info = {
                 "session_id": session_id,
-                "schema_path": schema_path,
-                "docs_path": docs_path,
+                "schema_data": schema_data,
+                "docs_data": documents_data,
+                "hierarchy_files": hierarchy_files or {},
+                "annotations_data": annotations_data,
             }
-
-            if annotations_data:
-                annotations_path = os.path.join(tmp_dir, "annotations.json")
-                Path(annotations_path).write_text(json.dumps(annotations_data))
-                session_info["annotations_path"] = annotations_path
-
-            flask.session["tater_session"] = session_info
+            flask.session["tater_session"] = {"session_id": session_id}
             if on_session_ready is not None:
                 on_session_ready(session_info)
             return "/annotate", no_update
         except Exception as e:
             return no_update, _error_text(f"Error starting session: {e}")
 
-    # Handle example card click: write example files to temp dir, redirect
+    # Handle example card click: load data from package dir, redirect
     @app.callback(
         Output("upload-location", "href", allow_duplicate=True),
         Output("example-feedback", "children"),
@@ -775,28 +755,16 @@ def register_upload_callbacks(app: Dash, on_session_ready=None, show_disclaimer:
             schema_data = json.loads((example_dir / "schema.json").read_text())
             docs_data = json.loads((example_dir / "documents.json").read_text())
 
-            tmp_dir = tempfile.mkdtemp(prefix="tater_session_")
-
-            # Resolve hierarchy file references relative to the example folder
-            for ref_name, source in list(schema_data.get("hierarchies", {}).items()):
-                if isinstance(source, str):
-                    src_path = example_dir / source
-                    dst_path = os.path.join(tmp_dir, src_path.name)
-                    Path(dst_path).write_text(src_path.read_text())
-                    schema_data["hierarchies"][ref_name] = dst_path
-
-            schema_path = os.path.join(tmp_dir, "schema.json")
-            docs_path = os.path.join(tmp_dir, "documents.json")
-            Path(schema_path).write_text(json.dumps(schema_data))
-            Path(docs_path).write_text(json.dumps(docs_data))
-
             session_id = secrets.token_hex(16)
             session_info = {
                 "session_id": session_id,
-                "schema_path": schema_path,
-                "docs_path": docs_path,
+                "schema_data": schema_data,
+                "docs_data": docs_data,
+                # Pass example dir so parse_schema can resolve relative
+                # hierarchy file paths directly from the package directory.
+                "base_dir": str(example_dir),
             }
-            flask.session["tater_session"] = session_info
+            flask.session["tater_session"] = {"session_id": session_id}
             if on_session_ready is not None:
                 on_session_ready(session_info)
             return "/annotate", no_update

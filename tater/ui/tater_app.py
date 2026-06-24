@@ -245,19 +245,30 @@ class TaterApp:
         """Create the Dash layout with navigation and annotation panel."""
         self.app.layout = layout.build_layout(self)
 
+    def _load_annotations_from_dict(self, data: dict) -> None:
+        """Load annotations from an in-memory dict (same format as the JSON file)."""
+        self._apply_annotations_data(data)
+
     def _load_annotations_from_file(self) -> None:
         """Load existing annotations from the annotations file."""
         if not self.annotations_path:
             return
-            
+
         path = Path(self.annotations_path)
         if not path.exists():
             return
-            
+
         try:
             with open(path, 'r') as f:
                 data = json.load(f)
-            
+            self._apply_annotations_data(data)
+            print(f"Loaded existing annotations from {self.annotations_path}")
+        except Exception as e:
+            print(f"Error loading annotations: {e}")
+
+    def _apply_annotations_data(self, data: dict) -> None:
+        """Apply a parsed annotations dict to self.annotations and self.metadata."""
+        try:
             from tater.models.document import DocumentMetadata
             extra_fields: set[str] = set()
             missing_fields: set[str] = set()
@@ -284,10 +295,8 @@ class TaterApp:
                 self._schema_warnings["extra"] = sorted(extra_fields)
             if missing_fields:
                 self._schema_warnings["missing"] = sorted(missing_fields)
-
-            print(f"Loaded existing annotations from {self.annotations_path}")
         except Exception as e:
-            print(f"Error loading annotations: {e}")
+            print(f"Error applying annotations: {e}")
 
     def _save_stores_to_file(
         self,

@@ -106,7 +106,14 @@ def run_hosted(args) -> None:
         """
         session_id = session_info.get("session_id", "")
         if session_id and session_id not in _session_cache:
-            tater_app = _build_session_app(app, session_info)
+            tater_app = _build_session_app_from_data(
+                app,
+                schema_data=session_info.get("schema_data"),
+                docs_data=session_info.get("docs_data"),
+                hierarchy_files=session_info.get("hierarchy_files"),
+                annotations_data=session_info.get("annotations_data"),
+                base_dir=session_info.get("base_dir"),
+            )
             if tater_app is not None:
                 _session_cache[session_id] = tater_app
 
@@ -121,70 +128,82 @@ def run_hosted(args) -> None:
         if not session_info:
             return build_upload_layout(show_disclaimer=show_disclaimer)
         session_id = session_info.get("session_id", "")
-        # Retrieve the pre-built TaterApp (built in _on_session_ready).
         tater_app = _session_cache.get(session_id)
         if tater_app is None:
-            # Fallback for cases where the cache was lost (e.g. server restart).
-            tater_app = _build_session_app(app, session_info)
-            if tater_app is None:
-                flask.session.pop("tater_session", None)
-                return build_upload_layout()
-            _session_cache[session_id] = tater_app
+            # Cache lost (server restart) — session data is gone, start over.
+            flask.session.pop("tater_session", None)
+            return build_upload_layout(show_disclaimer=show_disclaimer)
         return build_annotation_layout(tater_app)
 
     app.layout = serve_layout
     app.run(debug=args.debug, port=args.port, host=args.host)
 
 
-def _build_session_app(dash_app, session_info: dict):
-    """Construct and configure a TaterApp from session-stored temp file paths.
+def _build_session_app_from_data(
+    dash_app,
+    schema_data: dict,
+    docs_data: list,
+    hierarchy_files: dict | None = None,
+    annotations_data: dict | None = None,
+    base_dir=None,
+):
+    """Construct and configure a TaterApp from in-memory data.
 
-    Registers all callbacks on ``dash_app`` (the hosted Dash app).
-    Returns None if the session data is invalid or files are missing.
+    Args:
+        schema_data: Parsed tater JSON schema dict.
+        docs_data: List of document dicts (each with at least a ``text`` key).
+        hierarchy_files: ``{ref_name: {"filename": ..., "content": ...}}`` for
+            uploaded ontology files. Content strings are parsed as YAML and
+            injected into the schema before parsing so no temp files are needed.
+        annotations_data: Parsed annotations dict to preload, or None.
+        base_dir: Directory used to resolve relative hierarchy paths in the
+            schema (used for built-in examples whose files live in the package).
+
+    Returns None if anything is invalid.
     """
+    import copy
     from pathlib import Path
+    from tater.loaders.json_loader import parse_schema
+    from tater.loaders import widgets_from_model
     from tater.ui.tater_app import TaterApp
-    from tater.loaders import load_schema, widgets_from_model
 
-    schema_path = session_info.get("schema_path")
-    docs_path = session_info.get("docs_path")
-    if not schema_path or not docs_path:
-        return None
-    if not Path(schema_path).exists() or not Path(docs_path).exists():
+    if not schema_data or not docs_data:
         return None
 
     try:
-        config = load_schema(schema_path)
-    except Exception:
+        # Replace uploaded hierarchy file-path references with parsed YAML dicts
+        # so parse_schema sees inline data rather than unresolvable paths.
+        if hierarchy_files:
+            import yaml
+            schema_data = copy.deepcopy(schema_data)
+            for ref_name, file_info in hierarchy_files.items():
+                parsed = yaml.safe_load(file_info["content"])
+                schema_data.setdefault("hierarchies", {})[ref_name] = parsed
+
+        kw = {"base_dir": Path(base_dir)} if base_dir else {}
+        schema_model, widgets = parse_schema(schema_data, **kw)
+    except Exception as e:
+        print(f"Error parsing schema: {e}")
         return None
 
-    schema_model = config.get("schema_model")
-    if schema_model is None:
-        return None
-
-    widgets = config.get("widgets") or []
     if not widgets or not _covers_all_fields(widgets, schema_model):
         widgets = widgets_from_model(schema_model, overrides=widgets)
 
     tater_app = TaterApp(
-        title=config.get("title", "tater"),
-        description=config.get("description"),
-        instructions=config.get("instructions"),
-        annotations_path=None,  # no auto-save in hosted mode
+        title=schema_data.get("title", "tater"),
+        description=schema_data.get("description"),
+        instructions=schema_data.get("instructions"),
+        annotations_path=None,
         schema_model=schema_model,
         is_hosted=True,
         dash_app=dash_app,
     )
-    if not tater_app.load_documents(docs_path):
+
+    if not tater_app.load_documents(docs_data):
         return None
 
-    # Load existing annotations from the uploaded file (if any), then clear
-    # annotations_path so hosted mode stays read-only (no auto-save).
-    annotations_path = session_info.get("annotations_path")
-    if annotations_path and Path(annotations_path).exists():
-        tater_app.annotations_path = annotations_path
-        tater_app._load_annotations_from_file()
-        tater_app.annotations_path = None
+    if annotations_data:
+        tater_app._load_annotations_from_dict(annotations_data)
 
     tater_app.set_annotation_widgets(widgets)
     return tater_app
