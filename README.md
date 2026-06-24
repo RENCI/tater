@@ -387,7 +387,7 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 | `range_slider` | `list[float]` | `range_slider` | — |
 | `text` | `str` | `text_input` | `text_area` |
 | `span_annotation` | `list[SpanAnnotation]` | `span_annotation` | — |
-| `hierarchical_label` | `Optional[List[str]]` | `hierarchical_label_select` | — |
+| `hierarchical_label` | `Optional[List[str]]` / `Optional[List[List[str]]]` | `hierarchical_label_select` | `hierarchical_label_multi` |
 | `hierarchical_label_multi` | `Optional[List[List[str]]]` | `hierarchical_label_multi` | — |
 | `group` | nested model | auto (`GroupWidget`) | — |
 | `repeater` | `list[model]` | `listable` | `tabs`, `accordion` |
@@ -398,7 +398,7 @@ All UI properties belong inside the `widget` block. `widget.type` is required fo
 
 **`span_annotation`** — `entity_types` is required in the `widget` block.
 
-**`hierarchical_label`** — `hierarchy_ref` (in the `widget` block) must match a key in the top-level `hierarchies` dict.
+**`hierarchical_label`** — `hierarchy_ref` (in the `widget` block) must match a key in the top-level `hierarchies` dict. When `widget.type` is `hierarchical_label_multi`, the schema type is `Optional[List[List[str]]]` instead of `Optional[List[str]]`.
 
 ## Document format
 
@@ -477,8 +477,9 @@ tater --hosted [options]
 | `--port INT` | Server port (default: `8050`) |
 | `--host STR` | Bind address (default: `127.0.0.1`) |
 | `--debug` | Enable debug/hot-reload mode |
+| `--show-disclaimer` | Display a disclaimer modal that users must acknowledge before accessing the annotation UI (hosted mode only) |
 
-Environment variables: `TATER_APP_PORT`, `TATER_APP_HOST`, `TATER_APP_DEBUG`, `TATER_SECRET_KEY`.
+Environment variables: `TATER_APP_PORT`, `TATER_APP_HOST`, `TATER_APP_DEBUG`, `TATER_SECRET_KEY`, `TATER_SESSION_CACHE_MAX` (hosted mode session cache size, default `100`).
 
 ## Jupyter notebooks
 
@@ -569,8 +570,10 @@ tater --hosted --host 0.0.0.0 --port 8050
 ```
 
 **Flow — upload your own files:**
-1. User visits `/` → upload page, "Upload files" tab
-2. Upload schema JSON and documents (JSON, CSV, TSV, or Excel); status icons confirm each file is valid
+1. User visits `/` → upload page, "Set up" tab
+2. Upload a schema JSON and documents (JSON, CSV, TSV, or Excel); status icons confirm each file is valid. Alternatively, use one of the schema authoring tools:
+   - **Build schema** — no-code form builder; define fields interactively and click Apply
+   - **Design with AI** — copies a prompt to your clipboard; paste it into Claude, ChatGPT, or any AI assistant, follow the conversation to design your schema, then paste the resulting JSON back into the modal and click Apply
 3. If the schema references external hierarchy files, per-file upload zones appear automatically
 4. Optionally upload an existing annotations JSON to resume from a previous session
 5. Click **Start Annotating** → redirected to `/annotate`

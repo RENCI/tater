@@ -25,7 +25,9 @@ tater/                  # Library package
     document_loader.py  # load_documents(path) — dispatches on extension;
                         #   _load_tabular accepts Path or file-like (StringIO/BytesIO)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
-    upload_layout.py    # Hosted-mode upload page layout + callbacks
+    upload_layout.py    # Hosted-mode upload page layout + callbacks;
+                        #   also contains _LLM_PROMPT constant and _build_llm_prompt_modal()
+    schema_builder.py   # No-code schema builder modal for hosted mode
   examples/             # Built-in example sets for hosted mode "Browse examples" tab
     simple/             # meta.json + schema.json + documents.json
     gallery/            # meta.json + schema.json + documents.json
@@ -107,41 +109,58 @@ outputs, execution counts, and kernel metadata on `git add`).
 `--hosted` launches a multi-user server. The Dash app is shared; per-user state is isolated
 via Flask session cookies and a server-side `_session_cache` dict.
 
-**Upload page:** two tabs — "Upload files" and "Browse examples".
-- *Upload files*: schema JSON + documents (JSON, CSV, TSV, or Excel) + optional existing
-  annotations JSON. If the schema has file-path `hierarchies` references, per-file ontology
-  upload zones appear automatically. Each zone has a status icon (grey outline → filled blue
-  check on success). Tabular documents are parsed via `_parse_tabular_upload` (in
-  `upload_layout.py`), which decodes the base64 upload contents, creates a StringIO/BytesIO
-  buffer, calls `document_loader._load_tabular`, and normalises results to a list of dicts
-  before storing in `documents-store`.
+**Upload page:** two tabs — "Set up" and "Browse examples".
+- *Set up*: schema JSON (or use one of the schema authoring tools — **Build schema**
+  opens the no-code schema builder modal; **Design with AI** opens a modal with a copyable
+  LLM prompt the user pastes into Claude/ChatGPT, then pastes the resulting JSON back) +
+  documents (JSON, CSV, TSV, or Excel) + optional existing annotations JSON.
+  If the schema has file-path `hierarchies` references, per-file ontology upload zones appear
+  automatically. Each zone has a status icon (grey outline → filled blue check on success).
+  Tabular documents are parsed via `_parse_tabular_upload` (in `upload_layout.py`), which
+  decodes the base64 upload contents, creates a StringIO/BytesIO buffer, calls
+  `document_loader._load_tabular`, and normalises results to a list of dicts before storing
+  in `documents-store`.
+  **Design with AI flow:** `_LLM_PROMPT` (module-level constant in `upload_layout.py`) is
+  copied via `dmc.CopyButton`. When the user pastes the schema JSON and clicks Apply,
+  `apply_llm_schema` validates it with `_validate_schema_json`, writes to `schema-store`
+  and `pending-hierarchies` (both `allow_duplicate=True`), and closes the modal.
 - *Browse examples*: clickable cards for built-in example sets in `tater/examples/`. Clicking
   a card immediately creates a session and redirects — no submit button needed.
 
-**Session flow (upload tab):** user uploads schema + documents (+ optional ontology files +
-optional annotations) → tabular documents normalised to list-of-dicts and written to temp as
-`documents.json` → paths stored in `flask.session["tater_session"]` → redirect to `/annotate`
-→ `serve_layout()` reads the session, retrieves or builds the `TaterApp`, returns the
-annotation layout.
+**Session flow (upload tab):** user uploads (or builds) schema + documents (+ optional
+ontology files + optional annotations) → all data held as Python objects in memory → a UUID
+`session_id` is stored in `flask.session` → `_session_cache[session_id]` holds the
+`TaterApp` instance → redirect to `/annotate` → `serve_layout()` looks up the session cache
+and returns the annotation layout. No temp files are written.
+
+**Session cache:** `_session_cache` is an `OrderedDict` in `runner.py` mapping
+`session_id → TaterApp`. Bounded by `TATER_SESSION_CACHE_MAX` (env var, default `100`);
+when the limit is exceeded, the oldest entry is evicted via `popitem(last=False)`.
+`flask.session` stores only `{"session_id": session_id}` — a UUID string — to stay under
+the cookie size limit.
+
+**`_build_session_app_from_data`:** module-level function in `runner.py` that builds a
+`TaterApp` entirely from in-memory data: `(dash_app, schema_data, docs_data,
+hierarchy_files, annotations_data, base_dir)`. Hierarchy files are passed as decoded YAML
+content strings, parsed with `yaml.safe_load`, and injected inline into the schema dict as
+`hierarchies[ref_name] = parsed_dict` before `parse_schema` is called.
 
 **Session flow (examples tab):** user clicks a card → `load_example` callback reads the
-example's files directly from `tater/examples/<name>/`, resolves hierarchy paths to the same
-temp dir, creates session, redirects.
+example's files directly from `tater/examples/<name>/`, passes `base_dir=str(example_dir)`
+to `parse_schema` for native path resolution, creates session, redirects.
 
 **Adding a built-in example:** create a subfolder under `tater/examples/` with at minimum
 `meta.json` (`name`, `description`, `order`), `schema.json`, and `documents.json`. Ontology
 YAML files referenced in the schema should be placed alongside and referenced by filename only
 (not relative path). The example is discovered automatically at layout-build time.
 
-**Annotations preload in hosted mode:** if `session_info["annotations_path"]` is set (from
-an uploaded annotations file), `_build_session_app` temporarily sets `tater_app.annotations_path`,
-calls `_load_annotations_from_file()`, then clears it back to `None` so no auto-save occurs.
+**Annotations preload in hosted mode:** if an annotations file was uploaded,
+`_build_session_app_from_data` calls `TaterApp._load_annotations_from_dict(data)` directly
+(no file read), so no auto-save path is set and no disk writes occur.
 
-**Ontology files in hosted mode:** `hierarchies` entries in a JSON schema that reference
-external YAML files (e.g. `"ontology": "../data/pets.yaml"`) cannot be resolved from temp
-storage. The upload page detects these file-path references, shows a compact per-file upload
-zone for each, and rewrites the paths in the schema to absolute temp paths before writing
-`schema.json`. Inline hierarchy dicts work without any upload.
+**Ontology files in hosted mode:** uploaded YAML files are base64-decoded to content strings,
+parsed inline with `yaml.safe_load`, and injected directly into the schema dict under
+`hierarchies[ref_name]`. No temp files are written and no path rewriting is needed.
 
 **Always-register callbacks:** span, repeater, nested-repeater, hierarchical-label-select, and
 hierarchical-label-multi callbacks are registered once at server startup (not per-session).
@@ -340,6 +359,14 @@ the JS filter.
   NumberInputWidget, SliderWidget, RangeSliderWidget, TextInputWidget, TextAreaWidget,
   SpanAnnotationWidget, HierarchicalLabelSelectWidget, HierarchicalLabelMultiWidget,
   DividerWidget
+- Schema builder — no-code modal in hosted mode; supports all field types except group and
+  repeater; fields are reorderable, editable, and deletable; hierarchical label fields accept
+  inline YAML; outputs a downloadable JSON schema
+- Design with AI — modal in hosted mode with a copyable LLM prompt (`_LLM_PROMPT` in
+  `upload_layout.py`); user pastes prompt into Claude/ChatGPT, pastes resulting JSON back,
+  clicks Apply; validated by `apply_llm_schema` and stored in `schema-store`
+- Hosted mode temp-file-free session management: in-memory data flow, session cache
+  (`OrderedDict`) with FIFO eviction via `TATER_SESSION_CACHE_MAX`
 
 ## Tests
 
@@ -360,6 +387,7 @@ python -m pytest tests/ --headless                        # full suite
 - `test_save_load.py` — `TaterApp` save/load round-trip (no browser): flat fields, nested models, `SpanAnnotation` lists, metadata, schema-mismatch warnings
 - `test_widgets_from_model.py` — `widgets_from_model`, `WIDGET_CLASS`, `DEFAULT_WIDGET`; auto-gen for all field types, nested models, overrides
 - `test_parse_schema.py` — `parse_schema`, `_build_pydantic_field`, `_build_widget_from_spec`; no-widget-block → absent from list, containers, dividers, conditionals, unknown type errors
+- `test_hosted_mode.py` — `_build_session_app_from_data` (happy path, error cases, annotations preload, hierarchy injection), schema builder `_fields_to_schema` → `parse_schema` round-trip for all field types and widget variants, session cache eviction
 - `test_browser.py` — `dash.testing` browser tests: navigation, flag, notes
 
 **Browser test setup** requires Google Chrome (`.deb`, not snap) and `webdriver-manager`. The `pytest_setup_options` hook in `conftest.py` auto-installs a matching ChromeDriver via `webdriver-manager` on first run.
