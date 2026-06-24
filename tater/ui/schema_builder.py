@@ -22,6 +22,7 @@ _FIELD_TYPES = [
     {"value": "numeric", "label": "Numeric"},
     {"value": "range_slider", "label": "Range slider"},
     {"value": "span_annotation", "label": "Span annotation"},
+    {"value": "hierarchical_label", "label": "Hierarchical label"},
     {"value": "divider", "label": "Divider"},
 ]
 
@@ -54,6 +55,10 @@ _WIDGET_OPTIONS: dict[str, list[dict]] = {
         {"value": "span_annotation", "label": "Inline"},
         {"value": "span_popup", "label": "Popup"},
     ],
+    "hierarchical_label": [
+        {"value": "hierarchical_label_select", "label": "Single select"},
+        {"value": "hierarchical_label_multi", "label": "Multi-select"},
+    ],
     "divider": [],
 }
 
@@ -70,6 +75,7 @@ _TYPE_COLORS = {
     "numeric": "orange",
     "range_slider": "yellow",
     "span_annotation": "red",
+    "hierarchical_label": "teal",
     "divider": "gray",
 }
 
@@ -139,6 +145,7 @@ def build_schema_builder_modal() -> dmc.Modal:
                 label="Required",
                 checked=False,
                 mt="sm",
+                mb="sm",
             ),
             html.Div(
                 dmc.Textarea(
@@ -170,6 +177,31 @@ def build_schema_builder_modal() -> dmc.Modal:
                     placeholder="Optional hint text",
                 ),
                 id="schema-builder-text-section",
+                style=_HIDE,
+            ),
+            html.Div(
+                dmc.Stack(
+                    [
+                        dmc.TextInput(
+                            id="schema-builder-hl-ref",
+                            label="Hierarchy name",
+                            description="Key for this ontology — fields sharing the same name use the same tree.",
+                            placeholder="e.g. fauna",
+                        ),
+                        dmc.Textarea(
+                            id="schema-builder-hl-yaml",
+                            label="Hierarchy (YAML)",
+                            description="Indent with spaces to create nested levels.",
+                            placeholder="Animals:\n  - Cat\n  - Dog\nPlants:\n  - Oak\n  - Rose",
+                            autosize=True,
+                            minRows=4,
+                            maxRows=12,
+                            styles={"input": {"fontFamily": "monospace", "fontSize": "12px"}},
+                        ),
+                    ],
+                    gap="xs",
+                ),
+                id="schema-builder-hl-section",
                 style=_HIDE,
             ),
             dmc.Group(
@@ -299,6 +331,8 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         Output("schema-builder-max", "value"),
         Output("schema-builder-step", "value"),
         Output("schema-builder-placeholder", "value"),
+        Output("schema-builder-hl-ref", "value"),
+        Output("schema-builder-hl-yaml", "value"),
         Output("schema-builder-field-required", "checked"),
         Output("schema-builder-add-feedback", "children", allow_duplicate=True),
         Input("schema-builder-add-btn", "n_clicks"),
@@ -308,16 +342,16 @@ def register_schema_builder_callbacks(app: Dash) -> None:
     )
     def open_form(_add, _edits, fields):
         if not ctx.triggered or not ctx.triggered[0].get("value"):
-            return (no_update,) * 11
+            return (no_update,) * 13
         triggered = ctx.triggered_id
 
         if triggered == "schema-builder-add-btn":
-            return -1, "choice", "", "segmented_control", "", None, None, None, "", False, ""
+            return -1, "choice", "", "segmented_control", "", None, None, None, "", "", "", False, ""
 
         index = triggered["index"]
         fields = fields or []
         if index < 0 or index >= len(fields):
-            return (no_update,) * 11
+            return (no_update,) * 13
         field = fields[index]
         ftype = field["type"]
         wtype = field.get("widget_type") or _DEFAULT_WIDGET_TYPE.get(ftype, ftype)
@@ -328,6 +362,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         elif ftype == "span_annotation":
             options_val = ", ".join(field.get("entity_types", []))
 
+        is_hl = ftype == "hierarchical_label"
         return (
             index,
             ftype,
@@ -338,6 +373,8 @@ def register_schema_builder_callbacks(app: Dash) -> None:
             field.get("max_value"),
             field.get("step"),
             field.get("placeholder", "") if ftype == "text" else "",
+            field.get("hl_ref", "") if is_hl else "",
+            field.get("hl_yaml", "") if is_hl else "",
             bool(field.get("required", False)),
             "",
         )
@@ -356,6 +393,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         Output("schema-builder-options-section", "style"),
         Output("schema-builder-numeric-section", "style"),
         Output("schema-builder-text-section", "style"),
+        Output("schema-builder-hl-section", "style"),
         Output("schema-builder-widget-type-section", "style"),
         Output("schema-builder-widget-type", "data"),
         Output("schema-builder-widget-type", "value", allow_duplicate=True),
@@ -385,6 +423,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
             _SHOW if field_type in ("choice", "multi_choice", "span_annotation") else _HIDE,
             _SHOW if field_type in ("numeric", "range_slider") else _HIDE,
             _SHOW if field_type == "text" else _HIDE,
+            _SHOW if field_type == "hierarchical_label" else _HIDE,
             _SHOW if len(opts) > 1 else _HIDE,
             opts,
             wtype_value,
@@ -410,11 +449,13 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         State("schema-builder-max", "value"),
         State("schema-builder-step", "value"),
         State("schema-builder-placeholder", "value"),
+        State("schema-builder-hl-ref", "value"),
+        State("schema-builder-hl-yaml", "value"),
         State("schema-builder-fields", "data"),
         prevent_initial_call=True,
     )
     def save_field(_, edit_index, field_type, widget_type, label, required,
-                   options_text, min_val, max_val, step, placeholder, fields):
+                   options_text, min_val, max_val, step, placeholder, hl_ref, hl_yaml, fields):
         fields = list(fields or [])
         label = (label or "").strip()
         adding = edit_index == -1
@@ -452,6 +493,19 @@ def register_schema_builder_callbacks(app: Dash) -> None:
             field["options"] = options
         elif field_type == "span_annotation":
             field["entity_types"] = [e.strip() for e in (options_text or "").split(",") if e.strip()]
+        elif field_type == "hierarchical_label":
+            import yaml
+            ref = (hl_ref or "").strip()
+            if not ref:
+                return no_update, no_update, _err("Hierarchy name is required.")
+            if not (hl_yaml or "").strip():
+                return no_update, no_update, _err("Hierarchy YAML is required.")
+            try:
+                yaml.safe_load(hl_yaml)
+            except Exception as exc:
+                return no_update, no_update, _err(f"Invalid YAML: {exc}")
+            field["hl_ref"] = ref
+            field["hl_yaml"] = hl_yaml.strip()
         elif field_type in ("numeric", "range_slider"):
             for k, v in [("min_value", min_val), ("max_value", max_val), ("step", step)]:
                 if v is not None:
@@ -572,7 +626,11 @@ def _label_to_id(label: str) -> str:
 
 
 def _fields_to_schema(fields: list, title: str) -> dict:
+    import yaml
+
     data_schema = []
+    hierarchies: dict = {}
+
     for field in fields:
         if field["type"] == "divider":
             data_schema.append({"widget": {"type": "divider", "label": field["label"]}})
@@ -595,13 +653,25 @@ def _fields_to_schema(fields: list, title: str) -> dict:
             entity_types = field.get("entity_types", [])
             if entity_types:
                 widget["entity_types"] = entity_types
+        if ftype == "hierarchical_label":
+            ref = field.get("hl_ref", "")
+            widget["hierarchy_ref"] = ref
+            if ref and field.get("hl_yaml"):
+                try:
+                    hierarchies[ref] = yaml.safe_load(field["hl_yaml"])
+                except Exception:
+                    pass
         entry["widget"] = widget
         data_schema.append(entry)
-    return {
+
+    schema: dict = {
         "spec_version": "1.0",
         "title": title or "Annotation Schema",
         "data_schema": data_schema,
     }
+    if hierarchies:
+        schema["hierarchies"] = hierarchies
+    return schema
 
 
 def _field_row(field: dict, index: int, n: int, is_editing: bool) -> dmc.Paper:
@@ -620,6 +690,8 @@ def _field_row(field: dict, index: int, n: int, is_editing: bool) -> dmc.Paper:
     elif ftype == "span_annotation":
         et = field.get("entity_types", [])
         preview = (", ".join(et[:4]) + ("…" if len(et) > 4 else "")) if et else "unlabeled"
+    elif ftype == "hierarchical_label":
+        preview = f"→ {field['hl_ref']}" if field.get("hl_ref") else None
 
     left = dmc.Group(
         [
