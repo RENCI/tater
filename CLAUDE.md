@@ -25,7 +25,8 @@ tater/                  # Library package
     document_loader.py  # load_documents(path) — dispatches on extension;
                         #   _load_tabular accepts Path or file-like (StringIO/BytesIO)
   ui/                   # App machinery (TaterApp, layout, callbacks, value_helpers)
-    upload_layout.py    # Hosted-mode upload page layout + callbacks
+    upload_layout.py    # Hosted-mode upload page layout + callbacks;
+                        #   also contains _LLM_PROMPT constant and _build_llm_prompt_modal()
     schema_builder.py   # No-code schema builder modal for hosted mode
   examples/             # Built-in example sets for hosted mode "Browse examples" tab
     simple/             # meta.json + schema.json + documents.json
@@ -109,14 +110,20 @@ outputs, execution counts, and kernel metadata on `git add`).
 via Flask session cookies and a server-side `_session_cache` dict.
 
 **Upload page:** two tabs — "Upload files" and "Browse examples".
-- *Upload files*: schema JSON (or use the **Build schema** button to open the no-code schema
-  builder modal) + documents (JSON, CSV, TSV, or Excel) + optional existing annotations JSON.
+- *Upload files*: schema JSON (or use one of the schema authoring tools — **Build schema**
+  opens the no-code schema builder modal; **Design with AI** opens a modal with a copyable
+  LLM prompt the user pastes into Claude/ChatGPT, then pastes the resulting JSON back) +
+  documents (JSON, CSV, TSV, or Excel) + optional existing annotations JSON.
   If the schema has file-path `hierarchies` references, per-file ontology upload zones appear
   automatically. Each zone has a status icon (grey outline → filled blue check on success).
   Tabular documents are parsed via `_parse_tabular_upload` (in `upload_layout.py`), which
   decodes the base64 upload contents, creates a StringIO/BytesIO buffer, calls
   `document_loader._load_tabular`, and normalises results to a list of dicts before storing
   in `documents-store`.
+  **Design with AI flow:** `_LLM_PROMPT` (module-level constant in `upload_layout.py`) is
+  copied via `dmc.CopyButton`. When the user pastes the schema JSON and clicks Apply,
+  `apply_llm_schema` validates it with `_validate_schema_json`, writes to `schema-store`
+  and `pending-hierarchies` (both `allow_duplicate=True`), and closes the modal.
 - *Browse examples*: clickable cards for built-in example sets in `tater/examples/`. Clicking
   a card immediately creates a session and redirects — no submit button needed.
 
@@ -355,6 +362,9 @@ the JS filter.
 - Schema builder — no-code modal in hosted mode; supports all field types except group and
   repeater; fields are reorderable, editable, and deletable; hierarchical label fields accept
   inline YAML; outputs a downloadable JSON schema
+- Design with AI — modal in hosted mode with a copyable LLM prompt (`_LLM_PROMPT` in
+  `upload_layout.py`); user pastes prompt into Claude/ChatGPT, pastes resulting JSON back,
+  clicks Apply; validated by `apply_llm_schema` and stored in `schema-store`
 - Hosted mode temp-file-free session management: in-memory data flow, session cache
   (`OrderedDict`) with FIFO eviction via `TATER_SESSION_CACHE_MAX`
 

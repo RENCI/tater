@@ -571,7 +571,9 @@ tater --hosted --host 0.0.0.0 --port 8050
 
 **Flow — upload your own files:**
 1. User visits `/` → upload page, "Upload files" tab
-2. Upload a schema JSON and documents (JSON, CSV, TSV, or Excel); status icons confirm each file is valid. Alternatively, click **Build schema** to open a no-code schema builder — define fields interactively and click Apply.
+2. Upload a schema JSON and documents (JSON, CSV, TSV, or Excel); status icons confirm each file is valid. Alternatively, use one of the schema authoring tools:
+   - **Build schema** — no-code form builder; define fields interactively and click Apply
+   - **Design with AI** — copies a prompt to your clipboard; paste it into Claude, ChatGPT, or any AI assistant, follow the conversation to design your schema, then paste the resulting JSON back into the modal and click Apply
 3. If the schema references external hierarchy files, per-file upload zones appear automatically
 4. Optionally upload an existing annotations JSON to resume from a previous session
 5. Click **Start Annotating** → redirected to `/annotate`
