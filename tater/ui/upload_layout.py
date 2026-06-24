@@ -1,7 +1,7 @@
 """Upload page layout and callbacks for hosted mode.
 
 Flow:
-  1. User visits / → sees two tabs: "Upload files" and "Browse examples"
+  1. User visits / → sees two tabs: "Set up" and "Browse examples"
   2. Upload tab: schema JSON + documents JSON + optional annotations JSON.
      Validation feedback shown inline; if schema references hierarchy files,
      a compact ontology upload section appears automatically.
@@ -465,6 +465,10 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                 rightSection=DashIconify(icon="tabler:arrow-right", width=16),
             ),
             html.Div(id="submit-feedback"),
+            dmc.Text(
+                "* No data are stored on the server. Download your annotations before leaving.",
+                size="xs", c="dimmed", ta="right",
+            ),
         ],
         gap="md",
     )
@@ -553,7 +557,7 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                     [
                         dmc.Title("tater", order=1, ta="center"),
                         dmc.Text(
-                            "Document annotation — upload your schema and documents or choose a built-in example.",
+                            "Document annotation — provide your schema and documents or choose a built-in example.",
                             size="sm", c="dimmed", ta="center",
                         ),
                         dmc.Paper(
@@ -562,9 +566,9 @@ def build_upload_layout(show_disclaimer: bool = False) -> dmc.MantineProvider:
                                     dmc.TabsList(
                                         [
                                             dmc.TabsTab(
-                                                "Upload files",
+                                                "Set up",
                                                 value="upload",
-                                                leftSection=DashIconify(icon="tabler:upload", width=16),
+                                                leftSection=DashIconify(icon="tabler:list-check", width=16),
                                             ),
                                             dmc.TabsTab(
                                                 "Browse examples",
