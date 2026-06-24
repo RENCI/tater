@@ -109,8 +109,8 @@ outputs, execution counts, and kernel metadata on `git add`).
 `--hosted` launches a multi-user server. The Dash app is shared; per-user state is isolated
 via Flask session cookies and a server-side `_session_cache` dict.
 
-**Upload page:** two tabs — "Upload files" and "Browse examples".
-- *Upload files*: schema JSON (or use one of the schema authoring tools — **Build schema**
+**Upload page:** two tabs — "Set up" and "Browse examples".
+- *Set up*: schema JSON (or use one of the schema authoring tools — **Build schema**
   opens the no-code schema builder modal; **Design with AI** opens a modal with a copyable
   LLM prompt the user pastes into Claude/ChatGPT, then pastes the resulting JSON back) +
   documents (JSON, CSV, TSV, or Excel) + optional existing annotations JSON.
