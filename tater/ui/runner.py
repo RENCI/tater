@@ -83,7 +83,10 @@ def run_hosted(args) -> None:
     app.server.secret_key = os.environ.get("TATER_SECRET_KEY") or _random_secret_key()
 
     # Cache: session_id → TaterApp. Callbacks are registered once per session_id.
-    _session_cache: dict[str, object] = {}
+    # Oldest entry is evicted when the cache exceeds TATER_SESSION_CACHE_MAX.
+    from collections import OrderedDict
+    _cache_max = int(os.environ.get("TATER_SESSION_CACHE_MAX", 100))
+    _session_cache: OrderedDict[str, object] = OrderedDict()
 
     # Let callbacks look up the current user's TaterApp at runtime via flask.session.
     # Stored on the shared Dash app so TaterApp.__init__ can pick it up.
@@ -116,6 +119,8 @@ def run_hosted(args) -> None:
             )
             if tater_app is not None:
                 _session_cache[session_id] = tater_app
+                if len(_session_cache) > _cache_max:
+                    _session_cache.popitem(last=False)
 
     show_disclaimer = args.show_disclaimer
 
