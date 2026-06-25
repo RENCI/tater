@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field as dc_field
 import json
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, ClassVar, List, Optional, Union
 
 from dash import dcc, html
 import dash_mantine_components as dmc
@@ -207,6 +207,8 @@ class HierarchicalLabelWidget(ControlWidget):
     Holds the shared hierarchy/root/allow_non_leaf state used by both
     HierarchicalLabelSelectWidget (single) and HierarchicalLabelMultiWidget (multi).
     """
+
+    field_type: ClassVar[str] = "hierarchical_label"
 
     hierarchy: Union[Node, dict, list, str, Path, None] = None
     allow_non_leaf: bool = False

@@ -1,7 +1,7 @@
 """Base widget classes for Tater."""
 import typing
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 
@@ -421,6 +421,8 @@ class ChoiceWidget(ControlWidget):
     Options are derived automatically from the schema via ``bind_schema``.
     """
 
+    field_type: ClassVar[str] = "choice"
+
     default: Optional[str] = None
     options: list[str] = field(init=False, default_factory=list, repr=False)
 
@@ -446,6 +448,8 @@ class MultiChoiceWidget(ControlWidget):
     Schema field must be ``List[Literal[...]]`` or ``Optional[List[Literal[...]]]``.
     Options are derived automatically from the schema via ``bind_schema``.
     """
+
+    field_type: ClassVar[str] = "multi_choice"
 
     default: Optional[list[str]] = None
     options: list[str] = field(init=False, default_factory=list, repr=False)
@@ -479,6 +483,8 @@ class MultiChoiceWidget(ControlWidget):
 class BooleanWidget(ControlWidget):
     """Base for boolean widgets. Schema field must be ``bool`` or ``Optional[bool]``."""
 
+    field_type: ClassVar[str] = "boolean"
+
     @property
     def empty_value(self) -> bool:
         return False
@@ -507,6 +513,8 @@ class BooleanWidget(ControlWidget):
 class NumericWidget(ControlWidget):
     """Base for numeric widgets. Schema field must be ``int``, ``float``, or ``Optional[int/float]``."""
 
+    field_type: ClassVar[str] = "numeric"
+
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
         if field_info is None:
@@ -524,6 +532,8 @@ class NumericWidget(ControlWidget):
 @dataclass(eq=False)
 class TextWidget(ControlWidget):
     """Base for free-text widgets. Schema field must be ``str`` or ``Optional[str]``."""
+
+    field_type: ClassVar[str] = "text"
 
     def bind_schema(self, model: type) -> None:
         field_info = _resolve_field_info(model, self.field_path)
