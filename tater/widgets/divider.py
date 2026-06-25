@@ -1,6 +1,6 @@
 """DividerWidget — a labeled section break with no schema field."""
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 
 import dash_mantine_components as dmc
 
@@ -20,6 +20,8 @@ class DividerWidget(ContainerWidget):
         DividerWidget(label="Clinical Findings", before="diagnosis")
         DividerWidget(label="Demographics", before="pet.age")
     """
+
+    field_type: ClassVar[str] = "divider"
 
     schema_field: str = ""
     before: Optional[str] = field(kw_only=True, default=None)

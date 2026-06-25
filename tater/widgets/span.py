@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Optional, Any, TYPE_CHECKING
+from typing import ClassVar, Optional, Any, TYPE_CHECKING
 
 import dash_mantine_components as dmc
 
@@ -90,6 +90,8 @@ class SpanBaseWidget(TaterWidget):
     Handles entity-type color assignment, label/type plumbing, and the
     ``get_color_for_tag`` helper.  Subclasses implement ``component()``.
     """
+
+    field_type: ClassVar[str] = "span_annotation"
 
     def __init__(
         self,
