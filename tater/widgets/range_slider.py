@@ -1,7 +1,7 @@
 """RangeSlider widget for selecting a numeric range."""
 import typing
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 import dash_mantine_components as dmc
 
 from .base import ControlWidget, _unwrap_optional, _resolve_field_info
@@ -14,6 +14,8 @@ class RangeSliderWidget(ControlWidget):
     The schema field must be ``Optional[list[float]]`` or ``Optional[list[int]]``
     with a default of ``None``. The value is stored as a two-element list ``[min, max]``.
     """
+
+    field_type: ClassVar[str] = "range_slider"
 
     min_value: float = 0
     max_value: float = 100

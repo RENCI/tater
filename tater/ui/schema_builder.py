@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 
 from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
+
+from tater.loaders.model_loader import DEFAULT_WIDGET, WIDGET_CLASS
 
 
 SCHEMA_BUILDER_STORES = [
@@ -14,58 +17,76 @@ SCHEMA_BUILDER_STORES = [
     dcc.Store(id="schema-builder-edit-index", data=None),
 ]
 
+# Human-readable labels — the only thing that can't be derived from the widget system.
+_FIELD_TYPE_LABELS: dict[str, str] = {
+    "choice": "Choice (single select)",
+    "multi_choice": "Multi-choice",
+    "boolean": "Boolean",
+    "text": "Text",
+    "numeric": "Numeric",
+    "range_slider": "Range slider",
+    "span_annotation": "Span annotation",
+    "hierarchical_label": "Hierarchical label",
+    "divider": "Divider",
+}
+
+_WIDGET_TYPE_LABELS: dict[str, str] = {
+    "segmented_control": "Segmented control",
+    "radio_group": "Radio group",
+    "select": "Select dropdown",
+    "chip_radio": "Chip",
+    "multi_select": "Multi-select dropdown",
+    "checkbox_group": "Checkbox group",
+    "checkbox": "Checkbox",
+    "switch": "Switch",
+    "chip_boolean": "Chip",
+    "text_input": "Text input",
+    "text_area": "Text area",
+    "number_input": "Number input",
+    "slider": "Slider",
+    "range_slider": "Range slider",
+    "span_annotation": "Inline",
+    "span_popup": "Popup",
+    "hierarchical_label_select": "Single select",
+    "hierarchical_label_multi": "Multi-select",
+}
+
+# Derived from WIDGET_CLASS: group widget type strings by field_type.
+# Excludes container/repeater/group widgets (those without a field_type on their class).
+_WIDGET_OPTIONS: dict[str, list[dict]] = defaultdict(list)
+for _wtype, _cls in WIDGET_CLASS.items():
+    _ft = getattr(_cls, "field_type", None)
+    if _ft and _ft in _FIELD_TYPE_LABELS:
+        _WIDGET_OPTIONS[_ft].append({
+            "value": _wtype,
+            "label": _WIDGET_TYPE_LABELS.get(_wtype, _wtype),
+        })
+# Ensure ordering matches DEFAULT_WIDGET (default first), then stable remainder.
+_inverted = {v: k for k, v in WIDGET_CLASS.items()}
+for _ft in _WIDGET_OPTIONS:
+    _default_cls = DEFAULT_WIDGET.get(_ft)
+    _default_wtype = _inverted.get(_default_cls)
+    if _default_wtype:
+        opts = _WIDGET_OPTIONS[_ft]
+        opts.sort(key=lambda o: (0 if o["value"] == _default_wtype else 1, o["label"]))
+_WIDGET_OPTIONS = dict(_WIDGET_OPTIONS)
+# Field types without widget choice (single option or structural)
+for _ft in ("range_slider", "divider"):
+    _WIDGET_OPTIONS.setdefault(_ft, [])
+
+# Derived: field_type → default widget type string.
+_DEFAULT_WIDGET_TYPE: dict[str, str] = {}
+for _ft, _cls in DEFAULT_WIDGET.items():
+    _wtype = _inverted.get(_cls)
+    if _wtype:
+        _DEFAULT_WIDGET_TYPE[_ft] = _wtype
+_DEFAULT_WIDGET_TYPE.setdefault("range_slider", "range_slider")
+
+# Derived: ordered list for the field-type picker, preserving label order.
 _FIELD_TYPES = [
-    {"value": "choice", "label": "Choice (single select)"},
-    {"value": "multi_choice", "label": "Multi-choice"},
-    {"value": "boolean", "label": "Boolean"},
-    {"value": "text", "label": "Text"},
-    {"value": "numeric", "label": "Numeric"},
-    {"value": "range_slider", "label": "Range slider"},
-    {"value": "span_annotation", "label": "Span annotation"},
-    {"value": "hierarchical_label", "label": "Hierarchical label"},
-    {"value": "divider", "label": "Divider"},
+    {"value": ft, "label": label}
+    for ft, label in _FIELD_TYPE_LABELS.items()
 ]
-
-_WIDGET_OPTIONS: dict[str, list[dict]] = {
-    "choice": [
-        {"value": "segmented_control", "label": "Segmented control"},
-        {"value": "radio_group", "label": "Radio group"},
-        {"value": "select", "label": "Select dropdown"},
-        {"value": "chip_radio", "label": "Chip"},
-    ],
-    "multi_choice": [
-        {"value": "multi_select", "label": "Multi-select dropdown"},
-        {"value": "checkbox_group", "label": "Checkbox group"},
-    ],
-    "boolean": [
-        {"value": "checkbox", "label": "Checkbox"},
-        {"value": "switch", "label": "Switch"},
-        {"value": "chip_boolean", "label": "Chip"},
-    ],
-    "text": [
-        {"value": "text_input", "label": "Text input"},
-        {"value": "text_area", "label": "Text area"},
-    ],
-    "numeric": [
-        {"value": "number_input", "label": "Number input"},
-        {"value": "slider", "label": "Slider"},
-    ],
-    "range_slider": [],
-    "span_annotation": [
-        {"value": "span_annotation", "label": "Inline"},
-        {"value": "span_popup", "label": "Popup"},
-    ],
-    "hierarchical_label": [
-        {"value": "hierarchical_label_select", "label": "Single select"},
-        {"value": "hierarchical_label_multi", "label": "Multi-select"},
-    ],
-    "divider": [],
-}
-
-_DEFAULT_WIDGET_TYPE: dict[str, str] = {
-    ft: opts[0]["value"] for ft, opts in _WIDGET_OPTIONS.items() if opts
-}
-_DEFAULT_WIDGET_TYPE["range_slider"] = "range_slider"
 
 _TYPE_COLORS = {
     "choice": "blue",
@@ -140,12 +161,15 @@ def build_schema_builder_modal() -> dmc.Modal:
                 ),
                 id="schema-builder-widget-type-section",
             ),
-            dmc.Checkbox(
-                id="schema-builder-field-required",
-                label="Required",
-                checked=False,
-                mt="sm",
-                mb="sm",
+            html.Div(
+                dmc.Checkbox(
+                    id="schema-builder-field-required",
+                    label="Required",
+                    checked=False,
+                    mt="sm",
+                    mb="sm",
+                ),
+                id="schema-builder-required-section",
             ),
             html.Div(
                 dmc.Textarea(
@@ -207,7 +231,7 @@ def build_schema_builder_modal() -> dmc.Modal:
             dmc.Group(
                 [
                     dmc.Button(
-                        "Add field",
+                        "Save",
                         id="schema-builder-save-btn",
                         leftSection=DashIconify(icon="tabler:check", width=16),
                         size="sm",
@@ -314,10 +338,10 @@ def register_schema_builder_callbacks(app: Dash) -> None:
     )
     def toggle_form_panel(edit_index):
         if edit_index is None:
-            return _HIDE, "Add field", "Add field"
+            return _HIDE, "Add field", "Save"
         if edit_index == -1:
-            return _SHOW, "Add field", "Add field"
-        return _SHOW, "Edit field", "Save changes"
+            return _SHOW, "Add field", "Save"
+        return _SHOW, "Edit field", "Save"
 
     # ---------- Open form (add or edit) ----------
 
@@ -395,6 +419,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         Output("schema-builder-text-section", "style"),
         Output("schema-builder-hl-section", "style"),
         Output("schema-builder-widget-type-section", "style"),
+        Output("schema-builder-required-section", "style"),
         Output("schema-builder-widget-type", "data"),
         Output("schema-builder-widget-type", "value", allow_duplicate=True),
         Output("schema-builder-options", "label"),
@@ -425,6 +450,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
             _SHOW if field_type == "text" else _HIDE,
             _SHOW if field_type == "hierarchical_label" else _HIDE,
             _SHOW if len(opts) > 1 else _HIDE,
+            _HIDE if field_type == "divider" else _SHOW,
             opts,
             wtype_value,
             cfg["label"],
@@ -461,7 +487,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         adding = edit_index == -1
 
         if field_type == "divider":
-            field = {"type": "divider", "label": label}
+            field = {"type": "divider", "widget_type": "divider", "label": label}
             if adding:
                 fields.append(field)
             else:
@@ -677,11 +703,10 @@ def _fields_to_schema(fields: list, title: str) -> dict:
 def _field_row(field: dict, index: int, n: int, is_editing: bool) -> dmc.Paper:
     ftype = field["type"]
     wtype = field.get("widget_type", "")
-    default_wtype = _DEFAULT_WIDGET_TYPE.get(ftype, "")
 
-    badges = [dmc.Badge(ftype, color=_TYPE_COLORS.get(ftype, "gray"), size="xs")]
-    if wtype and wtype != default_wtype:
-        badges.append(dmc.Badge(wtype.replace("_", " "), color="gray", variant="outline", size="xs"))
+    badges = []
+    if wtype:
+        badges.append(dmc.Badge(wtype.replace("_", " "), color=_TYPE_COLORS.get(ftype, "gray"), size="xs"))
 
     preview = None
     if ftype in ("choice", "multi_choice"):
