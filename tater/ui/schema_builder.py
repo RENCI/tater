@@ -161,12 +161,15 @@ def build_schema_builder_modal() -> dmc.Modal:
                 ),
                 id="schema-builder-widget-type-section",
             ),
-            dmc.Checkbox(
-                id="schema-builder-field-required",
-                label="Required",
-                checked=False,
-                mt="sm",
-                mb="sm",
+            html.Div(
+                dmc.Checkbox(
+                    id="schema-builder-field-required",
+                    label="Required",
+                    checked=False,
+                    mt="sm",
+                    mb="sm",
+                ),
+                id="schema-builder-required-section",
             ),
             html.Div(
                 dmc.Textarea(
@@ -416,6 +419,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         Output("schema-builder-text-section", "style"),
         Output("schema-builder-hl-section", "style"),
         Output("schema-builder-widget-type-section", "style"),
+        Output("schema-builder-required-section", "style"),
         Output("schema-builder-widget-type", "data"),
         Output("schema-builder-widget-type", "value", allow_duplicate=True),
         Output("schema-builder-options", "label"),
@@ -446,6 +450,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
             _SHOW if field_type == "text" else _HIDE,
             _SHOW if field_type == "hierarchical_label" else _HIDE,
             _SHOW if len(opts) > 1 else _HIDE,
+            _HIDE if field_type == "divider" else _SHOW,
             opts,
             wtype_value,
             cfg["label"],
@@ -482,7 +487,7 @@ def register_schema_builder_callbacks(app: Dash) -> None:
         adding = edit_index == -1
 
         if field_type == "divider":
-            field = {"type": "divider", "label": label}
+            field = {"type": "divider", "widget_type": "divider", "label": label}
             if adding:
                 fields.append(field)
             else:
@@ -699,9 +704,9 @@ def _field_row(field: dict, index: int, n: int, is_editing: bool) -> dmc.Paper:
     ftype = field["type"]
     wtype = field.get("widget_type", "")
 
-    badges = [dmc.Badge(ftype, color=_TYPE_COLORS.get(ftype, "gray"), size="xs")]
+    badges = []
     if wtype:
-        badges.append(dmc.Badge(wtype.replace("_", " "), color="gray", variant="outline", size="xs"))
+        badges.append(dmc.Badge(wtype.replace("_", " "), color=_TYPE_COLORS.get(ftype, "gray"), size="xs"))
 
     preview = None
     if ftype in ("choice", "multi_choice"):
